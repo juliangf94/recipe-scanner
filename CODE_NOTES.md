@@ -1,0 +1,308 @@
+# RecipeScanner — Explicación del código línea a línea
+
+---
+
+## `backend/app/__init__.py`
+
+Este archivo es el corazón de la aplicación. Al estar en `app/__init__.py`, Python
+lo ejecuta automáticamente cuando se importa el paquete `app`. Contiene la función
+`create_app()` que construye, configura y retorna la instancia de Flask.
+
+**¿Por qué aquí y no en otro archivo?**
+Cuando en `run.py` escribimos `from app import create_app`, Python busca esa función
+en `app/__init__.py`. Es el punto de entrada del paquete.
+
+**Lo que hace `create_app` paso a paso:**
+1. Crea la instancia de Flask
+2. Carga la configuración según el entorno (development, testing, production)
+3. Inicializa extensiones — vacío en esta fase, se completa en Fase 8 con SQLAlchemy
+4. Registra los Blueprints — vacío en esta fase, se completa en Fases 4-6
+5. Retorna la app lista para usarse
+
+```python
+import os
+from flask import Flask
+from config import config
+
+
+def create_app(config_name=None):
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'default')
+
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+
+    # Initialize extensions here (Phase 8 — SQLAlchemy)
+
+    # Register blueprints here (Phases 4-6 — auth, recipes, scan)
+
+    return app
+```
+
+**Explicación línea por línea:**
+
+```python
+import os
+```
+Módulo estándar de Python para leer variables del sistema operativo.
+Lo necesitamos para leer `FLASK_ENV` desde el `.env`.
+
+```python
+from flask import Flask
+```
+Importa la clase `Flask`. Todo empieza acá — sin esto no hay app.
+
+```python
+from config import config
+```
+Importa el diccionario `config` de `config.py`. Ese diccionario mapea strings
+como `'development'` a clases como `DevelopmentConfig`. Sin esta línea no podemos
+cargar la configuración correcta según el entorno.
+
+```python
+def create_app(config_name=None):
+```
+Define la función factory. El parámetro `config_name` tiene valor por defecto `None`
+porque no queremos hardcodear el entorno aquí — lo vamos a leer del `.env`.
+
+```python
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'default')
+```
+Si nadie pasó un `config_name` explícito, intentamos leerlo de la variable de
+entorno `FLASK_ENV`. Si tampoco está definida en el `.env`, usamos `'default'`
+que apunta a `DevelopmentConfig`. Esto permite que `run.py` no tenga el entorno
+hardcodeado — simplemente llama `create_app()` y la función lo resuelve sola.
+
+```python
+    app = Flask(__name__)
+```
+Crea la instancia de Flask. `__name__` es una variable especial de Python que
+contiene el nombre del módulo actual (`app`). Flask lo usa para saber dónde
+buscar templates y archivos estáticos relativos a este paquete.
+
+```python
+    app.config.from_object(config[config_name])
+```
+`config[config_name]` accede al diccionario y obtiene la clase correcta, por
+ejemplo `DevelopmentConfig`. `app.config.from_object()` lee todos los atributos
+de esa clase (SECRET_KEY, JWT_SECRET_KEY, SQLALCHEMY_DATABASE_URI, etc.) y los
+carga en la configuración de Flask. A partir de acá, cualquier parte del código
+puede leer `current_app.config['SECRET_KEY']` y obtener el valor correcto.
+
+```python
+    # Initialize extensions here (Phase 8 — SQLAlchemy)
+```
+Comentario marcador. En la Fase 8 agregaremos aquí `db.init_app(app)` para
+inicializar SQLAlchemy. Por ahora está vacío porque todavía no usamos base de datos.
+
+```python
+    # Register blueprints here (Phases 4-6 — auth, recipes, scan)
+```
+Comentario marcador. En las Fases 4-6 registraremos aquí los Blueprints de Flask
+(auth, recipes, scan). Por ahora está vacío porque todavía no existen esas rutas.
+
+```python
+    return app
+```
+Retorna la instancia de Flask completamente configurada. `run.py` va a recibir
+esta instancia y la va a usar para levantar el servidor.
+
+---
+
+### ¿Qué es `FLASK_ENV`?
+
+`FLASK_ENV` es una variable de entorno que le dice a Flask en qué modo está corriendo.
+Se define en el archivo `.env`:
+
+```
+FLASK_ENV=development
+```
+
+Cuando `create_app()` se ejecuta sin argumentos, lee esa variable y carga la
+configuración correspondiente:
+
+```python
+config_name = os.environ.get('FLASK_ENV', 'default')
+# lee el .env → encuentra 'development' → carga DevelopmentConfig
+```
+
+**Sin `FLASK_ENV` habría que hardcodear el entorno en `run.py`:**
+```python
+app = create_app('development')  # ❌ hardcodeado
+```
+
+**Con `FLASK_ENV` en el `.env`:**
+```python
+app = create_app()  # ✅ lo resuelve solo leyendo el entorno
+```
+
+**La ventaja real aparece en producción:**
+El servidor (Render, Railway) tiene `FLASK_ENV=production` definida como variable
+de entorno del servidor. La app carga `ProductionConfig` automáticamente, sin
+que el código sepa dónde está corriendo.
+
+```
+Desarrollo  → .env tiene FLASK_ENV=development   → carga DevelopmentConfig
+Producción  → servidor tiene FLASK_ENV=production → carga ProductionConfig
+Tests       → test pasa 'testing' explícitamente  → carga TestingConfig
+```
+
+---
+
+## `backend/config.py`
+
+```python
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+```
+
+- `import os` — módulo estándar de Python para leer variables del sistema operativo.
+- `load_dotenv()` — lee el archivo `.env` del proyecto y carga cada variable dentro
+  de `os.environ`. Sin esta línea, `os.environ.get('SECRET_KEY')` devolvería `None`
+  en desarrollo porque la variable no está exportada en el shell.
+
+```python
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'dev-jwt-key-not-for-production')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+```
+
+- `Config` es la clase base. Todo lo que esté acá es compartido por los tres entornos.
+- `SECRET_KEY` — clave usada internamente por Flask para firmar cookies y sesiones.
+- `JWT_SECRET_KEY` — clave separada usada exclusivamente para firmar los tokens JWT.
+  Tener dos claves distintas es más seguro: rotar una no afecta a la otra.
+- Ambas usan `os.environ.get(nombre, fallback)` — en producción deben estar definidas
+  en el servidor; el fallback es solo para desarrollo.
+- `SQLALCHEMY_TRACK_MODIFICATIONS = False` — desactiva una feature de Flask-SQLAlchemy
+  que emite señales cada vez que se modifica un objeto. No la usamos y consume memoria
+  innecesariamente. Flask muestra un warning si no se desactiva explícitamente.
+  Se define solo aquí en la clase base — las subclases lo heredan sin repetirlo.
+
+```python
+class DevelopmentConfig(Config):
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///instance/development.db'
+```
+
+- Hereda todo de `Config` y solo sobreescribe lo que cambia.
+- `DEBUG = True` — activa el modo debug de Flask: recarga automática al guardar
+  archivos y muestra errores detallados en el browser.
+- `instance/development.db` — `instance/` es una carpeta especial de Flask pensada
+  para archivos que no van a Git: bases de datos locales, archivos de configuración
+  con secretos, uploads. Se agrega al `.gitignore` automáticamente.
+
+```python
+class TestingConfig(Config):
+    TESTING = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+```
+
+- `sqlite:///:memory:` — base de datos en RAM. Se crea al iniciar los tests y
+  desaparece al terminar. Cada test arranca con una base limpia.
+
+```python
+class ProductionConfig(Config):
+    DEBUG = False
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+```
+
+- `DEBUG = False` — en producción nunca se muestran errores detallados al usuario
+  (expondrían información interna de la app).
+- `DATABASE_URL` debe estar definida en el servidor de producción (Render, Railway,
+  etc.). Su valor será algo como: `postgresql://usuario:password@host:5432/nombre_db`
+- `JWT_SECRET_KEY` se sobreescribe aquí **sin fallback** — si la variable no está
+  definida en el servidor, vale `None` y la app falla al arrancar. Es deliberado:
+  mejor fallar visiblemente al iniciar que correr en producción con una clave débil.
+
+```python
+config = {
+    'development': DevelopmentConfig,
+    'testing':     TestingConfig,
+    'production':  ProductionConfig,
+    'default':     DevelopmentConfig
+}
+```
+
+- Diccionario que mapea nombres de entorno a clases. Permite que `create_app`
+  reciba un string como `'development'` y cargue la clase correcta sin usar
+  `if/elif`. La clave `'default'` asegura que si no se especifica entorno, siempre
+  se usa `DevelopmentConfig`.
+
+---
+
+## `backend/run.py`
+
+Este archivo es el **punto de entrada** de la aplicación. Es el único archivo que
+ejecutamos directamente con `python run.py`. Su responsabilidad es mínima: crear
+la instancia de la app usando la factory y arrancar el servidor de desarrollo.
+
+**¿Por qué existe run.py y no ponemos esto en app/__init__.py?**
+Separar el punto de entrada de la lógica de construcción de la app permite que
+los tests, el servidor de producción (gunicorn) y el servidor de desarrollo
+usen `create_app()` de maneras distintas sin interferirse entre sí. Gunicorn,
+por ejemplo, importa `app` desde `run.py` directamente sin llamar a `app.run()`.
+
+```python
+from app import create_app
+
+app = create_app()
+
+if __name__ == '__main__':
+    app.run()
+```
+
+**Explicación línea por línea:**
+
+```python
+from app import create_app
+```
+Importa la función factory desde el paquete `app/`. Python ejecuta `app/__init__.py`
+y encuentra `create_app` ahí. Sin este import no podemos construir la app.
+
+```python
+app = create_app()
+```
+Llama a la factory sin argumentos. Internamente, `create_app` lee la variable
+`FLASK_ENV` del `.env` (gracias a `load_dotenv()` en `config.py`) y carga
+`DevelopmentConfig`. El resultado es una instancia de Flask completamente
+configurada con `SECRET_KEY`, `JWT_SECRET_KEY`, `SQLALCHEMY_DATABASE_URI`, etc.
+
+```python
+if __name__ == '__main__':
+```
+Bloque de guarda estándar de Python. `__name__` vale `'__main__'` solo cuando
+el archivo se ejecuta directamente (`python run.py`). Si otro módulo importa
+`run`, este bloque no se ejecuta. Esto permite que gunicorn (servidor de
+producción) importe `app` desde `run.py` sin iniciar el servidor de desarrollo.
+
+```python
+    app.run()
+```
+Inicia el servidor de desarrollo de Flask. Sin argumentos usa los valores por
+defecto: `host='127.0.0.1'` y `port=5000`. El servidor queda escuchando en
+`http://localhost:5000`.
+
+---
+
+### ¿Cómo arrancar el servidor?
+
+Desde la carpeta `backend/` con el entorno virtual activo:
+
+```bash
+python run.py
+```
+
+Flask debería mostrar:
+```
+ * Running on http://127.0.0.1:5000
+ * Debug mode: on
+```
+
+El modo debug está activo porque `DevelopmentConfig` tiene `DEBUG = True`.
+Esto significa que Flask recarga el servidor automáticamente cuando guardas
+cambios en cualquier archivo Python.
