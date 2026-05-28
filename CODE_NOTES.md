@@ -306,3 +306,204 @@ Flask debería mostrar:
 El modo debug está activo porque `DevelopmentConfig` tiene `DEBUG = True`.
 Esto significa que Flask recarga el servidor automáticamente cuando guardas
 cambios en cualquier archivo Python.
+
+---
+
+## Sesión 2 — Modelos (`backend/app/models/`)
+
+Los modelos son **dataclasses de Python puro**, sin SQLAlchemy todavía. Esto nos
+permite definir y probar la lógica de negocio completa antes de introducir una
+base de datos. En la Sesión 8, el swap a SQLAlchemy solo toca la capa de
+persistencia — los modelos no cambian.
+
+**Nota — actualización tras revisar los mockups del diseño:**
+Los campos de cada modelo se ajustaron para coincidir exactamente con la UI
+diseñada (formulario de registro, pantalla de detalle de receta, dashboard,
+pantalla de escaneo). Ver imágenes de referencia del proyecto.
+
+**¿Por qué dataclasses y no clases normales?**
+`@dataclass` genera automáticamente `__init__`, `__repr__` y `__eq__` basándose
+en los campos declarados. Escribir menos código repetitivo y el comportamiento
+es predecible y testeable.
+
+**¿Por qué UUID como id?**
+UUID (Universally Unique Identifier) genera un string único garantizado sin
+necesitar una base de datos. En memoria, dos objetos creados al mismo tiempo
+nunca tendrán el mismo id. Cuando pasemos a SQLAlchemy, el id seguirá siendo
+un string UUID — no hay que cambiar nada en los modelos.
+
+**Patrón de campos:**
+- Los campos **sin default** van primero (son obligatorios al crear el objeto).
+- Los campos **con default simple** van después (`category`, `status`, etc.).
+- El campo `id` va al final con `default_factory` — se genera solo si no se
+  pasa uno explícito. Esto permite recrear objetos desde la base de datos
+  pasando el id existente.
+
+---
+
+### `backend/app/models/user.py`
+
+```python
+from dataclasses import dataclass, field
+import uuid
+
+
+@dataclass
+class User:
+    first_name: str
+    last_name: str
+    email: str
+    password_hash: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+**Campos:**
+
+- `first_name` / `last_name` — separados porque el formulario de registro los
+  pide por separado y el dashboard los muestra combinados ("JULIAN GONZALEZ",
+  iniciales "JG").
+- `email` — identificador único de login.
+- `password_hash` — hash de bcrypt. Nunca la contraseña en texto plano.
+- `id` — UUID generado automáticamente.
+
+---
+
+### `backend/app/models/recipe.py`
+
+```python
+from dataclasses import dataclass, field
+import uuid
+
+
+@dataclass
+class Recipe:
+    title: str
+    user_id: str
+    description: str = ''
+    servings: int = 0
+    prep_time_min: int = 0
+    category: str = ''
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+**Campos:**
+
+- `title` — nombre de la receta. Obligatorio.
+- `user_id` — UUID del usuario propietario. FK → User en SQLAlchemy (Sesión 8).
+- `description` — descripción opcional. Default vacío porque Groq puede no
+  extraerla del PDF.
+- `servings` — número de porciones. Mostrado en el detalle de receta.
+- `prep_time_min` — tiempo de preparación en minutos. Mostrado en el detalle.
+- `category` — categoría de la receta (`'Pasta'`, `'Meat'`, `'Dessert'`, etc.).
+  Usada para los filtros del dashboard.
+- `id` — UUID generado automáticamente.
+
+---
+
+### `backend/app/models/ingredient.py`
+
+```python
+from dataclasses import dataclass, field
+import uuid
+
+
+@dataclass
+class Ingredient:
+    name: str
+    quantity: str
+    unit: str
+    recipe_id: str
+    off_product_id: str = ''
+    estimated_cost: float = 0.0
+    cost_is_manual: bool = False
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+**Campos:**
+
+- `name` — nombre del ingrediente.
+- `quantity` — cantidad como string. Se mantiene `str` (no `float`) porque Groq
+  puede devolver valores como `"al gusto"` o `"una pizca"` que no se pueden
+  convertir a número sin romper el flujo.
+- `unit` — unidad de medida: `"g"`, `"ml"`, `"unit"`, `"tbsp"`, etc.
+- `recipe_id` — UUID de la receta a la que pertenece.
+- `off_product_id` — ID del producto en Open Food Facts. Vacío hasta que se
+  consulte la API. Permite evitar consultas repetidas al mismo ingrediente.
+- `estimated_cost` — precio estimado en euros, obtenido de Open Food Facts.
+  Default `0.0`. Si `cost_is_manual` es True, este valor fue editado por el
+  usuario y no se sobreescribe en futuras consultas a la API.
+- `cost_is_manual` — flag que indica si el precio fue editado manualmente.
+  La UI muestra "Prices fetched from Open Food Facts — tap to edit". Cuando el
+  usuario edita el precio, este flag se activa y la API externa deja de
+  sobreescribirlo.
+- `id` — UUID generado automáticamente.
+
+---
+
+### `backend/app/models/step.py`
+
+```python
+from dataclasses import dataclass, field
+import uuid
+
+
+@dataclass
+class Step:
+    order: int
+    description: str
+    recipe_id: str
+    duration_min: int = 0
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+**Campos:**
+
+- `order` — posición del paso (1, 2, 3...). `int` porque los pasos se ordenan
+  numéricamente para mostrarlos en secuencia.
+- `description` — texto del paso.
+- `recipe_id` — UUID de la receta a la que pertenece.
+- `duration_min` — duración estimada en minutos. Mostrada como badge en la UI
+  ("30 min", "10 min"). Default `0` cuando Groq no extrae la duración.
+- `id` — UUID generado automáticamente.
+
+---
+
+### `backend/app/models/pdf_scan.py`
+
+```python
+from dataclasses import dataclass, field
+import uuid
+
+
+@dataclass
+class PdfScan:
+    filename: str
+    recipe_id: str
+    status: str = 'pending'
+    scanned_at: str = ''
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+**Campos:**
+
+- `filename` — nombre original del archivo PDF subido.
+- `recipe_id` — UUID de la receta generada a partir de este escaneo.
+- `status` — estado del procesamiento: `'pending'`, `'processing'`, `'done'`,
+  `'error'`. Default `'pending'` porque al crear el objeto el PDF todavía no
+  fue procesado.
+- `scanned_at` — timestamp de cuándo se completó el escaneo. Se guarda como
+  string ISO (`'2025-05-10T14:30:00'`) para evitar depender de `datetime` en
+  la fase de memoria. En SQLAlchemy (Sesión 8) se convertirá a `DateTime`.
+- `id` — UUID generado automáticamente.
+
+---
+
+### Resumen de campos por modelo
+
+| Modelo | Campos obligatorios | Campos con default |
+|---|---|---|
+| `User` | `first_name`, `last_name`, `email`, `password_hash` | `id` (UUID) |
+| `Recipe` | `title`, `user_id` | `description=''`, `servings=0`, `prep_time_min=0`, `category=''`, `id` (UUID) |
+| `Ingredient` | `name`, `quantity`, `unit`, `recipe_id` | `off_product_id=''`, `estimated_cost=0.0`, `cost_is_manual=False`, `id` (UUID) |
+| `Step` | `order`, `description`, `recipe_id` | `duration_min=0`, `id` (UUID) |
+| `PdfScan` | `filename`, `recipe_id` | `status='pending'`, `scanned_at=''`, `id` (UUID) |

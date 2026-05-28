@@ -94,6 +94,8 @@ flowchart TD
 classDiagram
     class User {
         +String id
+        +String first_name
+        +String last_name
         +String email
         +String password_hash
     }
@@ -102,6 +104,10 @@ classDiagram
         +String id
         +String user_id
         +String title
+        +String description
+        +int servings
+        +int prep_time_min
+        +String category
     }
 
     class Ingredient {
@@ -110,6 +116,9 @@ classDiagram
         +String name
         +String quantity
         +String unit
+        +String off_product_id
+        +float estimated_cost
+        +bool cost_is_manual
     }
 
     class Step {
@@ -117,6 +126,7 @@ classDiagram
         +String recipe_id
         +int order
         +String description
+        +int duration_min
     }
 
     class PdfScan {
@@ -124,6 +134,7 @@ classDiagram
         +String recipe_id
         +String filename
         +String status
+        +String scanned_at
     }
 
     class BaseRepository {
