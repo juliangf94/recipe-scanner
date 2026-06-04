@@ -1,7 +1,7 @@
 # RecipeScanner — Sprint Plan
 
 Holberton School — RNCP 5 DWWM Portfolio Project
-Solo project — Julian Garcia
+Solo project — Julian Gonzalez
 
 ---
 
@@ -9,10 +9,10 @@ Solo project — Julian Garcia
 
 | Role | Assigned to |
 |---|---|
-| Project Manager (PM) | Julian Garcia |
-| Source Control Manager (SCM) | Julian Garcia |
-| Quality Assurance (QA) | Julian Garcia |
-| Developer | Julian Garcia |
+| Project Manager (PM) | Julian Gonzalez |
+| Source Control Manager (SCM) | Julian Gonzalez |
+| Quality Assurance (QA) | Julian Gonzalez |
+| Developer | Julian Gonzalez |
 
 ---
 
