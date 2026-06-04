@@ -525,14 +525,19 @@ class Ingredient:
 **Campos:**
 
 - `name` — nombre del ingrediente.
-- `quantity` — cantidad como string. Se mantiene `str` (no `float`) porque Groq puede devolver valores como `"al gusto"` o `"una pizca"` que no se pueden convertir a número sin romper el flujo.
+- `quantity` — cantidad como string. 
+  + Se mantiene `str` (no `float`) porque Groq puede devolver valores como `"al gusto"` o `"una pizca"` que no se pueden convertir a número sin romper el flujo.
 - `unit` — unidad de medida: `"g"`, `"ml"`, `"unit"`, `"tbsp"`, etc.
 - `recipe_id` — UUID de la receta a la que pertenece.
-- `off_product_id` — ID del producto en Open Food Facts. Vacío hasta que se consulte la API. Permite evitar consultas repetidas al mismo ingrediente.
+- `off_product_id` — ID del producto en Open Food Facts. 
+  + Vacío hasta que se consulte la API. 
+  + Permite evitar consultas repetidas al mismo ingrediente.
 - `estimated_cost` — precio estimado en euros, obtenido de Open Food Facts.
-  Default `0.0`. Si `cost_is_manual` es True, este valor fue editado por el usuario y no se sobreescribe en futuras consultas a la API.
+  + Default `0.0`. 
+  + Si `cost_is_manual` es True, este valor fue editado por el usuario y no se sobreescribe en futuras consultas a la API.
 - `cost_is_manual` — flag que indica si el precio fue editado manualmente.
-  La UI muestra "Prices fetched from Open Food Facts — tap to edit". Cuando el usuario edita el precio, este flag se activa y la API externa deja de sobreescribirlo.
+  + La UI muestra "Prices fetched from Open Food Facts — tap to edit". 
+  + Cuando el usuario edita el precio, este flag se activa y la API externa deja de sobreescribirlo.
 - `id` — UUID generado automáticamente.
 
 ---
@@ -602,3 +607,221 @@ class PdfScan:
 | `Ingredient` | `name`, `quantity`, `unit`, `recipe_id` | `off_product_id=''`, `estimated_cost=0.0`, `cost_is_manual=False`, `id` (UUID) |
 | `Step` | `order_num`, `description`, `recipe_id` | `duration_min=0`, `id` (UUID) |
 | `PdfScan` | `filename`, `recipe_id` | `status='pending'`, `scanned_at=''`, `id` (UUID) |
+
+---
+
+## Sesión 3 — Repository Pattern (`backend/app/persistence/`)
+
+### ¿Qué es el Repository Pattern?
+
+El **Repository Pattern** es un patrón de diseño que separa la lógica de negocio
+del acceso a datos. En lugar de que la Facade llame directamente a la base de
+datos, llama a un repositorio que se encarga de guardar y recuperar objetos.
+
+**Ventaja clave — intercambiabilidad:**
+La Facade no sabe si los datos están en RAM, en SQLite o en PostgreSQL. Solo
+conoce la interfaz del repositorio (`get_all`, `save`, `delete`...). Esto
+permite que en la Sesión 8 cambiemos `InMemoryStorage` por `DbStorage` sin
+tocar una sola línea de la Facade ni de la API.
+
+```
+Sesión 3-7:  Facade → InMemoryStorage (RAM)
+Sesión 8:    Facade → DbStorage (SQLAlchemy)  ← solo cambia esta línea
+```
+
+**¿Qué es una ABC (Abstract Base Class)?**
+Una ABC es una clase que define una interfaz — declara qué métodos deben existir
+sin implementarlos. Cualquier clase que herede de ella está obligada a
+implementar esos métodos. Si no lo hace, Python lanza un error al instanciarla.
+
+Es el equivalente a un contrato: `InMemoryStorage` y `DbStorage` firman ese
+contrato cuando heredan de `BaseRepository`.
+
+---
+
+### `backend/app/persistence/repository.py`
+
+```python
+from abc import ABC, abstractmethod
+
+
+class BaseRepository(ABC):
+
+    @abstractmethod
+    def get_all(self):
+        pass
+
+    @abstractmethod
+    def get_by_id(self, obj_id):
+        pass
+
+    @abstractmethod
+    def save(self, obj):
+        pass
+
+    @abstractmethod
+    def update(self, obj):
+        pass
+
+    @abstractmethod
+    def delete(self, obj_id):
+        pass
+```
+
+**Explicación línea por línea:**
+
+```python
+from abc import ABC, abstractmethod
+```
+Importa dos cosas del módulo `abc` (Abstract Base Classes) de Python estándar:
+- `ABC` — clase base que convierte nuestra clase en abstracta.
+- `abstractmethod` — decorador que marca un método como obligatorio para las
+  subclases. Si una subclase no implementa un método marcado con este decorador,
+  Python lanza `TypeError` al intentar instanciarla.
+
+```python
+class BaseRepository(ABC):
+```
+Hereda de `ABC`. Esto convierte `BaseRepository` en una clase abstracta — no
+se puede instanciar directamente (`BaseRepository()` daría error). Solo sirve
+como contrato para las implementaciones concretas.
+
+```python
+    @abstractmethod
+    def get_all(self):
+        pass
+```
+Declara que toda implementación concreta debe tener un método `get_all` que
+retorne todos los objetos almacenados. `pass` indica que esta clase no
+proporciona implementación — eso es responsabilidad de `InMemoryStorage` y
+`DbStorage`.
+
+Los 5 métodos abstractos son:
+- `get_all()` — retorna todos los objetos
+- `get_by_id(obj_id)` — retorna un objeto por su UUID, o `None` si no existe
+- `save(obj)` — guarda un objeto nuevo, retorna el objeto guardado
+- `update(obj)` — sobreescribe un objeto existente, retorna el objeto actualizado
+- `delete(obj_id)` — elimina un objeto por su UUID
+
+---
+
+### `backend/app/persistence/memory_storage.py`
+
+```python
+from app.persistence.repository import BaseRepository
+
+
+class InMemoryStorage(BaseRepository):
+
+    def __init__(self):
+        self._storage = {}
+
+    def get_all(self):
+        return list(self._storage.values())
+
+    def get_by_id(self, obj_id):
+        return self._storage.get(obj_id)
+
+    def save(self, obj):
+        self._storage[obj.id] = obj
+        return obj
+
+    def update(self, obj):
+        self._storage[obj.id] = obj
+        return obj
+
+    def delete(self, obj_id):
+        self._storage.pop(obj_id, None)
+```
+
+**Explicación línea por línea:**
+
+```python
+from app.persistence.repository import BaseRepository
+```
+Importa la clase abstracta. `InMemoryStorage` la heredará e implementará sus
+5 métodos obligatorios.
+
+```python
+class InMemoryStorage(BaseRepository):
+```
+Hereda de `BaseRepository`. Al no ser abstracta, puede instanciarse. Python
+verificará que los 5 métodos abstractos estén implementados.
+
+```python
+    def __init__(self):
+        self._storage = {}
+```
+El constructor inicializa el almacenamiento: un diccionario vacío. El `_`
+(guión bajo) es una convención de Python que indica que es un atributo privado
+— no debería accederse desde fuera de la clase directamente.
+
+La estructura del diccionario es `{ uuid: objeto }`. Ejemplo:
+```python
+{
+  'a3f1c2d4-...': User(first_name='Julian', ...),
+  'b7e2f3a1-...': User(first_name='Maria', ...)
+}
+```
+
+```python
+    def get_all(self):
+        return list(self._storage.values())
+```
+`self._storage.values()` retorna todos los objetos del diccionario.
+`list()` los convierte en una lista porque `dict.values()` es una vista, no
+una lista, y el código que llama a este método esperará poder iterar con índices.
+
+```python
+    def get_by_id(self, obj_id):
+        return self._storage.get(obj_id)
+```
+`dict.get(key)` retorna el valor si la clave existe, o `None` si no existe.
+Más seguro que `self._storage[obj_id]` que lanzaría `KeyError` si no encuentra
+el id.
+
+```python
+    def save(self, obj):
+        self._storage[obj.id] = obj
+        return obj
+```
+Guarda el objeto usando su `id` como clave. Si ya existía un objeto con ese
+id, lo sobreescribe (pero eso no debería pasar en `save` — para eso está
+`update`). Retorna el objeto para que el código que llama pueda encadenar
+operaciones.
+
+```python
+    def update(self, obj):
+        self._storage[obj.id] = obj
+        return obj
+```
+Idéntico a `save` en la implementación en memoria — sobreescribe el objeto
+existente. La distinción entre `save` y `update` es semántica y se vuelve
+importante en `DbStorage` donde `save` hace `INSERT` y `update` hace `UPDATE`.
+
+```python
+    def delete(self, obj_id):
+        self._storage.pop(obj_id, None)
+```
+`dict.pop(key, default)` elimina la clave si existe y retorna su valor.
+El segundo argumento `None` evita que lance `KeyError` si el id no existe
+— simplemente no hace nada en ese caso.
+
+---
+
+### ¿Por qué una instancia por entidad?
+
+La Facade tendrá una instancia de `InMemoryStorage` **por cada tipo de objeto**:
+
+```python
+self._users      = InMemoryStorage()
+self._recipes    = InMemoryStorage()
+self._ingredients = InMemoryStorage()
+self._steps      = InMemoryStorage()
+self._pdf_scans  = InMemoryStorage()
+```
+
+Cada instancia tiene su propio `_storage` dict independiente. Esto espeja
+exactamente la estructura de la base de datos: una tabla por entidad.
+En la Sesión 8, cada instancia de `InMemoryStorage` se reemplaza por una
+instancia de `DbStorage` que apunta a su tabla correspondiente.
