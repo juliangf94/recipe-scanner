@@ -127,20 +127,19 @@ gitGraph
 
 | Sesión | Rama | Archivos | Objetivo |
 |---|---|---|---|
-| 1 | `feature/setup` | `app/__init__.py`, `run.py`, `.env`, `.gitignore`, `requirements.txt` | Flask corriendo en localhost:5000 |
-| 2 | `feature/models` | `models/user.py`, `recipe.py`, `ingredient.py`, `step.py`, `pdf_scan.py` | 5 dataclasses definidas |
-| 3 | `feature/repository` | `persistence/repository.py`, `memory_storage.py` | CRUD en memoria funcionando |
-| 4 | `feature/auth` | `utils/security.py`, `utils/jwt_helper.py`, `api/v1/auth.py` | Register + Login con JWT |
-| 5 | `feature/facade` | `services/facade.py`, `api/v1/recipes.py`, `api/v1/ingredients.py` | CRUD recetas validado |
-| 6 | `feature/scan` | `api/v1/scan.py` + Groq en facade | PDF → receta extraída |
-| 7 | `feature/off` | Open Food Facts en facade | Precios de ingredientes |
-| 8 | `feature/db` | `persistence/db_storage.py`, `config.py` actualizado | Swap a SQLAlchemy — backend completo |
-| 9 | `feature/frontend` | A decidir según tiempo disponible | Ver nota abajo |
+| 1 | `develop` | `app/__init__.py`, `run.py`, `.env`, `.gitignore`, `requirements.txt` | Flask corriendo en localhost:5000 |
+| 2 | `develop` | `models/user.py`, `recipe.py`, `ingredient.py`, `step.py`, `pdf_scan.py` | 5 dataclasses definidas |
+| 3 | `develop` | `persistence/repository.py`, `memory_storage.py` | CRUD en memoria funcionando |
+| 4 | `develop` | `utils/security.py`, `utils/jwt_helper.py`, `api/v1/auth.py` | Register + Login con JWT |
+| 5 | `develop` | `services/facade.py`, `api/v1/recipes.py`, `api/v1/ingredients.py` | CRUD recetas validado |
+| 6 | `develop` | `api/v1/scan.py` + Groq en facade | PDF → receta extraída |
+| 7 | `develop` | Open Food Facts en facade | Precios de ingredientes |
+| 8 | `feature/sqlalchemy` | `persistence/db_storage.py`, `config.py` actualizado | Swap a SQLAlchemy — backend completo |
+| 9 | `develop` | `templates/`, `static/` | Jinja2 — UI server-side integrada en Flask |
 
 > **Nota — Sesión 9 (Frontend):**
-> La decisión del frontend se toma al llegar a la Sesión 8.
-> Como el backend devuelve JSON puro en todos sus endpoints,
-> cualquier opción se puede conectar sin modificar una sola línea del backend.
+> Decisión tomada: **Jinja2 + HTML/CSS/JS**.
+> Un solo servidor, sin build process separado, sin CORS, sin deploy adicional.
 >
 > | Tiempo disponible | Opción | Motivo |
 > |---|---|---|
