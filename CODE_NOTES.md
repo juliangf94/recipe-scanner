@@ -6,10 +6,15 @@
 
 ### ¿Qué es Flask y por qué lo usamos?
 
-Flask es un **microframework web para Python**. "Micro" no significa que sea
-limitado — significa que el núcleo es mínimo y deliberadamente simple. Flask
-solo incluye lo esencial: un servidor HTTP, un sistema de rutas y un motor de
-templates (Jinja2). Todo lo demás (base de datos, autenticación, validación)
+Flask es un **microframework web para Python**
+("Micro" no significa que sea limitado — significa que el núcleo es mínimo y deliberadamente simple).  
+Flask solo incluye lo esencial: 
+
+- Un servidor HTTP, 
+- Un sistema de rutas 
+- Un motor de templates (Jinja2)
+
+Todo lo demás (base de datos, autenticación, validación)
 se agrega según las necesidades del proyecto.
 
 **¿Por qué Flask y no Django o FastAPI?**
@@ -86,51 +91,50 @@ cargar la configuración correcta según el entorno.
 ```python
 def create_app(config_name=None):
 ```
-Define la función factory. El parámetro `config_name` tiene valor por defecto `None`
+Define la función factory. 
+El parámetro `config_name` tiene valor por defecto `None`
 porque no queremos hardcodear el entorno aquí — lo vamos a leer del `.env`.
 
 ```python
     if config_name is None:
         config_name = os.environ.get('FLASK_ENV', 'default')
 ```
-Si nadie pasó un `config_name` explícito, intentamos leerlo de la variable de
-entorno `FLASK_ENV`. Si tampoco está definida en el `.env`, usamos `'default'`
-que apunta a `DevelopmentConfig`. Esto permite que `run.py` no tenga el entorno
-hardcodeado — simplemente llama `create_app()` y la función lo resuelve sola.
+Si nadie pasó un `config_name` explícito, intentamos leerlo de la variable de entorno `FLASK_ENV`. 
+Si tampoco está definida en el `.env`, usamos `'default'` que apunta a `DevelopmentConfig`. 
+Esto permite que `run.py` no tenga el entorno hardcodeado — implemente llama `create_app()` y la función lo resuelve sola.
 
 ```python
     app = Flask(__name__)
 ```
-Crea la instancia de Flask. `__name__` es una variable especial de Python que
-contiene el nombre del módulo actual (`app`). Flask lo usa para saber dónde
-buscar templates y archivos estáticos relativos a este paquete.
+Crea la instancia de Flask. `__name__` es una variable especial de Python que contiene el nombre del módulo actual (`app`). 
+Flask lo usa para saber dónde buscar templates y archivos estáticos relativos a este paquete.
 
 ```python
     app.config.from_object(config[config_name])
 ```
-`config[config_name]` accede al diccionario y obtiene la clase correcta, por
-ejemplo `DevelopmentConfig`. `app.config.from_object()` lee todos los atributos
-de esa clase (SECRET_KEY, JWT_SECRET_KEY, SQLALCHEMY_DATABASE_URI, etc.) y los
-carga en la configuración de Flask. A partir de acá, cualquier parte del código
-puede leer `current_app.config['SECRET_KEY']` y obtener el valor correcto.
+- `config[config_name]` accede al diccionario y obtiene la clase correcta, por ejemplo `DevelopmentConfig`. 
+- `app.config.from_object()` lee todos los atributos de esa clase (SECRET_KEY, JWT_SECRET_KEY, SQLALCHEMY_DATABASE_URI, etc.) y los carga en la configuración de Flask. 
+- A partir de acá, cualquier parte del código puede leer `current_app.config['SECRET_KEY']` y obtener el valor correcto.
 
 ```python
     # Initialize extensions here (Phase 8 — SQLAlchemy)
 ```
-Comentario marcador. En la Fase 8 agregaremos aquí `db.init_app(app)` para
-inicializar SQLAlchemy. Por ahora está vacío porque todavía no usamos base de datos.
+**Comentario marcador**:
+En la Fase 8 agregaremos aquí `db.init_app(app)` para inicializar SQLAlchemy. 
+Por ahora está vacío porque todavía no usamos base de datos.
 
 ```python
     # Register blueprints here (Phases 4-6 — auth, recipes, scan)
 ```
-Comentario marcador. En las Fases 4-6 registraremos aquí los Blueprints de Flask
-(auth, recipes, scan). Por ahora está vacío porque todavía no existen esas rutas.
+**Comentario marcador** 
+En las Fases 4-6 registraremos aquí los Blueprints de Flask (auth, recipes, scan). 
+Por ahora está vacío porque todavía no existen esas rutas.
 
 ```python
     return app
 ```
-Retorna la instancia de Flask completamente configurada. `run.py` va a recibir
-esta instancia y la va a usar para levantar el servidor.
+Retorna la instancia de Flask completamente configurada. 
+`run.py` va a recibir esta instancia y la va a usar para levantar el servidor.
 
 ---
 
@@ -143,8 +147,7 @@ Se define en el archivo `.env`:
 FLASK_ENV=development
 ```
 
-Cuando `create_app()` se ejecuta sin argumentos, lee esa variable y carga la
-configuración correspondiente:
+Cuando `create_app()` se ejecuta sin argumentos, lee esa variable y carga la configuración correspondiente:
 
 ```python
 config_name = os.environ.get('FLASK_ENV', 'default')
@@ -162,9 +165,8 @@ app = create_app()  # ✅ lo resuelve solo leyendo el entorno
 ```
 
 **La ventaja real aparece en producción:**
-El servidor (Render, Railway) tiene `FLASK_ENV=production` definida como variable
-de entorno del servidor. La app carga `ProductionConfig` automáticamente, sin
-que el código sepa dónde está corriendo.
+El servidor (Render, Railway) tiene `FLASK_ENV=production` definida como variable de entorno del servidor. 
+La app carga `ProductionConfig` automáticamente, sin que el código sepa dónde está corriendo.
 
 ```
 Desarrollo  → .env tiene FLASK_ENV=development   → carga DevelopmentConfig
@@ -184,9 +186,8 @@ load_dotenv()
 ```
 
 - `import os` — módulo estándar de Python para leer variables del sistema operativo.
-- `load_dotenv()` — lee el archivo `.env` del proyecto y carga cada variable dentro
-  de `os.environ`. Sin esta línea, `os.environ.get('SECRET_KEY')` devolvería `None`
-  en desarrollo porque la variable no está exportada en el shell.
+- `load_dotenv()` — lee el archivo `.env` del proyecto y carga cada variable dentro de `os.environ`. 
+  + Sin esta línea, `os.environ.get('SECRET_KEY')` devolvería `None` en desarrollo porque la variable no está exportada en el shell.
 
 ```python
 class Config:
@@ -198,13 +199,13 @@ class Config:
 - `Config` es la clase base. Todo lo que esté acá es compartido por los tres entornos.
 - `SECRET_KEY` — clave usada internamente por Flask para firmar cookies y sesiones.
 - `JWT_SECRET_KEY` — clave separada usada exclusivamente para firmar los tokens JWT.
-  Tener dos claves distintas es más seguro: rotar una no afecta a la otra.
+  + Tener dos claves distintas es más seguro: rotar una no afecta a la otra.
 - Ambas usan `os.environ.get(nombre, fallback)` — en producción deben estar definidas
   en el servidor; el fallback es solo para desarrollo.
-- `SQLALCHEMY_TRACK_MODIFICATIONS = False` — desactiva una feature de Flask-SQLAlchemy
-  que emite señales cada vez que se modifica un objeto. No la usamos y consume memoria
-  innecesariamente. Flask muestra un warning si no se desactiva explícitamente.
-  Se define solo aquí en la clase base — las subclases lo heredan sin repetirlo.
+- `SQLALCHEMY_TRACK_MODIFICATIONS = False` — desactiva una feature de Flask-SQLAlchemy que emite señales cada vez que se modifica un objeto. 
+  + No la usamos y consume memoria innecesariamente. 
+  + Flask muestra un warning si no se desactiva explícitamente.
+  + Se define solo aquí en la clase base — las subclases lo heredan sin repetirlo.
 
 ```python
 class DevelopmentConfig(Config):
@@ -213,11 +214,12 @@ class DevelopmentConfig(Config):
 ```
 
 - Hereda todo de `Config` y solo sobreescribe lo que cambia.
-- `DEBUG = True` — activa el modo debug de Flask: recarga automática al guardar
-  archivos y muestra errores detallados en el browser.
-- `instance/development.db` — `instance/` es una carpeta especial de Flask pensada
-  para archivos que no van a Git: bases de datos locales, archivos de configuración
-  con secretos, uploads. Se agrega al `.gitignore` automáticamente.
+- `DEBUG = True` — activa el modo debug de Flask: recarga automática al guardar   archivos y muestra errores detallados en el browser.
+- `instance/development.db` — `instance/` es una carpeta especial de Flask pensada  para archivos que no van a Git: 
+  + bases de datos locales, 
+  + archivos de configuración con secretos, 
+  + uploads. 
+  + Se agrega al `.gitignore` automáticamente.
 
 ```python
 class TestingConfig(Config):
@@ -225,8 +227,9 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
 ```
 
-- `sqlite:///:memory:` — base de datos en RAM. Se crea al iniciar los tests y
-  desaparece al terminar. Cada test arranca con una base limpia.
+- `sqlite:///:memory:` — base de datos en RAM. 
+  + Se crea al iniciar los tests y desaparece al terminar. 
+  + Cada test arranca con una base limpia.
 
 ```python
 class ProductionConfig(Config):
@@ -235,13 +238,11 @@ class ProductionConfig(Config):
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 ```
 
-- `DEBUG = False` — en producción nunca se muestran errores detallados al usuario
-  (expondrían información interna de la app).
-- `DATABASE_URL` debe estar definida en el servidor de producción (Render, Railway,
-  etc.). Su valor será algo como: `postgresql://usuario:password@host:5432/nombre_db`
-- `JWT_SECRET_KEY` se sobreescribe aquí **sin fallback** — si la variable no está
-  definida en el servidor, vale `None` y la app falla al arrancar. Es deliberado:
-  mejor fallar visiblemente al iniciar que correr en producción con una clave débil.
+- `DEBUG = False` — en producción nunca se muestran errores detallados al usuario  (expondrían información interna de la app).
+- `DATABASE_URL` debe estar definida en el servidor de producción (Render, Railway, etc.). 
+  + Su valor será algo como: `postgresql://usuario:password@host:5432/nombre_db`
+- `JWT_SECRET_KEY` se sobreescribe aquí **sin fallback** — si la variable no está  definida en el servidor, vale `None` y la app falla al arrancar. 
+    + Es deliberado: mejor fallar visiblemente al iniciar que correr en producción con una clave débil.
 
 ```python
 config = {
@@ -252,24 +253,20 @@ config = {
 }
 ```
 
-- Diccionario que mapea nombres de entorno a clases. Permite que `create_app`
-  reciba un string como `'development'` y cargue la clase correcta sin usar
-  `if/elif`. La clave `'default'` asegura que si no se especifica entorno, siempre
-  se usa `DevelopmentConfig`.
+- Diccionario que mapea nombres de entorno a clases. Permite que `create_app`   reciba un string como `'development'` y cargue la clase correcta sin usar `if/elif`. 
+La clave `'default'` asegura que si no se especifica entorno, siempre se usa `DevelopmentConfig`.
 
 ---
 
 ## `backend/run.py`
 
-Este archivo es el **punto de entrada** de la aplicación. Es el único archivo que
-ejecutamos directamente con `python run.py`. Su responsabilidad es mínima: crear
-la instancia de la app usando la factory y arrancar el servidor de desarrollo.
+Este archivo es el **punto de entrada** de la aplicación. 
+Es el único archivo que ejecutamos directamente con `python run.py`. 
+Su responsabilidad es mínima: crear la instancia de la app usando la factory y arrancar el servidor de desarrollo.
 
 **¿Por qué existe run.py y no ponemos esto en app/__init__.py?**
-Separar el punto de entrada de la lógica de construcción de la app permite que
-los tests, el servidor de producción (gunicorn) y el servidor de desarrollo
-usen `create_app()` de maneras distintas sin interferirse entre sí. Gunicorn,
-por ejemplo, importa `app` desde `run.py` directamente sin llamar a `app.run()`.
+Separar el punto de entrada de la lógica de construcción de la app permite que los  **tests**, el servidor de producción (**gunicorn**) y el **servidor de desarrollo** usen `create_app()` de maneras distintas sin interferirse entre sí. 
+Gunicorn, por ejemplo, importa `app` desde `run.py` directamente sin llamar a `app.run()`.
 
 ```python
 from app import create_app
@@ -285,31 +282,31 @@ if __name__ == '__main__':
 ```python
 from app import create_app
 ```
-Importa la función factory desde el paquete `app/`. Python ejecuta `app/__init__.py`
-y encuentra `create_app` ahí. Sin este import no podemos construir la app.
+Importa la función factory desde el paquete `app/`. 
+Python ejecuta `app/__init__.py` y encuentra `create_app` ahí. 
+Sin este import no podemos construir la app.
 
 ```python
 app = create_app()
 ```
-Llama a la factory sin argumentos. Internamente, `create_app` lee la variable
-`FLASK_ENV` del `.env` (gracias a `load_dotenv()` en `config.py`) y carga
-`DevelopmentConfig`. El resultado es una instancia de Flask completamente
-configurada con `SECRET_KEY`, `JWT_SECRET_KEY`, `SQLALCHEMY_DATABASE_URI`, etc.
+Llama a la factory sin argumentos. 
+Internamente, `create_app` lee la variable `FLASK_ENV` del `.env` (gracias a `load_dotenv()` en `config.py`) y carga `DevelopmentConfig`. 
+El resultado es una instancia de Flask completamente configurada con `SECRET_KEY`, `JWT_SECRET_KEY`, `SQLALCHEMY_DATABASE_URI`, etc.
 
 ```python
 if __name__ == '__main__':
 ```
-Bloque de guarda estándar de Python. `__name__` vale `'__main__'` solo cuando
-el archivo se ejecuta directamente (`python run.py`). Si otro módulo importa
-`run`, este bloque no se ejecuta. Esto permite que gunicorn (servidor de
-producción) importe `app` desde `run.py` sin iniciar el servidor de desarrollo.
+Bloque de guarda estándar de Python. 
+`__name__` vale `'__main__'` solo cuando el archivo se ejecuta directamente (`python run.py`). 
+Si otro módulo importa `run`, este bloque no se ejecuta. 
+Esto permite que gunicorn (servidor de producción) importe `app` desde `run.py` sin iniciar el servidor de desarrollo.
 
 ```python
     app.run()
 ```
-Inicia el servidor de desarrollo de Flask. Sin argumentos usa los valores por
-defecto: `host='127.0.0.1'` y `port=5000`. El servidor queda escuchando en
-`http://localhost:5000`.
+Inicia el servidor de desarrollo de Flask. 
+Sin argumentos usa los valores por defecto: `host='127.0.0.1'` y `port=5000`. 
+El servidor queda escuchando en `http://localhost:5000`.
 
 ---
 
@@ -328,33 +325,71 @@ Flask debería mostrar:
 ```
 
 El modo debug está activo porque `DevelopmentConfig` tiene `DEBUG = True`.
-Esto significa que Flask recarga el servidor automáticamente cuando guardas
-cambios en cualquier archivo Python.
+Esto significa que Flask recarga el servidor automáticamente cuando guardas cambios en cualquier archivo Python.
 
 ---
 
 ## Sesión 2 — Modelos (`backend/app/models/`)
 
-Los modelos son **dataclasses de Python puro**, sin SQLAlchemy todavía. Esto nos
-permite definir y probar la lógica de negocio completa antes de introducir una
-base de datos. En la Sesión 8, el swap a SQLAlchemy solo toca la capa de
-persistencia — los modelos no cambian.
+Los modelos son **dataclasses de Python puro**, sin SQLAlchemy todavía. 
+Esto nos permite definir y probar la lógica de negocio completa antes de introducir una base de datos. 
+En la Sesión 8, el swap a SQLAlchemy solo toca la capa de persistencia — los modelos no cambian.
 
 **Nota — actualización tras revisar los mockups del diseño:**
-Los campos de cada modelo se ajustaron para coincidir exactamente con la UI
-diseñada (formulario de registro, pantalla de detalle de receta, dashboard,
-pantalla de escaneo). Ver imágenes de referencia del proyecto.
+Los campos de cada modelo se ajustaron para coincidir exactamente con la UI diseñada (formulario de registro, pantalla de detalle de receta, dashboard, pantalla de escaneo). 
+Ver imágenes de referencia del proyecto.
 
-**¿Por qué dataclasses y no clases normales?**
-`@dataclass` genera automáticamente `__init__`, `__repr__` y `__eq__` basándose
-en los campos declarados. Escribir menos código repetitivo y el comportamiento
-es predecible y testeable.
+**¿Qué es `dataclasses`?**
+`dataclasses` es un módulo estándar de Python (incluido desde Python 3.7) que
+permite crear clases pensadas para almacenar datos de forma simple. Sin él,
+para crear una clase `User` necesitarías escribir manualmente el `__init__`,
+el `__repr__` y el `__eq__`. Con `@dataclass`, Python los genera solo.
+
+**Comparación — sin vs con `@dataclass`:**
+
+Sin `@dataclass`:
+```python
+class User:
+    def __init__(self, first_name, last_name, email, password_hash):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.email = email
+        self.password_hash = password_hash
+
+    def __repr__(self):
+        return f"User(email={self.email})"
+
+    def __eq__(self, other):
+        return self.email == other.email
+```
+
+Con `@dataclass`:
+```python
+@dataclass
+class User:
+    first_name: str
+    last_name: str
+    email: str
+    password_hash: str
+```
+
+Ambos son equivalentes. `@dataclass` genera los tres métodos automáticamente
+leyendo los campos declarados con anotaciones de tipo (`first_name: str`, etc.).
+
+**¿Qué significa `@dataclass`?**
+El símbolo `@` indica un **decorador** — una función que envuelve a otra función
+o clase y modifica su comportamiento. `@dataclass` es un decorador que toma la
+clase `User` y le añade `__init__`, `__repr__` y `__eq__` antes de que Python
+la cargue en memoria. No cambia la lógica — solo reduce el código repetitivo.
+
+**¿Por qué `dataclasses` y no clases normales?**
+`@dataclass` genera automáticamente `__init__`, `__repr__` y `__eq__` basándose en los campos declarados. 
+Escribir menos código repetitivo y el comportamiento es predecible y testeable.
 
 **¿Por qué UUID como id?**
-UUID (Universally Unique Identifier) genera un string único garantizado sin
-necesitar una base de datos. En memoria, dos objetos creados al mismo tiempo
-nunca tendrán el mismo id. Cuando pasemos a SQLAlchemy, el id seguirá siendo
-un string UUID — no hay que cambiar nada en los modelos.
+UUID (Universally Unique Identifier) genera un string único garantizado sin necesitar una base de datos. 
+En memoria, dos objetos creados al mismo tiempo nunca tendrán el mismo `id`. 
+Cuando pasemos a SQLAlchemy, el id seguirá siendo un string UUID — no hay que cambiar nada en los modelos.
 
 **Patrón de campos:**
 - Los campos **sin default** van primero (son obligatorios al crear el objeto).
@@ -380,6 +415,54 @@ class User:
     password_hash: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 ```
+
+**Explicación línea por línea:**
+
+```python
+from dataclasses import dataclass, field
+```
+Importa dos cosas del módulo `dataclasses`:
+- `dataclass` — el decorador que genera `__init__`, `__repr__` y `__eq__` automáticamente.
+- `field` — función que permite configurar comportamiento especial en un campo,
+  como `default_factory` para generar el `id` dinámicamente en cada instancia.
+
+```python
+import uuid
+```
+Módulo estándar de Python para generar UUIDs. Un UUID es un string de 36
+caracteres como `'a3f1c2d4-7b8e-4c1a-9f2d-3e5b6c7d8e9f'` — único garantizado
+sin necesitar una base de datos.
+
+```python
+@dataclass
+class User:
+```
+El decorador `@dataclass` analiza los campos declarados con anotaciones de tipo
+(`first_name: str`, etc.) y genera automáticamente:
+- `__init__` — para crear instancias: `User('Julian', 'Gonzalez', 'j@mail.com', 'hash')`
+- `__repr__` — para mostrar el objeto: `User(first_name='Julian', ...)`
+- `__eq__` — para comparar dos objetos campo por campo
+
+```python
+    first_name: str
+    last_name: str
+    email: str
+    password_hash: str
+```
+Campos **obligatorios** — deben pasarse al crear el objeto. El tipo (`str`)
+es solo una anotación, Python no lo valida en runtime, pero documenta qué se
+espera en cada campo y lo usa `@dataclass` para generar el `__init__`.
+`password_hash` almacena el resultado de bcrypt — nunca la contraseña en texto plano.
+
+```python
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+Campo **opcional** con valor por defecto generado. `field(default_factory=...)`
+indica que el valor se genera llamando a la función `lambda` cada vez que se
+crea un `User` nuevo. `uuid.uuid4()` genera un UUID aleatorio y `str()` lo
+convierte a string. La `lambda:` es necesaria porque sin ella Python ejecutaría
+`uuid.uuid4()` una sola vez al cargar el módulo y todos los objetos compartirían
+el mismo id.
 
 **Campos:**
 
@@ -446,20 +529,14 @@ class Ingredient:
 **Campos:**
 
 - `name` — nombre del ingrediente.
-- `quantity` — cantidad como string. Se mantiene `str` (no `float`) porque Groq
-  puede devolver valores como `"al gusto"` o `"una pizca"` que no se pueden
-  convertir a número sin romper el flujo.
+- `quantity` — cantidad como string. Se mantiene `str` (no `float`) porque Groq puede devolver valores como `"al gusto"` o `"una pizca"` que no se pueden convertir a número sin romper el flujo.
 - `unit` — unidad de medida: `"g"`, `"ml"`, `"unit"`, `"tbsp"`, etc.
 - `recipe_id` — UUID de la receta a la que pertenece.
-- `off_product_id` — ID del producto en Open Food Facts. Vacío hasta que se
-  consulte la API. Permite evitar consultas repetidas al mismo ingrediente.
+- `off_product_id` — ID del producto en Open Food Facts. Vacío hasta que se consulte la API. Permite evitar consultas repetidas al mismo ingrediente.
 - `estimated_cost` — precio estimado en euros, obtenido de Open Food Facts.
-  Default `0.0`. Si `cost_is_manual` es True, este valor fue editado por el
-  usuario y no se sobreescribe en futuras consultas a la API.
+  Default `0.0`. Si `cost_is_manual` es True, este valor fue editado por el usuario y no se sobreescribe en futuras consultas a la API.
 - `cost_is_manual` — flag que indica si el precio fue editado manualmente.
-  La UI muestra "Prices fetched from Open Food Facts — tap to edit". Cuando el
-  usuario edita el precio, este flag se activa y la API externa deja de
-  sobreescribirlo.
+  La UI muestra "Prices fetched from Open Food Facts — tap to edit". Cuando el usuario edita el precio, este flag se activa y la API externa deja de sobreescribirlo.
 - `id` — UUID generado automáticamente.
 
 ---
@@ -482,12 +559,10 @@ class Step:
 
 **Campos:**
 
-- `order` — posición del paso (1, 2, 3...). `int` porque los pasos se ordenan
-  numéricamente para mostrarlos en secuencia.
+- `order` — posición del paso (1, 2, 3...). `int` porque los pasos se ordenan numéricamente para mostrarlos en secuencia.
 - `description` — texto del paso.
 - `recipe_id` — UUID de la receta a la que pertenece.
-- `duration_min` — duración estimada en minutos. Mostrada como badge en la UI
-  ("30 min", "10 min"). Default `0` cuando Groq no extrae la duración.
+- `duration_min` — duración estimada en minutos. Mostrada como badge en la UI ("30 min", "10 min"). Default `0` cuando Groq no extrae la duración.
 - `id` — UUID generado automáticamente.
 
 ---
@@ -513,11 +588,11 @@ class PdfScan:
 - `filename` — nombre original del archivo PDF subido.
 - `recipe_id` — UUID de la receta generada a partir de este escaneo.
 - `status` — estado del procesamiento: `'pending'`, `'processing'`, `'done'`,
-  `'error'`. Default `'pending'` porque al crear el objeto el PDF todavía no
-  fue procesado.
-- `scanned_at` — timestamp de cuándo se completó el escaneo. Se guarda como
-  string ISO (`'2025-05-10T14:30:00'`) para evitar depender de `datetime` en
-  la fase de memoria. En SQLAlchemy (Sesión 8) se convertirá a `DateTime`.
+  `'error'`. 
+  + Default `'pending'` porque al crear el objeto el PDF todavía no fue procesado.
+- `scanned_at` — timestamp de cuándo se completó el escaneo. 
+  + Se guarda como string ISO (`'2025-05-10T14:30:00'`) para evitar depender de `datetime` en la fase de memoria. 
+  + En SQLAlchemy (Sesión 8) se convertirá a `DateTime`.
 - `id` — UUID generado automáticamente.
 
 ---
