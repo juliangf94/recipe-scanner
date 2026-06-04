@@ -294,6 +294,6 @@ The server will start at `http://localhost:5000`.
 
 ## Author
 
-**Julian Garcia**
+**Julian GONZALEZ**
 Holberton School — RNCP 5 DWWM
 GitHub: [juliangf94](https://github.com/juliangf94)
