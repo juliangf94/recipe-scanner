@@ -4,6 +4,30 @@
 
 ## `backend/app/__init__.py`
 
+### ¿Qué es Flask y por qué lo usamos?
+
+Flask es un **microframework web para Python**. "Micro" no significa que sea
+limitado — significa que el núcleo es mínimo y deliberadamente simple. Flask
+solo incluye lo esencial: un servidor HTTP, un sistema de rutas y un motor de
+templates (Jinja2). Todo lo demás (base de datos, autenticación, validación)
+se agrega según las necesidades del proyecto.
+
+**¿Por qué Flask y no Django o FastAPI?**
+
+| Framework | Por qué no lo elegimos |
+|---|---|
+| Django | Incluye ORM, admin, formularios, autenticación — todo preconfigurado. Para aprender es difícil saber qué hace qué. Curva de aprendizaje alta para un proyecto de 2 meses. |
+| FastAPI | Moderno y muy rápido, pero orientado a APIs puras. No integra Jinja2 de forma nativa, lo que complica el frontend server-side que queremos en la Sesión 9. |
+| Flask | Control total sobre cada decisión. Jinja2 integrado. Fácil de entender cada línea. Ideal para explicar al jury exactamente qué hace cada componente. |
+
+**¿Qué hace Flask en este proyecto?**
+1. Recibe las peticiones HTTP del browser.
+2. Enruta cada petición al Blueprint correcto (`/auth`, `/recipes`, `/scan`).
+3. Renderiza los templates Jinja2 para el frontend.
+4. Devuelve respuestas JSON para los endpoints de la API.
+
+---
+
 Este archivo es el corazón de la aplicación. Al estar en `app/__init__.py`, Python
 lo ejecuta automáticamente cuando se importa el paquete `app`. Contiene la función
 `create_app()` que construye, configura y retorna la instancia de Flask.
