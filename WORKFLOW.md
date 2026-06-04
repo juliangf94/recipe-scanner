@@ -28,6 +28,9 @@ git checkout -b feature/nombre-del-feature
 
 **3. Verificar que funciona**
 ```bash
+# Activar el entorno virtual (siempre antes de correr cualquier cosa)
+source backend/venv/bin/activate
+
 # Correr el archivo directamente
 python backend/run.py
 
