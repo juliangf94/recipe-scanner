@@ -45,10 +45,10 @@ pytest backend/
 
 **5. Mergear a develop**
 ```bash
-git add <archivos específicos>
-git commit -m "feat: descripción del cambio"
+git add <specific files>
+git commit -m "feat: description of the change"
 git checkout develop
-git merge feature/nombre-del-feature
+git merge feature/feature-name
 ```
 
 ---
