@@ -614,15 +614,13 @@ class PdfScan:
 
 ### ¿Qué es el Repository Pattern?
 
-El **Repository Pattern** es un patrón de diseño que separa la lógica de negocio
-del acceso a datos. En lugar de que la Facade llame directamente a la base de
-datos, llama a un repositorio que se encarga de guardar y recuperar objetos.
+El **Repository Pattern** es un patrón de diseño que separa la lógica de negocio del acceso a datos. 
+En lugar de que la Facade llame directamente a la base de datos, llama a un repositorio que se encarga de guardar y recuperar objetos.
 
 **Ventaja clave — intercambiabilidad:**
-La Facade no sabe si los datos están en RAM, en SQLite o en PostgreSQL. Solo
-conoce la interfaz del repositorio. Esto permite que en la Sesión 8 cambiemos
-`InMemoryStorage` por `SQLAlchemyRepository` sin tocar una sola línea de la
-Facade ni de la API.
+La Facade no sabe si los datos están en **RAM**, en **SQLite** o en **PostgreSQL**. 
+Solo conoce la interfaz del repositorio. 
+Esto permite que en la Sesión 8 cambiemos `InMemoryStorage` por `SQLAlchemyRepository` sin tocar una sola línea de la Facade ni de la API.
 
 ```
 Sesión 3-7:  Facade → InMemoryStorage (RAM)
@@ -630,15 +628,15 @@ Sesión 8:    Facade → SQLAlchemyRepository  ← solo cambia esta línea
 ```
 
 **¿Por qué todo en un solo archivo?**
-A diferencia de tener `repository.py` y `memory_storage.py` separados, ponemos
-todo en `repository.py`. Es la misma decisión que tomamos en HBnB — más simple
-de navegar, y todas las implementaciones del patrón viven juntas. `memory_storage.py`
-queda vacío y se puede eliminar.
+A diferencia de tener `repository.py` y `memory_storage.py` separados, ponemos todo en `repository.py`. 
+Es la misma decisión que tomamos en HBnB — más simple de navegar, y todas las implementaciones del patrón viven juntas. 
+-   `memory_storage.py` queda vacío y se puede eliminar.
 
 **¿Qué es una ABC (Abstract Base Class)?**
 Una ABC es una clase que define una interfaz — declara qué métodos deben existir
-sin implementarlos. Cualquier clase que herede de ella está obligada a
-implementar esos métodos. Si no lo hace, Python lanza un error al instanciarla.
+sin implementarlos. 
+Cualquier clase que herede de ella está obligada a implementar esos métodos. 
+Si no lo hace, Python lanza un error al instanciarla.
 
 Es el equivalente a un contrato: `InMemoryStorage` y `SQLAlchemyRepository`
 firman ese contrato cuando heredan de `BaseRepository`.
@@ -719,13 +717,13 @@ from abc import ABC, abstractmethod
 Importa del módulo estándar `abc`:
 - `ABC` — convierte la clase en abstracta, no se puede instanciar directamente.
 - `abstractmethod` — decorador que obliga a las subclases a implementar el método.
-  Si no lo hacen, Python lanza `TypeError` al intentar instanciarlas.
+  + Si no lo hacen, Python lanza `TypeError` al intentar instanciarlas.
 
 ```python
 class BaseRepository(ABC):
 ```
-Define el contrato. No se puede hacer `BaseRepository()` — solo sirve como
-interfaz que `InMemoryStorage` y `SQLAlchemyRepository` deben cumplir.
+Define el contrato. 
+No se puede hacer `BaseRepository()` — solo sirve como interfaz que `InMemoryStorage` y `SQLAlchemyRepository` deben cumplir.
 
 **Los 6 métodos abstractos:**
 - `get_all()` — retorna todos los objetos almacenados
@@ -738,22 +736,25 @@ interfaz que `InMemoryStorage` y `SQLAlchemyRepository` deben cumplir.
 ```python
 class InMemoryStorage(BaseRepository):
 ```
-Implementación concreta que usa RAM. Hereda de `BaseRepository` e implementa
-los 6 métodos. Al no ser abstracta, puede instanciarse.
+Implementación concreta que usa RAM. 
+Hereda de `BaseRepository` e implementa los 6 métodos. 
+Al no ser abstracta, puede instanciarse.
 
 ```python
     def __init__(self):
         self._storage = {}
 ```
-Diccionario `{ uuid: objeto }`. El `_` indica que es privado — solo la clase
-lo usa directamente. Ejemplo de contenido:
+-   Diccionario `{ uuid: objeto }`. 
+-   El `_` indica que es privado — solo la clase lo usa directamente. 
+
+Ejemplo de contenido:
 ```python
 {
   'a3f1c2d4-...': User(first_name='Julian', ...),
   'b7e2f3a1-...': User(first_name='Maria', ...)
 }
 ```
-
+---
 ```python
     def get_by_attribute(self, attr_name, attr_value):
         return next(
@@ -762,15 +763,14 @@ lo usa directamente. Ejemplo de contenido:
             None
         )
 ```
-Método genérico para buscar por cualquier campo sin necesitar métodos
-específicos como `get_by_email`. `getattr(obj, attr_name)` lee dinámicamente
-el atributo con ese nombre del objeto. `next(..., None)` retorna el primer
-resultado o `None` si no encuentra ninguno. Ejemplos de uso:
+Método genérico para buscar por cualquier campo sin necesitar métodos específicos como `get_by_email`. 
+-   `getattr(obj, attr_name)` lee dinámicamente el atributo con ese nombre del objeto. 
+-   `next(..., None)` retorna el primer resultado o `None` si no encuentra ninguno. Ejemplos de uso:
 ```python
 storage.get_by_attribute('email', 'julian@test.com')
 storage.get_by_attribute('recipe_id', 'a3f1-...')
 ```
-
+---
 ```python
     def save(self, obj):
         self._storage[obj.id] = obj
@@ -782,7 +782,8 @@ storage.get_by_attribute('recipe_id', 'a3f1-...')
 ```
 En memoria ambos son idénticos — sobreescriben la clave con el objeto.
 La distinción es semántica y se vuelve real en `SQLAlchemyRepository`:
-`save` hace `INSERT`, `update` hace `UPDATE`.
+-   `save` hace `INSERT`, 
+-   `update` hace `UPDATE`.
 
 ```python
     def delete(self, obj_id):
@@ -804,6 +805,213 @@ self._steps       = InMemoryStorage()
 self._pdf_scans   = InMemoryStorage()
 ```
 
-Cada instancia tiene su propio `_storage` dict independiente — espeja la
-estructura de la base de datos (una tabla por entidad). En la Sesión 8,
-cada `InMemoryStorage()` se reemplaza por `SQLAlchemyRepository(ModelClass)`.
+Cada instancia tiene su propio `_storage` dict independiente — espeja la estructura de la base de datos (una tabla por entidad).
+En la Sesión 8, cada `InMemoryStorage()` se reemplaza por `SQLAlchemyRepository(ModelClass)`.
+
+---
+
+## Sesión 4 — Autenticación (`utils/security.py` + `api/v1/auth.py`)
+
+### Decisiones técnicas de esta sesión
+
+**`flask_jwt_extended` en lugar de `PyJWT` manual**
+
+Usamos `flask_jwt_extended` — la misma librería que en HBnB. Proporciona el
+decorador `@jwt_required()` y las funciones `create_access_token` /
+`get_jwt_identity` que ya conocemos. Hacerlo manual con `PyJWT` requeriría
+escribir las funciones de encode/decode nosotros, más código sin beneficio real.
+
+**`utils/security.py` sigue siendo necesario**
+Aunque `flask_jwt_extended` maneja los tokens, bcrypt (hash de contraseñas)
+no está incluido. `security.py` tendrá dos funciones simples: `hash_password`
+y `check_password`. Son funciones puras — sin estado, sin dependencias de Flask.
+
+**No hay `utils/jwt_helper.py`**
+Estaba planificado originalmente, pero `flask_jwt_extended` lo reemplaza por
+completo. No tiene sentido crear un archivo que solo envuelva funciones que
+ya existen en la librería.
+
+**`Blueprint` en lugar de `flask_restx`**
+`flask_restx` genera documentación Swagger automática — útil cuando tienes un
+frontend separado (React, app móvil) que necesita conocer tu API. Con Jinja2
+el frontend es el mismo servidor Flask; no hay consumidor externo que necesite
+leer documentación de endpoints.
+
+**`JWT_SECRET_KEY` en `config.py`**
+`flask_jwt_extended` lee automáticamente `JWT_SECRET_KEY` de la configuración
+de Flask. Ya lo tenemos definido en `config.py` — no hay que configurar nada
+adicional.
+
+---
+
+### `backend/app/utils/security.py`
+
+```python
+import bcrypt
+
+
+def hash_password(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+```
+
+**Explicación línea por línea:**
+
+```python
+import bcrypt
+```
+Librería de hashing diseñada específicamente para contraseñas. A diferencia
+de SHA-256 o MD5, bcrypt es **lento por diseño** — incluye un factor de costo
+configurable que hace que calcular el hash tome tiempo. Esto hace que los
+ataques de fuerza bruta sean impracticables.
+
+```python
+def hash_password(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+```
+- `password.encode('utf-8')` — bcrypt trabaja con bytes, no con strings. `encode` convierte el string a bytes.
+- `bcrypt.gensalt()` — genera un salt aleatorio. El salt se incluye en el hash final, por eso dos llamadas con la misma contraseña producen hashes distintos.
+- `.decode('utf-8')` — convierte el resultado de bytes a string para guardarlo en el modelo `User`.
+
+```python
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+```
+- Recibe la contraseña en texto plano y el hash guardado en la base de datos.
+- `bcrypt.checkpw` extrae el salt del hash, lo aplica a la contraseña y compara.
+  Retorna `True` si coinciden, `False` si no.
+- No hay que extraer el salt manualmente — bcrypt lo hace internamente.
+
+---
+
+### `backend/app/utils/__init__.py`
+
+Vacío. Solo existe para que Python reconozca `utils/` como paquete y permita
+`from app.utils.security import hash_password`.
+
+---
+
+### `backend/app/api/v1/auth.py`
+
+```python
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import create_access_token
+from app.services.facade import facade
+from app.utils.security import hash_password, check_password
+
+auth_bp = Blueprint('auth', __name__)
+
+
+@auth_bp.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+
+    if not data or not data.get('email') or not data.get('password'):
+        return jsonify({'error': 'email and password are required'}), 400
+
+    if facade.get_user_by_email(data['email']):
+        return jsonify({'error': 'Email already registered'}), 400
+
+    user = facade.register_user(
+        first_name=data.get('first_name', ''),
+        last_name=data.get('last_name', ''),
+        email=data['email'],
+        password=data['password']
+    )
+    return jsonify({'message': 'User created successfully', 'user_id': user.id}), 201
+
+
+@auth_bp.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+
+    if not data or not data.get('email') or not data.get('password'):
+        return jsonify({'error': 'email and password are required'}), 400
+
+    user = facade.get_user_by_email(data['email'])
+    if not user or not check_password(data['password'], user.password_hash):
+        return jsonify({'error': 'Invalid credentials'}), 401
+
+    token = create_access_token(identity=user.id)
+    return jsonify({'token': token, 'user': {
+        'id': user.id,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'email': user.email
+    }}), 200
+```
+
+**Explicación línea por línea:**
+
+```python
+from flask import Blueprint, request, jsonify
+```
+- `Blueprint` — agrupa rutas relacionadas. Se registra en `create_app()` con un prefijo `/api/v1/auth`.
+- `request` — objeto de Flask que contiene el body, headers y parámetros de la petición HTTP.
+- `jsonify` — convierte un dict Python a una respuesta HTTP con `Content-Type: application/json`.
+
+```python
+from flask_jwt_extended import create_access_token
+```
+Función que genera un token JWT firmado con `JWT_SECRET_KEY`. El token incluye
+el `identity` (user_id) y expira según `JWT_ACCESS_TOKEN_EXPIRES` en config.
+
+```python
+from app.services.facade import facade
+```
+Importa la instancia de la Facade — punto de entrada único para toda la lógica
+de negocio. El Blueprint no accede al repositorio directamente.
+
+```python
+auth_bp = Blueprint('auth', __name__)
+```
+Crea el Blueprint. El primer argumento `'auth'` es el nombre interno de Flask.
+Se registrará en `create_app()` con `app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')`.
+
+```python
+    if facade.get_user_by_email(data['email']):
+        return jsonify({'error': 'Email already registered'}), 400
+```
+Verifica duplicados antes de crear. Si ya existe un usuario con ese email,
+retorna 400 (Bad Request). El número `400` va separado de `jsonify` con una
+coma — esa es la sintaxis de Flask para devolver código de estado personalizado.
+
+```python
+    token = create_access_token(identity=user.id)
+```
+`identity` es el dato que se guarda en el token y que recuperamos después con
+`get_jwt_identity()`. Usamos el `user.id` (UUID string) — así sabemos qué
+usuario hace cada petición sin consultar la base de datos.
+
+---
+
+### Registrar el Blueprint en `app/__init__.py`
+
+Cuando escribas `auth.py`, también hay que registrar el Blueprint en
+`create_app()`. El archivo `app/__init__.py` quedará así:
+
+```python
+import os
+from flask import Flask
+from flask_jwt_extended import JWTManager
+from config import config
+
+
+def create_app(config_name=None):
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'default')
+
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+
+    JWTManager(app)  # Initialize flask_jwt_extended
+
+    # Register blueprints here (Phases 4-6 — auth, recipes, scan)
+    from app.api.v1.auth import auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
+
+    return app
+```
