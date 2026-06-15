@@ -33,10 +33,15 @@ class IngredientList(Resource):
     @jwt_required()
     @api.expect(ingredient_model, validate=True)
     @api.response(201, 'Ingredient added')
+    @api.response(403, 'Forbidden')
     @api.response(404, 'Recipe not found')
     def post(self, recipe_id):
-        if not facade.get_recipe(recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
             return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
         data = api.payload
         ingredient = facade.add_ingredient(
             recipe_id=recipe_id,
@@ -66,21 +71,31 @@ class IngredientDetail(Resource):
     @jwt_required()
     @api.expect(ingredient_update_model)
     @api.response(200, 'Ingredient updated')
+    @api.response(403, 'Forbidden')
     @api.response(404, 'Ingredient not found')
     def put(self, recipe_id, ingredient_id):
+        user_id = get_jwt_identity()
         ingredient = facade.get_ingredient(ingredient_id)
         if not ingredient or ingredient.recipe_id != recipe_id:
             return {'error': 'Ingredient not found'}, 404
+        recipe = facade.get_recipe(recipe_id)
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
         updated = facade.update_ingredient(ingredient_id, **api.payload)
         return {'id': updated.id, 'name': updated.name,
                 'quantity': updated.quantity, 'unit': updated.unit}, 200
     # DELETE
     @jwt_required()
     @api.response(204, 'Ingredient deleted')
+    @api.response(403, 'Forbidden')
     @api.response(404, 'Ingredient not found')
     def delete(self, recipe_id, ingredient_id):
+        user_id = get_jwt_identity()
         ingredient = facade.get_ingredient(ingredient_id)
         if not ingredient or ingredient.recipe_id != recipe_id:
             return {'error': 'Ingredient not found'}, 404
+        recipe = facade.get_recipe(recipe_id)
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
         facade.delete_ingredient(ingredient_id)
         return '', 204

@@ -3,6 +3,7 @@ from flask import Flask
 from flask_restx import Api
 from flask_jwt_extended import JWTManager
 from config import config
+from app.extensions import db
 
 
 
@@ -15,6 +16,7 @@ def create_app(config_name=None):
     app.config.from_object(config[config_name])
 
     JWTManager(app)
+    db.init_app(app)
 
     # Define the security scheme for Swagger UI
     authorizations = {
@@ -49,5 +51,8 @@ def create_app(config_name=None):
     api.add_namespace(ingredients_ns, path='/api/v1')
     api.add_namespace(scan_ns, path='/api/v1/scan')
     api.add_namespace(costs_ns, path='/api/v1')
+
+    with app.app_context():
+        db.create_all()
 
     return app
