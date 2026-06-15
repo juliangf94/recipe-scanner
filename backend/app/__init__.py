@@ -42,10 +42,12 @@ def create_app(config_name=None):
     from app.api.v1.recipes import api as recipes_ns
     from app.api.v1.ingredients import api as ingredients_ns
     from app.api.v1.scan import api as scan_ns
+    from app.api.v1.costs import api as costs_ns
 
     api.add_namespace(auth_ns, path='/api/v1/auth')
     api.add_namespace(recipes_ns, path='/api/v1/recipes')
     api.add_namespace(ingredients_ns, path='/api/v1')
     api.add_namespace(scan_ns, path='/api/v1/scan')
+    api.add_namespace(costs_ns, path='/api/v1')
 
     return app

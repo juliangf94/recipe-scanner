@@ -134,24 +134,41 @@ Solo project — Julian Gonzalez
 
 ---
 
-## Sprint 4 — Prices + Database
+## Sprint 4 — Prices + Database 🔄 IN PROGRESS
 
 **Goal:** Ingredient prices fetched from Open Food Facts and full swap from InMemoryStorage to SQLAlchemy.
+
+**Sesiones:** 9 y 10 → ver explicación detallada en `CODE_NOTES.md` (Sesión 9 · Sesión 10)
 
 **Duration:** Week 5
 
 | Task | File | Priority | Status |
 |---|---|---|---|
-| Open Food Facts integration | `services/facade.py` | Should Have | Pending |
+| Open Food Facts integration — facade | `services/facade.py` | Should Have | ✅ Done |
+| Endpoint `GET /recipes/<id>/cost` | `api/v1/costs.py` | Should Have | ✅ Done |
+| Modelo `CustomPrice` | `models/custom_price.py` | Should Have | ✅ Done |
+| Custom Prices CRUD — facade | `services/facade.py` | Should Have | ✅ Done |
+| Custom Prices endpoints (GET/POST/PUT/DELETE) | `api/v1/costs.py` | Should Have | ✅ Done |
+| Registrar namespace costs | `app/__init__.py` | Should Have | ✅ Done |
+| Postman — 116 tests pasando | `tests/postman/` | Should Have | ✅ Done |
 | DbStorage with SQLAlchemy | `persistence/db_storage.py` | Must Have | Pending |
 | SQLAlchemy models | `models/*.py` updated | Must Have | Pending |
 | Config update for DB | `config.py` | Must Have | Pending |
 | Swap InMemoryStorage → DbStorage | `app/__init__.py` | Must Have | Pending |
 | Integration tests — DB | `tests/test_db.py` | Must Have | Pending |
 
+**Architectural note:**
+- Open Food Facts no tiene datos de precios confiables para ingredientes crudos.
+  Se usa la API para identificar el producto y su categoría, y se aplica una tabla
+  de precios promedio (`FALLBACK_PRICES`) como estrategia de estimación.
+- El endpoint de costos va en un archivo separado `api/v1/costs.py` para mantener
+  la separación de responsabilidades.
+- SQLAlchemy se desarrolla en rama `feature/sqlalchemy` (Sesión 10).
+
 **Definition of Done:**
-- All existing tests pass after the SQLAlchemy swap
-- Ingredient prices returned from Open Food Facts for each recipe
+- `GET /api/v1/recipes/<id>/cost` devuelve precio estimado por ingrediente + total
+- Precio se calcula con Open Food Facts + tabla de fallback
+- Todos los tests de Postman existentes siguen pasando
 - Data persists after server restart (SQLite dev database)
 - Branch `feature/sqlalchemy` merged into `develop`
 

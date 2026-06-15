@@ -1,6 +1,7 @@
 import fitz
 import json
 import os
+import requests
 from groq import Groq
 from app.persistence.repository import InMemoryStorage
 from app.models.user import User
@@ -8,8 +9,32 @@ from app.models.recipe import Recipe
 from app.models.ingredient import Ingredient
 from app.models.step import Step
 from app.models.pdf_scan import PdfScan
+from app.models.custom_price import CustomPrice
 from app.utils.security import hash_password
 
+
+OFF_SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
+
+FALLBACK_PRICES = {
+    # Prices in EUR per kg — average French supermarket prices 2025
+    'harina': 1.20,    'flour': 1.20,
+    'azucar': 1.00,    'sugar': 1.00,
+    'manteca': 9.00,   'butter': 9.00,
+    'leche': 1.20,     'milk': 1.20,
+    'huevo': 2.00,     'huevos': 2.00,    'egg': 2.00,    'eggs': 2.00,
+    'ricota': 8.50,
+    'queso': 12.00,    'cheese': 12.00,
+    'sal': 0.50,       'salt': 0.50,
+    'aceite': 4.00,    'oil': 4.00,
+    'crema': 3.50,     'cream': 3.50,
+    'limon': 2.50,     'lemon': 2.50,
+    'naranja': 1.80,   'orange': 1.80,
+    'vainilla': 30.00, 'vanilla': 30.00,
+    'chocolate': 8.00, 'cacao': 10.00,
+    'levadura': 8.00,  'yeast': 8.00,
+    'nuez': 15.00,     'nuts': 15.00,
+    'almendra': 20.00, 'almond': 20.00,
+}
 
 GROQ_PROMPT = """You are a recipe extraction assistant. \
 Extract the recipe from the following text and return ONLY a valid JSON \
@@ -41,6 +66,7 @@ class RecipeScannerFacade:
         self._recipes = InMemoryStorage()
         self._ingredients = InMemoryStorage()
         self._steps = InMemoryStorage()
+        self._custom_prices = InMemoryStorage()
 
     # --- Users --- api/v1/auth.py ---
 
@@ -202,6 +228,109 @@ class RecipeScannerFacade:
             return json.loads(content)
         except Exception:
             return None
+
+    # --- Custom Prices --- api/v1/costs.py ---
+
+    def get_custom_prices(self, user_id):
+        return [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+
+    def get_custom_price(self, user_id, ingredient_name):
+        name_lower = ingredient_name.lower().strip()
+        for cp in self._custom_prices.get_all():
+            if cp.user_id == user_id and cp.ingredient_name == name_lower:
+                return cp
+        return None
+
+    def create_custom_price(self, user_id, ingredient_name, price_per_kg):
+        cp = CustomPrice(
+            user_id=user_id,
+            ingredient_name=ingredient_name.lower().strip(),
+            price_per_kg=price_per_kg
+        )
+        return self._custom_prices.save(cp)
+
+    def update_custom_price(self, user_id, ingredient_name, price_per_kg):
+        cp = self.get_custom_price(user_id, ingredient_name)
+        if not cp:
+            return None
+        cp.price_per_kg = price_per_kg
+        return self._custom_prices.update(cp)
+
+    def delete_custom_price(self, user_id, ingredient_name):
+        cp = self.get_custom_price(user_id, ingredient_name)
+        if not cp:
+            return False
+        self._custom_prices.delete(cp.id)
+        return True
+
+    # --- Costs (Open Food Facts) --- api/v1/costs.py ---
+
+    def get_recipe_cost(self, recipe_id, user_id):
+        recipe = self.get_recipe(recipe_id)
+        ingredients = self.get_ingredients_by_recipe(recipe_id)
+        result = []
+        total = 0.0
+
+        for ing in ingredients:
+            price_per_kg = self._get_ingredient_price(ing.name, user_id)
+            try:
+                qty = float(ing.quantity)
+            except (ValueError, TypeError):
+                qty = 0.0
+            estimated = round(qty * (price_per_kg / 1000), 2)
+            total += estimated
+            result.append({
+                'name': ing.name,
+                'quantity': ing.quantity,
+                'unit': ing.unit,
+                'price_per_kg': price_per_kg,
+                'estimated_price': estimated
+            })
+
+        return {
+            'recipe_id': recipe_id,
+            'recipe_title': recipe.title,
+            'ingredients': result,
+            'total_estimated_cost': round(total, 2),
+            'currency': 'EUR',
+            'note': 'Estimated prices in EUR/kg. Source: Open Food Facts + average prices France.'
+        }
+
+    def _get_ingredient_price(self, name, user_id=None):
+        name_lower = name.lower().strip()
+
+        if user_id:
+            custom = self.get_custom_price(user_id, name_lower)
+            if custom:
+                return custom.price_per_kg
+
+        try:
+            params = {
+                'search_terms': name,
+                'json': 1,
+                'page_size': 1,
+                'action': 'process',
+                'fields': 'product_name,categories_tags'
+            }
+            response = requests.get(OFF_SEARCH_URL, params=params, timeout=5)
+            products = response.json().get('products', [])
+
+            if products:
+                product = products[0]
+                product_name = product.get('product_name', '').lower()
+                categories = ' '.join(product.get('categories_tags', []))
+                combined = f"{product_name} {categories}"
+                for key, price in FALLBACK_PRICES.items():
+                    if key in combined:
+                        return price
+        except Exception:
+            pass
+
+        for key, price in FALLBACK_PRICES.items():
+            if key in name_lower:
+                return price
+
+        return 5.00
 
 
 facade = RecipeScannerFacade()

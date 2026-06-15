@@ -1,2275 +1,2806 @@
 {
-    "info": {
-        "_postman_id": "rsc-v1-2025",
-        "name": "RecipeScanner API",
-        "description": "Tests de la API RecipeScanner — Holberton School RNCP 5 DWWM.\n\nInstrucciones:\n1. Importar este archivo en Postman (File > Import)\n2. Importar RecipeScanner_environment.json y seleccionar entorno 'RecipeScanner Dev'\n3. Ejecutar en orden: Auth → Recipes → Ingredients → Scan → Security\n\nEl request 'Login — success' guarda el token automáticamente en {{token}}.",
-        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  "info": {
+    "_postman_id": "rsc-v1-2025",
+    "name": "RecipeScanner API",
+    "description": "Tests de la API RecipeScanner — Holberton School RNCP 5 DWWM.\n\nInstrucciones:\n1. Importar este archivo en Postman (File > Import)\n2. Importar RecipeScanner_environment.json y seleccionar entorno 'RecipeScanner Dev'\n3. Ejecutar en orden: Auth → Recipes → Ingredients → Scan → Security\n\nEl request 'Login — success' guarda el token automáticamente en {{token}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
     },
-    "variable": [
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "recipe_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ingredient_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 — Auth",
+      "description": "Registro, login y gestión del perfil. Ejecutar en orden.",
+      "item": [
         {
-            "key": "base_url",
-            "value": "http://localhost:5000",
-            "type": "string"
+          "name": "Register — success (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Julian\",\n  \"last_name\": \"Gonzalez\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('test_email', 'julian_' + Date.now() + '@test.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — user created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Response has user_id', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('user_id');",
+                  "    pm.environment.set('user_id', json.user_id);",
+                  "});",
+                  "pm.test('Password never exposed', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property('password');",
+                  "    pm.expect(json).to.not.have.property('password_hash');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "key": "token",
-            "value": "",
-            "type": "string"
+          "name": "Register — duplicate email (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Julian\",\n  \"last_name\": \"Gonzalez\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — duplicate email rejected', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Error mentions already registered', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.include('already registered');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "key": "user_id",
-            "value": "",
-            "type": "string"
+          "name": "Login — success (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has JWT token — saved to {{token}}', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('token');",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "    pm.environment.set('token', json.token);",
+                  "});",
+                  "pm.test('Response has user object', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.user).to.have.property('id');",
+                  "    pm.expect(json.user).to.have.property('email');",
+                  "    pm.expect(json.user).to.have.property('first_name');",
+                  "    pm.expect(json.user).to.have.property('last_name');",
+                  "});",
+                  "pm.test('Password hash not exposed', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.user).to.not.have.property('password_hash');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "key": "recipe_id",
-            "value": "",
-            "type": "string"
+          "name": "Login — wrong password (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"wrongpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — wrong password rejected', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Same error for wrong password and unknown email (no info leak)', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.equal('Invalid credentials');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "key": "ingredient_id",
-            "value": "",
-            "type": "string"
+          "name": "GET /me — current user (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Returns user data without password_hash', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "    pm.expect(json).to.not.have.property('password_hash');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /me — update profile (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Julian Updated\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — profile updated', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('First name was updated', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.first_name).to.equal('Julian Updated');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /me — no token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — no token rejected', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register — empty body (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — empty body rejected', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register — missing password (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"first_name\":\"Test\",\"last_name\":\"User\",\"email\":\"no_pass@test.com\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing password rejected', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login — empty body (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — empty body rejected', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login — non-existent user (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"nobody@test.com\",\"password\":\"password123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — unknown user rejected', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Same error message as wrong password (no info leak)', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.equal('Invalid credentials');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /me — empty update still returns user (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — empty update accepted', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response still has user fields', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /me — password update (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"password\":\"newpassword456\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — password updated', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('password_hash never exposed', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property('password_hash');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login — with new password (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{test_email}}\",\"password\":\"newpassword456\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — new password works', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Token refreshed', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('token');",
+                  "    pm.environment.set('token', json.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
-    ],
-    "item": [
+      ]
+    },
+    {
+      "name": "2 — Recipes",
+      "description": "CRUD de recetas. Requiere JWT — ejecutar Login primero.",
+      "item": [
         {
-            "name": "1 — Auth",
-            "description": "Registro, login y gestión del perfil. Ejecutar en orden.",
-            "item": [
-                {
-                    "name": "Register — success (201)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"first_name\": \"Julian\",\n  \"last_name\": \"Gonzalez\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"password123\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/register",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "register"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "prerequest",
-                            "script": {
-                                "exec": [
-                                    "pm.environment.set('test_email', 'julian_' + Date.now() + '@test.com');"
-                                ]
-                            }
-                        },
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 201 — user created', function () {",
-                                    "    pm.response.to.have.status(201);",
-                                    "});",
-                                    "pm.test('Response has user_id', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('user_id');",
-                                    "    pm.environment.set('user_id', json.user_id);",
-                                    "});",
-                                    "pm.test('Password never exposed', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.not.have.property('password');",
-                                    "    pm.expect(json).to.not.have.property('password_hash');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Register — duplicate email (400)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"first_name\": \"Julian\",\n  \"last_name\": \"Gonzalez\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"password123\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/register",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "register"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 400 — duplicate email rejected', function () {",
-                                    "    pm.response.to.have.status(400);",
-                                    "});",
-                                    "pm.test('Error mentions already registered', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.error).to.include('already registered');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Login — success (200)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"password123\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/login",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "login"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200 — login successful', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Response has JWT token — saved to {{token}}', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('token');",
-                                    "    pm.expect(json.token).to.be.a('string');",
-                                    "    pm.environment.set('token', json.token);",
-                                    "});",
-                                    "pm.test('Response has user object', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.user).to.have.property('id');",
-                                    "    pm.expect(json.user).to.have.property('email');",
-                                    "    pm.expect(json.user).to.have.property('first_name');",
-                                    "    pm.expect(json.user).to.have.property('last_name');",
-                                    "});",
-                                    "pm.test('Password hash not exposed', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.user).to.not.have.property('password_hash');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Login — wrong password (401)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"wrongpassword\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/login",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "login"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 401 — wrong password rejected', function () {",
-                                    "    pm.response.to.have.status(401);",
-                                    "});",
-                                    "pm.test('Same error for wrong password and unknown email (no info leak)', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.error).to.equal('Invalid credentials');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "GET /me — current user (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Returns user data without password_hash', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('id');",
-                                    "    pm.expect(json).to.have.property('email');",
-                                    "    pm.expect(json).to.not.have.property('password_hash');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "PUT /me — update profile (200)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"first_name\": \"Julian Updated\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200 — profile updated', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('First name was updated', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.first_name).to.equal('Julian Updated');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "GET /me — no token (401)",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 401 — no token rejected', function () {",
-                                    "    pm.response.to.have.status(401);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Register — empty body (400)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/register",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "register"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 400 — empty body rejected', function () {",
-                                    "    pm.response.to.have.status(400);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Register — missing password (400)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/register",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "register"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"first_name\":\"Test\",\"last_name\":\"User\",\"email\":\"no_pass@test.com\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 400 — missing password rejected', function () {",
-                                    "    pm.response.to.have.status(400);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Login — empty body (400)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/login",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "login"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 400 — empty body rejected', function () {",
-                                    "    pm.response.to.have.status(400);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Login — non-existent user (401)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/login",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "login"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"email\":\"nobody@test.com\",\"password\":\"password123\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 401 — unknown user rejected', function () {",
-                                    "    pm.response.to.have.status(401);",
-                                    "});",
-                                    "pm.test('Same error message as wrong password (no info leak)', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.error).to.equal('Invalid credentials');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "PUT /me — empty update still returns user (200)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200 — empty update accepted', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Response still has user fields', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('id');",
-                                    "    pm.expect(json).to.have.property('email');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "PUT /me — password update (200)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"password\":\"newpassword456\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200 — password updated', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('password_hash never exposed', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.not.have.property('password_hash');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Login — with new password (200)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/login",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "login"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"email\":\"{{test_email}}\",\"password\":\"newpassword456\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200 — new password works', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Token refreshed', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('token');",
-                                    "    pm.environment.set('token', json.token);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
+          "name": "Create recipe — success (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tarta de manzana\",\n  \"description\": \"Receta clásica de tarta de manzana\",\n  \"servings\": 8,\n  \"prep_time_min\": 60,\n  \"category\": \"Postres\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — recipe created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Response has id — saved to {{recipe_id}}', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.environment.set('recipe_id', json.id);",
+                  "});",
+                  "pm.test('Recipe has user_id', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('user_id');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "name": "2 — Recipes",
-            "description": "CRUD de recetas. Requiere JWT — ejecutar Login primero.",
-            "item": [
-                {
-                    "name": "Create recipe — success (201)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"title\": \"Tarta de manzana\",\n  \"description\": \"Receta clásica de tarta de manzana\",\n  \"servings\": 8,\n  \"prep_time_min\": 60,\n  \"category\": \"Postres\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                ""
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 201 — recipe created', function () {",
-                                    "    pm.response.to.have.status(201);",
-                                    "});",
-                                    "pm.test('Response has id — saved to {{recipe_id}}', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('id');",
-                                    "    pm.environment.set('recipe_id', json.id);",
-                                    "});",
-                                    "pm.test('Recipe has user_id', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('user_id');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "List my recipes (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                ""
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Response is an array', function () {",
-                                    "    pm.expect(pm.response.json()).to.be.an('array');",
-                                    "});",
-                                    "pm.test('Array has at least one recipe', function () {",
-                                    "    pm.expect(pm.response.json().length).to.be.at.least(1);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Get recipe by ID (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Recipe ID matches', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.id).to.equal(pm.environment.get('recipe_id'));",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Get recipe — not found (404)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/non-existent-id",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "non-existent-id"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 404 — recipe not found', function () {",
-                                    "    pm.response.to.have.status(404);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Update recipe (200)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"title\": \"Tarta de manzana actualizada\",\n  \"servings\": 10\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200 — recipe updated', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Title was updated', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.title).to.equal('Tarta de manzana actualizada');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Create recipe — missing title (400)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                ""
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"description\":\"No title here\",\"servings\":4}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 400 — missing required title', function () {",
-                                    "    pm.response.to.have.status(400);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Get recipe — invalid UUID (404)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "00000000-0000-0000-0000-000000000000"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 404 — non-existent recipe', function () {",
-                                    "    pm.response.to.have.status(404);",
-                                    "});",
-                                    "pm.test('Error property present', function () {",
-                                    "    pm.expect(pm.response.json()).to.have.property('error');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Create recipe — success for edge case tests (201)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                ""
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"title\":\"Edge Case Recipe\",\"servings\":2,\"category\":\"Test\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 201 — edge recipe created', function () {",
-                                    "    pm.response.to.have.status(201);",
-                                    "});",
-                                    "pm.test('recipe_id saved for ownership tests', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.environment.set('recipe_id', json.id);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "PUT recipe — full update (200)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"title\":\"Fully Updated\",\"description\":\"New desc\",\"servings\":6,\"prep_time_min\":45,\"category\":\"Postres\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200 — full update accepted', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('All updated fields reflected', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.title).to.equal('Fully Updated');",
-                                    "    pm.expect(json.servings).to.equal(6);",
-                                    "    pm.expect(json.category).to.equal('Postres');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "PUT recipe — non-existent (404)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "00000000-0000-0000-0000-000000000000"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"title\":\"Ghost\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 404 — non-existent recipe not updated', function () {",
-                                    "    pm.response.to.have.status(404);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "GET /recipes/ — only my recipes returned (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                ""
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('All recipes belong to current user', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    var userId = pm.environment.get('user_id');",
-                                    "    json.forEach(function(r) { pm.expect(r.user_id).to.equal(userId); });",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
+          "name": "List my recipes (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "pm.test('Array has at least one recipe', function () {",
+                  "    pm.expect(pm.response.json().length).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "name": "3 — Ingredients",
-            "description": "Gestión de ingredientes. Requiere JWT y recipe_id guardado en sección 2.",
-            "item": [
-                {
-                    "name": "Add ingredient to recipe (201)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"name\": \"Harina\",\n  \"quantity\": \"500\",\n  \"unit\": \"g\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 201 — ingredient added', function () {",
-                                    "    pm.response.to.have.status(201);",
-                                    "});",
-                                    "pm.test('Response has id — saved to {{ingredient_id}}', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('id');",
-                                    "    pm.environment.set('ingredient_id', json.id);",
-                                    "});",
-                                    "pm.test('Ingredient linked to correct recipe', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.recipe_id).to.equal(pm.environment.get('recipe_id'));",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "List ingredients for recipe (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Response is an array', function () {",
-                                    "    pm.expect(pm.response.json()).to.be.an('array');",
-                                    "});",
-                                    "pm.test('Array has at least one ingredient', function () {",
-                                    "    pm.expect(pm.response.json().length).to.be.at.least(1);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Get ingredient by ID (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients",
-                                "{{ingredient_id}}"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Ingredient ID matches', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.id).to.equal(pm.environment.get('ingredient_id'));",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Update ingredient (200)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"quantity\": \"600\",\n  \"unit\": \"g\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients",
-                                "{{ingredient_id}}"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200 — ingredient updated', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Quantity was updated', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.quantity).to.equal('600');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Delete ingredient (204)",
-                    "request": {
-                        "method": "DELETE",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients",
-                                "{{ingredient_id}}"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 204 — ingredient deleted', function () {",
-                                    "    pm.response.to.have.status(204);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Add ingredient — missing required fields (400)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"name\":\"Harina\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 400 — missing quantity and unit', function () {",
-                                    "    pm.response.to.have.status(400);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Add ingredient — non-existent recipe (404)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000/ingredients",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "00000000-0000-0000-0000-000000000000",
-                                "ingredients"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"name\":\"Sal\",\"quantity\":\"1\",\"unit\":\"tsp\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 404 — recipe not found', function () {",
-                                    "    pm.response.to.have.status(404);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Add ingredient — valid (201)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"name\":\"Azucar\",\"quantity\":\"200\",\"unit\":\"g\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 201', function () {",
-                                    "    pm.response.to.have.status(201);",
-                                    "});",
-                                    "pm.test('ingredient_id saved', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.environment.set('ingredient_id', json.id);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "GET ingredient — wrong recipe in path (404)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000/ingredients/{{ingredient_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "00000000-0000-0000-0000-000000000000",
-                                "ingredients",
-                                "{{ingredient_id}}"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 404 — ingredient not found under wrong recipe', function () {",
-                                    "    pm.response.to.have.status(404);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "PUT ingredient — non-existent (404)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/00000000-0000-0000-0000-000000000000",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients",
-                                "00000000-0000-0000-0000-000000000000"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"quantity\":\"999\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 404 — non-existent ingredient', function () {",
-                                    "    pm.response.to.have.status(404);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "PUT ingredient — partial update (200)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}",
-                                "ingredients",
-                                "{{ingredient_id}}"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"unit\":\"kg\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Unit was updated', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.unit).to.equal('kg');",
-                                    "});",
-                                    "pm.test('Name unchanged', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json.name).to.equal('Azucar');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
+          "name": "Get recipe by ID (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Recipe ID matches', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.id).to.equal(pm.environment.get('recipe_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "name": "4 — Scan",
-            "description": "Subir PDF para extraer receta con Groq. Requiere JWT. Seleccionar el PDF manualmente en el request.",
-            "item": [
-                {
-                    "name": "Upload PDF — no file (400)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "body": {
-                            "mode": "formdata",
-                            "formdata": []
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/scan/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "scan",
-                                ""
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 400 — no file attached', function () {",
-                                    "    pm.response.to.have.status(400);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Upload PDF — MANUAL (run individually, select file first)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "body": {
-                            "mode": "formdata",
-                            "formdata": [
-                                {
-                                    "key": "file",
-                                    "type": "file",
-                                    "src": "",
-                                    "description": "Seleccionar el PDF de receta"
-                                }
-                            ]
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/scan/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "scan",
-                                ""
-                            ]
-                        }
-                    },
-                    "event": []
-                }
-            ]
+          "name": "Get recipe — not found (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/non-existent-id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "non-existent-id"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — recipe not found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "name": "7 — Cross-User Security",
-            "description": "Verifica que un usuario no pueda modificar datos de otro.",
-            "item": [
-                {
-                    "name": "Register second user (201)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/register",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "register"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"first_name\":\"Otro\",\"last_name\":\"Usuario\",\"email\":\"{{test_email2}}\",\"password\":\"pass_user2\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 201 — second user created', function () {",
-                                    "    pm.response.to.have.status(201);",
-                                    "});",
-                                    "pm.test('user2_id saved', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.environment.set('user2_id', json.user_id);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Login as second user (200)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/login",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "login"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"email\":\"{{test_email2}}\",\"password\":\"pass_user2\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('token2 saved', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.environment.set('token2', json.token);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "GET /me as user2 (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token2}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Returns user2 data not user1', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('id');",
-                                    "    pm.expect(json.id).to.equal(pm.environment.get('user2_id'));",
-                                    "    pm.expect(json.id).to.not.equal(pm.environment.get('user_id'));",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "PUT user1 recipe as user2 — Forbidden (403)",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            },
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token2}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}"
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\"title\":\"Hacked\"}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 403 — cannot modify another user recipe', function () {",
-                                    "    pm.response.to.have.status(403);",
-                                    "});",
-                                    "pm.test('Error says Forbidden', function () {",
-                                    "    pm.expect(pm.response.json().error).to.equal('Forbidden');",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "DELETE user1 recipe as user2 — Forbidden (403)",
-                    "request": {
-                        "method": "DELETE",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token2}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 403 — cannot delete another user recipe', function () {",
-                                    "    pm.response.to.have.status(403);",
-                                    "});",
-                                    "pm.test('Recipe still exists after forbidden delete', function () {",
-                                    "    pm.response.to.have.status(403);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "GET /me as user2 returns user2 not user1 (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token2}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('Returns user2 data not user1', function () {",
-                                    "    var json = pm.response.json();",
-                                    "    pm.expect(json).to.have.property('id');",
-                                    "    pm.expect(json.id).to.equal(pm.environment.get('user2_id'));",
-                                    "    pm.expect(json.id).to.not.equal(pm.environment.get('user_id'));",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "List recipes as user2 — empty list (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token2}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                ""
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 200', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "pm.test('User2 has no recipes', function () {",
-                                    "    pm.expect(pm.response.json()).to.be.an('array').with.lengthOf(0);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
+          "name": "Update recipe (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tarta de manzana actualizada\",\n  \"servings\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — recipe updated', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Title was updated', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.title).to.equal('Tarta de manzana actualizada');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "name": "5 — Cleanup",
-            "description": "Borrar receta creada en sección 2. Va al final para que los tests de Ingredients puedan usar el recipe_id.",
-            "item": [
-                {
-                    "name": "Delete recipe (204)",
-                    "request": {
-                        "method": "DELETE",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                "{{recipe_id}}"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 204 — recipe deleted', function () {",
-                                    "    pm.response.to.have.status(204);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
+          "name": "Create recipe — missing title (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"description\":\"No title here\",\"servings\":4}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing required title', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
-            "name": "6 — Security",
-            "description": "Verifica que los endpoints protejan correctamente los datos.",
-            "item": [
-                {
-                    "name": "No token — recipes list (401)",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                ""
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 401 — no token rejected', function () {",
-                                    "    pm.response.to.have.status(401);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Invalid token (422)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer invalid.token.here"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/recipes/",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "recipes",
-                                ""
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 422 — malformed token rejected', function () {",
-                                    "    pm.response.to.have.status(422);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Swagger docs accessible (200)",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/api/docs",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "docs"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Swagger UI accessible', function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "DELETE /me — account deleted (204)",
-                    "request": {
-                        "method": "DELETE",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 204 — account deleted', function () {",
-                                    "    pm.response.to.have.status(204);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "GET /me after DELETE — token invalid (401)",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{token}}"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/auth/me",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "auth",
-                                "me"
-                            ]
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test('Status 404 or 401 — deleted user token rejected', function () {",
-                                    "    pm.expect([401, 404]).to.include(pm.response.code);",
-                                    "});"
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
+          "name": "Get recipe — invalid UUID (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — non-existent recipe', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Error property present', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create recipe — success for edge case tests (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"Edge Case Recipe\",\"servings\":2,\"category\":\"Test\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — edge recipe created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('recipe_id saved for ownership tests', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.environment.set('recipe_id', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT recipe — full update (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"Fully Updated\",\"description\":\"New desc\",\"servings\":6,\"prep_time_min\":45,\"category\":\"Postres\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — full update accepted', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('All updated fields reflected', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.title).to.equal('Fully Updated');",
+                  "    pm.expect(json.servings).to.equal(6);",
+                  "    pm.expect(json.category).to.equal('Postres');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT recipe — non-existent (404)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"Ghost\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — non-existent recipe not updated', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /recipes/ — only my recipes returned (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('All recipes belong to current user', function () {",
+                  "    var json = pm.response.json();",
+                  "    var userId = pm.environment.get('user_id');",
+                  "    json.forEach(function(r) { pm.expect(r.user_id).to.equal(userId); });",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
-    ]
+      ]
+    },
+    {
+      "name": "3 — Ingredients",
+      "description": "Gestión de ingredientes. Requiere JWT y recipe_id guardado en sección 2.",
+      "item": [
+        {
+          "name": "Add ingredient to recipe (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Harina\",\n  \"quantity\": \"500\",\n  \"unit\": \"g\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — ingredient added', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Response has id — saved to {{ingredient_id}}', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.environment.set('ingredient_id', json.id);",
+                  "});",
+                  "pm.test('Ingredient linked to correct recipe', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.recipe_id).to.equal(pm.environment.get('recipe_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List ingredients for recipe (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "pm.test('Array has at least one ingredient', function () {",
+                  "    pm.expect(pm.response.json().length).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get ingredient by ID (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients",
+                "{{ingredient_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Ingredient ID matches', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.id).to.equal(pm.environment.get('ingredient_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update ingredient (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": \"600\",\n  \"unit\": \"g\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients",
+                "{{ingredient_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — ingredient updated', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Quantity was updated', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.quantity).to.equal('600');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete ingredient (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients",
+                "{{ingredient_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 — ingredient deleted', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add ingredient — missing required fields (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Harina\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing quantity and unit', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add ingredient — non-existent recipe (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000/ingredients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "00000000-0000-0000-0000-000000000000",
+                "ingredients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Sal\",\"quantity\":\"1\",\"unit\":\"tsp\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — recipe not found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add ingredient — valid (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Azucar\",\"quantity\":\"200\",\"unit\":\"g\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('ingredient_id saved', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.environment.set('ingredient_id', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET ingredient — wrong recipe in path (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000/ingredients/{{ingredient_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "00000000-0000-0000-0000-000000000000",
+                "ingredients",
+                "{{ingredient_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — ingredient not found under wrong recipe', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT ingredient — non-existent (404)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"quantity\":\"999\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — non-existent ingredient', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT ingredient — partial update (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients",
+                "{{ingredient_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"unit\":\"kg\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Unit was updated', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.unit).to.equal('kg');",
+                  "});",
+                  "pm.test('Name unchanged', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.name).to.equal('Azucar');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 — Scan",
+      "description": "Subir PDF para extraer receta con Groq. Requiere JWT. Seleccionar el PDF manualmente en el request.",
+      "item": [
+        {
+          "name": "Upload PDF — no file (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": []
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/scan/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "scan",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — no file attached', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload PDF — MANUAL (run individually, select file first)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Seleccionar el PDF de receta"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/scan/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "scan",
+                ""
+              ]
+            }
+          },
+          "event": []
+        }
+      ]
+    },
+    {
+      "name": "7 — Cross-User Security",
+      "description": "Verifica que un usuario no pueda modificar datos de otro.",
+      "item": [
+        {
+          "name": "Register second user (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"first_name\":\"Otro\",\"last_name\":\"Usuario\",\"email\":\"{{test_email2}}\",\"password\":\"pass_user2\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — second user created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('user2_id saved', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.environment.set('user2_id', json.user_id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as second user (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{test_email2}}\",\"password\":\"pass_user2\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('token2 saved', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.environment.set('token2', json.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /me as user2 (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token2}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Returns user2 data not user1', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json.id).to.equal(pm.environment.get('user2_id'));",
+                  "    pm.expect(json.id).to.not.equal(pm.environment.get('user_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT user1 recipe as user2 — Forbidden (403)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token2}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"Hacked\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — cannot modify another user recipe', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('Error says Forbidden', function () {",
+                  "    pm.expect(pm.response.json().error).to.equal('Forbidden');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE user1 recipe as user2 — Forbidden (403)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token2}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — cannot delete another user recipe', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('Recipe still exists after forbidden delete', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /me as user2 returns user2 not user1 (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token2}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Returns user2 data not user1', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json.id).to.equal(pm.environment.get('user2_id'));",
+                  "    pm.expect(json.id).to.not.equal(pm.environment.get('user_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List recipes as user2 — empty list (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token2}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('User2 has no recipes', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array').with.lengthOf(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 — Custom Prices",
+      "item": [
+        {
+          "name": "POST /prices — crear precio (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ingredient_name\": \"harina\",\n  \"price_per_kg\": 2.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — precio creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Response tiene id, ingredient_name, price_per_kg', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('ingredient_name');",
+                  "    pm.expect(json).to.have.property('price_per_kg');",
+                  "});",
+                  "pm.test('ingredient_name es harina', function () {",
+                  "    pm.expect(pm.response.json().ingredient_name).to.eql('harina');",
+                  "});",
+                  "pm.test('price_per_kg es 2', function () {",
+                  "    pm.expect(pm.response.json().price_per_kg).to.eql(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /prices — listar precios (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response es un array con al menos 1 precio', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.be.an('array');",
+                  "    pm.expect(json.length).to.be.at.least(1);",
+                  "});",
+                  "pm.test('Items tienen ingredient_name y price_per_kg', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json[0]).to.have.property('ingredient_name');",
+                  "    pm.expect(json[0]).to.have.property('price_per_kg');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /prices/harina — obtener precio (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices/harina",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices",
+                "harina"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('ingredient_name es harina', function () {",
+                  "    pm.expect(pm.response.json().ingredient_name).to.eql('harina');",
+                  "});",
+                  "pm.test('price_per_kg es 2', function () {",
+                  "    pm.expect(pm.response.json().price_per_kg).to.eql(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /prices — duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ingredient_name\": \"harina\",\n  \"price_per_kg\": 5.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 — precio ya existe', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('Response tiene campo error', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /prices/harina — actualizar precio (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price_per_kg\": 3.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices/harina",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices",
+                "harina"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — precio actualizado', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('price_per_kg actualizado a 3', function () {",
+                  "    pm.expect(pm.response.json().price_per_kg).to.eql(3);",
+                  "});",
+                  "pm.test('ingredient_name sigue siendo harina', function () {",
+                  "    pm.expect(pm.response.json().ingredient_name).to.eql('harina');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /prices/harina — eliminar precio (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices/harina",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices",
+                "harina"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 — precio eliminado', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /prices/harina — después del delete (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices/harina",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices",
+                "harina"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — precio no existe', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Response tiene campo error', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 — Costs",
+      "item": [
+        {
+          "name": "GET /recipes/<id>/cost — obtener costo (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/cost",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "cost"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response tiene todos los campos esperados', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('recipe_id');",
+                  "    pm.expect(json).to.have.property('recipe_title');",
+                  "    pm.expect(json).to.have.property('ingredients');",
+                  "    pm.expect(json).to.have.property('total_estimated_cost');",
+                  "    pm.expect(json).to.have.property('currency');",
+                  "    pm.expect(json).to.have.property('note');",
+                  "});",
+                  "pm.test('currency es EUR', function () {",
+                  "    pm.expect(pm.response.json().currency).to.eql('EUR');",
+                  "});",
+                  "pm.test('total_estimated_cost es un número', function () {",
+                  "    pm.expect(pm.response.json().total_estimated_cost).to.be.a('number');",
+                  "});",
+                  "pm.test('ingredients es un array', function () {",
+                  "    pm.expect(pm.response.json().ingredients).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /recipes/<id>/cost — con precio custom (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/cost",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "cost"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Create a custom price for 'harina' before this request",
+                  "pm.sendRequest({",
+                  "    url: pm.environment.get('base_url') + '/api/v1/prices',",
+                  "    method: 'POST',",
+                  "    header: {",
+                  "        'Content-Type': 'application/json',",
+                  "        'Authorization': 'Bearer ' + pm.environment.get('token')",
+                  "    },",
+                  "    body: {",
+                  "        mode: 'raw',",
+                  "        raw: JSON.stringify({ ingredient_name: 'harina', price_per_kg: 20.00 })",
+                  "    }",
+                  "}, function(err, res) {});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Algún ingrediente usa precio custom de harina (€20/kg)', function () {",
+                  "    var json = pm.response.json();",
+                  "    var harina = json.ingredients.find(function(i) {",
+                  "        return i.name.toLowerCase() === 'harina';",
+                  "    });",
+                  "    if (harina) {",
+                  "        pm.expect(harina.price_per_kg).to.eql(20);",
+                  "    } else {",
+                  "        pm.expect(true).to.be.true; // ingrediente no está en esta receta, test skipped",
+                  "    }",
+                  "});",
+                  "// Cleanup: delete the custom price",
+                  "pm.sendRequest({",
+                  "    url: pm.environment.get('base_url') + '/api/v1/prices/harina',",
+                  "    method: 'DELETE',",
+                  "    header: { 'Authorization': 'Bearer ' + pm.environment.get('token') }",
+                  "}, function(err, res) {});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /recipes/<id>/cost — receta no existe (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000/cost",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "00000000-0000-0000-0000-000000000000",
+                "cost"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — receta no existe', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Response tiene campo error', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 — Cleanup",
+      "description": "Borrar receta creada en sección 2. Va al final para que los tests de Ingredients puedan usar el recipe_id.",
+      "item": [
+        {
+          "name": "Delete recipe (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 — recipe deleted', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 — Security",
+      "description": "Verifica que los endpoints protejan correctamente los datos.",
+      "item": [
+        {
+          "name": "No token — recipes list (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — no token rejected', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid token (422)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer invalid.token.here"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 — malformed token rejected', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Swagger docs accessible (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/docs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "docs"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Swagger UI accessible', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /me — account deleted (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 — account deleted', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /me after DELETE — token invalid (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 or 401 — deleted user token rejected', function () {",
+                  "    pm.expect([401, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }

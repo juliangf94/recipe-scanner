@@ -3302,3 +3302,823 @@ Groq (LLaMA 3.3-70b) extrae la receta del texto del PDF y devuelve JSON estructu
 | Tests unitarios — modelos y repository | ✅ |
 
 **Próximo: Sprint 4** — Precios con Open Food Facts + swap InMemoryStorage → SQLAlchemy.
+
+---
+
+# Sesión 9 — Sprint 4 · Precios con Open Food Facts (`api/v1/costs.py` + `services/facade.py`)
+
+## ¿Qué es Open Food Facts?
+
+Open Food Facts es una **base de datos abierta de productos alimenticios** mantenida por la comunidad, similar a Wikipedia pero para comida. 
+Contiene información nutricional, ingredientes, categorías y marcas de millones de productos en todo el mundo.
+
+-   **URL base de la API:** `https://world.openfoodfacts.org`
+-   **Autenticación:** ninguna — es completamente pública y gratuita.
+-   **Librería a usar:** `requests` — la librería estándar de Python para hacer llamadas HTTP.
+
+### Lo que nos da Open Food Facts
+
+| Dato | ¿Sirve para nosotros? |
+|---|---|
+| Nombre del producto | ✅ Para confirmar que encontramos el ingrediente |
+| Categorías (tags) | ✅ Para inferir el tipo de ingrediente |
+| Información nutricional | ✅ Dato extra para el futuro |
+| **Precio** | ❌ Datos muy escasos — la mayoría de productos no tienen precio |
+
+### Por qué Open Food Facts no tiene precios confiables
+
+Open Food Facts es un proyecto de nutrición, no de precios. Los precios los carga la comunidad de forma voluntaria y cubren principalmente productos envasados de supermercados europeos. Para ingredientes crudos como "harina", "huevos" o "ricota", raramente hay datos de precio.
+
+**Solución:** usar Open Food Facts para **identificar el producto y su categoría**, y aplicar nuestra propia tabla de precios promedio (`FALLBACK_PRICES`) según el tipo de ingrediente. Esto es honesto, siempre funciona, y demuestra integración con API externa.
+
+---
+
+## Por qué un endpoint separado (Opción B)
+
+Se evaluaron dos diseños:
+
+**Opción A — precio inline en el scan:**
+Después de extraer la receta con Groq, llamar a Open Food Facts por cada ingrediente en el mismo request. Problema: si una receta tiene 10 ingredientes, son 10 llamadas HTTP adicionales en un request que ya tarda 2-3 segundos por Groq. Total: 10-15 segundos de espera.
+
+**Opción B — endpoint separado `GET /recipes/<id>/cost` (elegida):**
+El scan sigue siendo rápido. El usuario consulta el costo cuando lo necesita.
+
+```
+Opción A (descartada):
+  POST /scan → Groq (3s) + OFF × 10 ingredientes (5s) = 8s de espera
+
+Opción B (elegida):
+  POST /scan → Groq (3s)         ← rápido
+  GET /recipes/<id>/cost → OFF   ← bajo demanda, cuando el usuario lo pide
+```
+
+Además funciona para cualquier receta, no solo las escaneadas — si el usuario creó una receta manualmente también puede ver su costo estimado.
+
+---
+
+## Nueva dependencia: `requests`
+
+```bash
+pip install requests
+```
+
+`requests` es la librería HTTP más usada en Python para consumir APIs externas:
+
+```python
+import requests
+response = requests.get(url, params={...}, timeout=5)
+data = response.json()
+```
+
+- `params` — parámetros que se agregan a la URL como query string (`?key=value&...`)
+- `timeout=5` — si la API no responde en 5 segundos, lanza una excepción. Sin timeout, el request puede colgar indefinidamente y bloquear el servidor Flask.
+- `.json()` — parsea el body de la respuesta como JSON directamente.
+
+Agregar a `requirements.txt` con `pip freeze > requirements.txt` después de instalar.
+
+---
+
+## Constantes del módulo en `facade.py`
+
+Al igual que `GROQ_PROMPT`, las constantes de Open Food Facts se definen **antes de la clase**:
+
+```python
+OFF_SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
+
+FALLBACK_PRICES = {
+    # Precios en EUR por kg — promedio supermercados Francia 2025
+    'harina': 1.20,    'flour': 1.20,
+    'azucar': 1.00,    'sugar': 1.00,
+    'manteca': 9.00,   'butter': 9.00,
+    'leche': 1.20,     'milk': 1.20,
+    'huevo': 2.00,     'huevos': 2.00,    
+    'egg': 2.00,       'eggs': 2.00,
+    'ricota': 8.50,
+    'queso': 12.00,    'cheese': 12.00,
+    'sal': 0.50,       'salt': 0.50,
+    'aceite': 4.00,    'oil': 4.00,
+    'crema': 3.50,     'cream': 3.50,
+    'limon': 2.50,     'lemon': 2.50,
+    'naranja': 1.80,   'orange': 1.80,
+    'vainilla': 30.00, 'vanilla': 30.00,
+    'chocolate': 8.00, 'cacao': 10.00,
+    'levadura': 8.00,  'yeast': 8.00,
+    'nuez': 15.00,     'nuts': 15.00,
+    'almendra': 20.00, 'almond': 20.00,
+}
+```
+
+Nivel de módulo = se crea una sola vez cuando Python importa el archivo, no en cada llamada al método.
+
+**FALLBACK_PRICES:** precios en **EUR por kg**, basados en precios promedio de supermercados franceses (Carrefour, Leclerc, Monoprix) en 2025. Son aproximaciones — el objetivo es dar una estimación razonable, no un precio exacto.
+
+---
+
+# Codigo Sprint 4
+
+## `backend/app/models/custom_price.py`
+
+```python
+from dataclasses import dataclass, field
+import uuid
+
+
+@dataclass
+class CustomPrice:
+    user_id: str
+    ingredient_name: str
+    price_per_kg: float
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+### Lógica
+
+#### Estructura del modelo
+```py
+@dataclass
+class CustomPrice:
+    user_id: str
+    ingredient_name: str
+    price_per_kg: float
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+-   Mismo patrón que todos los modelos del proyecto — `@dataclass` con `id` autogenerado
+-   `user_id` — cada precio custom pertenece a un usuario específico
+    +   Cuando migremos a SQLAlchemy, esto se convierte en una foreign key a la tabla `users`
+-   `ingredient_name` — se guarda en minúsculas y sin espacios (la facade lo normaliza antes de crear)
+-   `price_per_kg` — float en EUR, mismo sistema de unidades que `FALLBACK_PRICES`
+-   No tiene `recipe_id` — el precio es global para el usuario, no está atado a una receta específica
+
+---
+
+## Nuevos métodos en `facade.py`
+
+### `get_recipe_cost(recipe_id, user_id)` — método público
+
+```python
+def get_recipe_cost(self, recipe_id, user_id):
+    recipe = self.get_recipe(recipe_id)
+    ingredients = self.get_ingredients_by_recipe(recipe_id)
+    result = []
+    total = 0.0
+
+    for ing in ingredients:
+        price_per_kg = self._get_ingredient_price(ing.name, user_id)
+        try:
+            qty = float(ing.quantity)
+        except (ValueError, TypeError):
+            qty = 0.0
+        estimated = round(qty * (price_per_kg / 1000), 2)
+        total += estimated
+        result.append({
+            'name': ing.name,
+            'quantity': ing.quantity,
+            'unit': ing.unit,
+            'price_per_kg': price_per_kg,
+            'estimated_price': estimated
+        })
+
+    return {
+        'recipe_id': recipe_id,
+        'recipe_title': recipe.title,
+        'ingredients': result,
+        'total_estimated_cost': round(total, 2),
+        'currency': 'EUR',
+        'note': 'Estimated prices in EUR/kg. Source: Open Food Facts + average prices France.'
+    }
+```
+
+#### Lógica
+##### Objeto Recipe
+```py
+def get_recipe_cost(self, recipe_id, user_id):
+    recipe = self.get_recipe(recipe_id)
+```
+-   Obtiene el objeto `Recipe` del storage usando el ID
+-   Lo necesitamos para incluir el `recipe_title` en la respuesta
+    +   Así el cliente sabe a qué receta corresponde el costo sin tener que hacer otra petición
+
+##### Lista de ingredientes
+```py
+    ingredients = self.get_ingredients_by_recipe(recipe_id)
+```
+-   Obtiene la lista de todos los ingredientes asociados a esa receta
+-   Este método filtra el storage completo buscando ingredientes cuyo `recipe_id` coincida
+    +   Si la receta no tiene ingredientes, devuelve lista vacía y el total será 0
+
+##### Acumuladores
+```py
+    result = []
+    total = 0.0
+```
+-   `result` va a contener un dict por cada ingrediente con su precio calculado
+-   `total` acumula la suma de todos los precios estimados
+    +   Se inicializan vacíos/cero antes del loop
+
+##### Loop por ingrediente
+```py
+    for ing in ingredients:
+        price_per_kg = self._get_ingredient_price(ing.name, user_id)
+```
+-   Itera sobre cada ingrediente de la receta
+-   `ing` es un objeto `Ingredient` con atributos `name`, `quantity`, `unit`, `recipe_id`, `id`
+-   Pasa `user_id` al método privado para que pueda verificar precios custom del usuario
+    +   Orden de lookup: precio custom → Open Food Facts → FALLBACK_PRICES → €5.00
+
+##### Conversión de cantidad
+```py
+        try:
+            qty = float(ing.quantity)
+        except (ValueError, TypeError):
+            qty = 0.0
+```
+-   `ing.quantity` es siempre un **string** porque lo guardamos así desde el modelo
+    +   Permite valores como `"200"`, `"1/2"`, `"al gusto"`
+-   `float("200")` → `200.0` ✅
+-   `float("al gusto")` → `ValueError` → `qty = 0.0`
+-   `float("1/2")` → `ValueError` → `qty = 0.0`
+-   `float(None)` → `TypeError` → `qty = 0.0`
+-   Si `qty = 0.0`, el ingrediente aparece en la respuesta con `estimated_price: 0.0`
+    +   No se descarta, sigue en la lista pero no suma al total
+
+##### Fórmula de precio
+```py
+        estimated = round(qty * (price_per_kg / 1000), 2)
+        total += estimated
+```
+-   Primero convierte el precio de euros/kg a euros/gramo dividiendo por 1000
+-   Después multiplica por la cantidad en gramos
+    +   Ejemplo: 500g de ricota a €8.50/kg → `500 × (8.50 / 1000)` = `500 × 0.0085` = **€4.25**
+-   `round(..., 2)` redondea a 2 decimales — resultado en euros con centavos
+-   `total += estimated` acumula el precio de cada ingrediente; después del loop tiene la suma total
+
+##### Construcción del resultado por ingrediente
+```py
+        result.append({
+            'name': ing.name,
+            'quantity': ing.quantity,
+            'unit': ing.unit,
+            'price_per_kg': price_per_kg,
+            'estimated_price': estimated
+        })
+```
+-   Agrega un dict a la lista `result` con los datos de este ingrediente
+-   Incluye `price_per_kg` explícitamente para que el usuario pueda verificar de dónde viene el cálculo
+    +   Transparencia total — el cliente puede mostrar "€8.50/kg" junto al precio estimado
+
+##### Return final
+```py
+    return {
+        'recipe_id': recipe_id,
+        'recipe_title': recipe.title,
+        'ingredients': result,
+        'total_estimated_cost': round(total, 2),
+        'currency': 'EUR',
+        'note': 'Estimated prices in EUR/kg. Source: Open Food Facts + average prices France.'
+    }
+```
+-   `recipe_id` + `recipe_title` — identifica la receta sin que el cliente necesite hacer otra petición
+-   `ingredients` — lista con el precio por ingrediente
+-   `total_estimated_cost` — `round(total, 2)` porque las sumas de floats acumulan errores de punto flotante
+    +   Ejemplo: `4.25 + 0.24` puede dar `4.490000000001` sin el redondeo
+-   `currency: 'EUR'` — explícito para que la UI pueda mostrar el símbolo correcto
+-   `note` — en inglés, transparencia de que son estimaciones y no precios reales
+
+---
+
+### `_get_ingredient_price(name, user_id)` — método privado
+
+```python
+def _get_ingredient_price(self, name, user_id=None):
+    name_lower = name.lower().strip()
+
+    if user_id:
+        custom = self.get_custom_price(user_id, name_lower)
+        if custom:
+            return custom.price_per_kg
+
+    try:
+        params = {
+            'search_terms': name,
+            'json': 1,
+            'page_size': 1,
+            'action': 'process',
+            'fields': 'product_name,categories_tags'
+        }
+        response = requests.get(OFF_SEARCH_URL, params=params, timeout=5)
+        products = response.json().get('products', [])
+
+        if products:
+            product = products[0]
+            product_name = product.get('product_name', '').lower()
+            categories = ' '.join(product.get('categories_tags', []))
+            combined = f"{product_name} {categories}"
+            for key, price in FALLBACK_PRICES.items():
+                if key in combined:
+                    return price
+    except Exception:
+        pass
+
+    for key, price in FALLBACK_PRICES.items():
+        if key in name_lower:
+            return price
+
+    return 5.00
+```
+
+#### Lógica
+##### Precio custom del usuario
+```py
+def _get_ingredient_price(self, name, user_id=None):
+    name_lower = name.lower().strip()
+
+    if user_id:
+        custom = self.get_custom_price(user_id, name_lower)
+        if custom:
+            return custom.price_per_kg
+```
+-   `user_id=None` — parámetro opcional para mantener compatibilidad si se llama sin usuario
+-   Si el usuario tiene un precio personalizado para este ingrediente, lo usa directamente
+    +   Tiene prioridad máxima — el precio custom siempre gana sobre OFF y FALLBACK_PRICES
+-   `get_custom_price` busca en `_custom_prices` por `user_id` + `ingredient_name` normalizado
+
+##### Normalización del nombre
+```py
+    name_lower = name.lower().strip()
+```
+-   Convierte el nombre a minúsculas y elimina espacios al inicio/final
+    +   `"  Ricota Fresca  "` → `"ricota fresca"`
+-   Necesario porque los ingredientes vienen de Groq con capitalización variable y posibles espacios
+
+##### Llamada a Open Food Facts
+```py
+    try:
+        params = {
+            'search_terms': name,
+            'json': 1,
+            'page_size': 1,
+            'action': 'process',
+            'fields': 'product_name,categories_tags'
+        }
+        response = requests.get(OFF_SEARCH_URL, params=params, timeout=5)
+```
+-   Todo el bloque está dentro de un `try` porque es una llamada a red
+    +   Puede fallar por timeout, DNS, error HTTP, respuesta inválida, o sin conexión
+-   Parámetros del query:
+    +   `search_terms` — el nombre del ingrediente a buscar
+    +   `json: 1` — pide la respuesta en formato JSON (sin esto devuelve HTML)
+    +   `page_size: 1` — solo necesitamos el primer resultado, no toda la lista
+    +   `action: 'process'` — activa el endpoint de búsqueda de la API
+    +   `fields` — pide solo `product_name` y `categories_tags`; sin esto OFF devuelve más de 100 campos por producto
+-   `requests` convierte `params` en query string automáticamente
+-   `timeout=5` — si la API no responde en 5 segundos, lanza `requests.exceptions.Timeout`
+
+##### Extracción de productos
+```py
+        products = response.json().get('products', [])
+
+        if products:
+            product = products[0]
+```
+-   `response.json()` — parsea el body de la respuesta como dict Python
+-   `.get('products', [])` — extrae la lista; si la clave no existe devuelve lista vacía en lugar de `KeyError`
+-   `if products:` — verifica que OFF encontró al menos un producto
+-   `products[0]` — toma el primer resultado, el más relevante según OFF
+
+##### Búsqueda de precio en el producto OFF
+```py
+            product_name = product.get('product_name', '').lower()
+            categories = ' '.join(product.get('categories_tags', []))
+            combined = f"{product_name} {categories}"
+            for key, price in FALLBACK_PRICES.items():
+                if key in combined:
+                    return price
+```
+-   `categories_tags` es una lista de tags, ej. `["en:flours", "en:cereals", "en:baking"]`
+    +   Se une con espacios para poder buscar por substring en un solo string
+-   `combined` concatena nombre y categorías: `"farine de blé t55 en:flours en:cereals-and-their-products"`
+-   `"flour" in combined` → `True` → retorna `1.20` (€/kg) — el primer match gana
+
+##### Manejo de errores de red
+```py
+    except Exception:
+        pass
+```
+-   Captura cualquier excepción: timeout, error DNS, SSL, respuesta no-JSON, etc.
+-   `pass` ignora el error y la ejecución continúa en el fallback de abajo
+
+##### Fallback por nombre del ingrediente
+```py
+    for key, price in FALLBACK_PRICES.items():
+        if key in name_lower:
+            return price
+```
+-   Si OFF falló o no encontró match, busca directamente en el nombre del ingrediente
+    +   `"ricota" in "ricota fresca"` → `True` → retorna `8.50`
+
+##### Precio por defecto
+```py
+    return 5.00
+```
+-   Si nada matchea, €5.00/kg como fallback final
+-   Nunca retorna `None` ni `0` — siempre hay un float para que la fórmula funcione
+
+---
+
+### Custom Prices — métodos CRUD
+
+```python
+def get_custom_prices(self, user_id):
+    return [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+
+def get_custom_price(self, user_id, ingredient_name):
+    name_lower = ingredient_name.lower().strip()
+    for cp in self._custom_prices.get_all():
+        if cp.user_id == user_id and cp.ingredient_name == name_lower:
+            return cp
+    return None
+
+def create_custom_price(self, user_id, ingredient_name, price_per_kg):
+    cp = CustomPrice(
+        user_id=user_id,
+        ingredient_name=ingredient_name.lower().strip(),
+        price_per_kg=price_per_kg
+    )
+    return self._custom_prices.save(cp)
+
+def update_custom_price(self, user_id, ingredient_name, price_per_kg):
+    cp = self.get_custom_price(user_id, ingredient_name)
+    if not cp:
+        return None
+    cp.price_per_kg = price_per_kg
+    return self._custom_prices.update(cp)
+
+def delete_custom_price(self, user_id, ingredient_name):
+    cp = self.get_custom_price(user_id, ingredient_name)
+    if not cp:
+        return False
+    self._custom_prices.delete(cp.id)
+    return True
+```
+
+### Lógica
+
+#### `get_custom_prices` — listar todos
+```py
+def get_custom_prices(self, user_id):
+    return [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+```
+-   Filtra el storage por `user_id` — cada usuario solo ve sus propios precios
+-   Mismo patrón que `get_recipes_by_user` y `get_ingredients_by_recipe`
+
+#### `get_custom_price` — buscar por nombre
+```py
+def get_custom_price(self, user_id, ingredient_name):
+    name_lower = ingredient_name.lower().strip()
+    for cp in self._custom_prices.get_all():
+        if cp.user_id == user_id and cp.ingredient_name == name_lower:
+            return cp
+    return None
+```
+-   Busca por dos atributos a la vez (`user_id` + `ingredient_name`)
+    +   `InMemoryStorage.get_by_attribute` solo filtra por uno, por eso iteramos manualmente
+-   `name_lower` normaliza el input antes de comparar — `"Ricota"` matchea con `"ricota"` guardado
+
+#### `create_custom_price` — crear
+```py
+def create_custom_price(self, user_id, ingredient_name, price_per_kg):
+    cp = CustomPrice(
+        user_id=user_id,
+        ingredient_name=ingredient_name.lower().strip(),
+        price_per_kg=price_per_kg
+    )
+    return self._custom_prices.save(cp)
+```
+-   Normaliza el nombre antes de guardarlo — siempre se almacena en minúsculas
+    +   Garantiza que las búsquedas posteriores matcheen independientemente de la capitalización del input
+
+#### `update_custom_price` — actualizar precio
+```py
+def update_custom_price(self, user_id, ingredient_name, price_per_kg):
+    cp = self.get_custom_price(user_id, ingredient_name)
+    if not cp:
+        return None
+    cp.price_per_kg = price_per_kg
+    return self._custom_prices.update(cp)
+```
+-   Reutiliza `get_custom_price` para encontrar el objeto — no duplica la lógica de búsqueda
+-   Si no existe, retorna `None` — el endpoint lo convierte en 404
+-   Solo actualiza `price_per_kg` — el nombre del ingrediente es la clave y no cambia
+
+#### `delete_custom_price` — eliminar
+```py
+def delete_custom_price(self, user_id, ingredient_name):
+    cp = self.get_custom_price(user_id, ingredient_name)
+    if not cp:
+        return False
+    self._custom_prices.delete(cp.id)
+    return True
+```
+-   Retorna `bool` en lugar de `None` — el endpoint necesita saber si existía o no
+    +   `True` → existía y se eliminó → 204
+    +   `False` → no existía → 404
+-   Después del delete el ingrediente vuelve a usar OFF + FALLBACK_PRICES en el próximo cálculo
+
+---
+
+## `backend/app/api/v1/costs.py`
+
+```python
+from flask_restx import Namespace, Resource, fields
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.services.facade import facade
+
+api = Namespace('costs', description='Recipe cost estimation and custom ingredient prices')
+
+price_model = api.model('Price', {
+    'ingredient_name': fields.String(required=True, description='Ingredient name'),
+    'price_per_kg': fields.Float(required=True, description='Price in EUR per kg')
+})
+
+price_update_model = api.model('PriceUpdate', {
+    'price_per_kg': fields.Float(required=True, description='New price in EUR per kg')
+})
+
+
+@api.route('/recipes/<string:recipe_id>/cost')
+class RecipeCost(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Cost estimated successfully')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Recipe not found')
+    def get(self, recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        result = facade.get_recipe_cost(recipe_id, user_id)
+        return result, 200
+
+
+@api.route('/prices')
+class PriceList(Resource):
+
+    @jwt_required()
+    @api.response(200, 'List of custom prices')
+    def get(self):
+        user_id = get_jwt_identity()
+        prices = facade.get_custom_prices(user_id)
+        return [{'id': cp.id, 'ingredient_name': cp.ingredient_name,
+                 'price_per_kg': cp.price_per_kg} for cp in prices], 200
+
+    @jwt_required()
+    @api.expect(price_model, validate=True)
+    @api.response(201, 'Custom price created')
+    @api.response(409, 'Price for this ingredient already exists')
+    def post(self):
+        user_id = get_jwt_identity()
+        data = api.payload
+        existing = facade.get_custom_price(user_id, data['ingredient_name'])
+        if existing:
+            return {'error': 'Price for this ingredient already exists. Use PUT to update it.'}, 409
+        cp = facade.create_custom_price(user_id, data['ingredient_name'], data['price_per_kg'])
+        return {'id': cp.id, 'ingredient_name': cp.ingredient_name,
+                'price_per_kg': cp.price_per_kg}, 201
+
+
+@api.route('/prices/<string:ingredient_name>')
+class PriceDetail(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Custom price found')
+    @api.response(404, 'Custom price not found')
+    def get(self, ingredient_name):
+        user_id = get_jwt_identity()
+        cp = facade.get_custom_price(user_id, ingredient_name)
+        if not cp:
+            return {'error': 'Custom price not found'}, 404
+        return {'id': cp.id, 'ingredient_name': cp.ingredient_name,
+                'price_per_kg': cp.price_per_kg}, 200
+
+    @jwt_required()
+    @api.expect(price_update_model, validate=True)
+    @api.response(200, 'Custom price updated')
+    @api.response(404, 'Custom price not found')
+    def put(self, ingredient_name):
+        user_id = get_jwt_identity()
+        cp = facade.update_custom_price(user_id, ingredient_name, api.payload['price_per_kg'])
+        if not cp:
+            return {'error': 'Custom price not found'}, 404
+        return {'id': cp.id, 'ingredient_name': cp.ingredient_name,
+                'price_per_kg': cp.price_per_kg}, 200
+
+    @jwt_required()
+    @api.response(204, 'Custom price deleted')
+    @api.response(404, 'Custom price not found')
+    def delete(self, ingredient_name):
+        user_id = get_jwt_identity()
+        if not facade.delete_custom_price(user_id, ingredient_name):
+            return {'error': 'Custom price not found'}, 404
+        return '', 204
+```
+
+### Lógica
+
+#### Imports y Namespace
+```py
+from flask_restx import Namespace, Resource
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.services.facade import facade
+
+api = Namespace('costs', description='Recipe cost estimation via Open Food Facts')
+```
+-   Mismo patrón que `recipes.py` y `auth.py` — cada archivo define su propio `Namespace`
+-   `jwt_required` y `get_jwt_identity` para proteger el endpoint y saber qué usuario pide el costo
+-   `facade` es el singleton que tiene toda la lógica de negocio
+-   El archivo está separado de `recipes.py` porque consulta una API externa y hace cálculos de estimación
+    +   Si mañana cambiamos de Open Food Facts a otra fuente de precios, solo tocamos `costs.py`
+    +   No hay riesgo de romper el CRUD de recetas
+
+#### Modelos de precio
+```py
+price_model = api.model('Price', {
+    'ingredient_name': fields.String(required=True, description='Ingredient name'),
+    'price_per_kg': fields.Float(required=True, description='Price in EUR per kg')
+})
+
+price_update_model = api.model('PriceUpdate', {
+    'price_per_kg': fields.Float(required=True, description='New price in EUR per kg')
+})
+```
+-   `price_model` — para `POST /prices`, requiere nombre del ingrediente y precio
+-   `price_update_model` — para `PUT /prices/<name>`, solo necesita el nuevo precio
+    +   El nombre ya viene en la URL, no hace falta en el body
+
+#### Ruta del endpoint
+```py
+@api.route('/recipes/<string:recipe_id>/cost')
+class RecipeCost(Resource):
+```
+-   La ruta anida el costo bajo la receta porque el costo es información derivada de sus ingredientes
+    +   Sigue convenciones REST donde los recursos secundarios se anidan bajo el recurso padre
+-   La URL completa resulta `/api/v1/recipes/<recipe_id>/cost` porque en `__init__.py` se registra con `path='/api/v1'`
+
+#### Método GET — verificación de acceso
+```py
+    @jwt_required()
+    @api.response(200, 'Cost estimated successfully')
+    @api.response(403, 'Forbidden — recipe belongs to another user')
+    @api.response(404, 'Recipe not found')
+    def get(self, recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+```
+-   `@jwt_required()` — el endpoint es privado, solo usuarios autenticados pueden calcular costos
+-   `get_jwt_identity()` — extrae el `user_id` del token para verificar propiedad
+-   Primero verifica que la receta existe → 404 si no
+-   Después verifica que le pertenece al usuario autenticado → 403 si no
+    +   Mismo patrón de seguridad que el PUT y DELETE de `recipes.py`
+
+#### Delegación a la facade y respuesta
+```py
+        result = facade.get_recipe_cost(recipe_id, user_id)
+        return result, 200
+```
+-   Pasa `user_id` a la facade para que `_get_ingredient_price` pueda priorizar precios custom
+-   `result` ya es un dict listo para serializar como JSON — flask_restx lo convierte automáticamente
+
+#### `PriceList` — GET y POST en `/prices`
+```py
+@api.route('/prices')
+class PriceList(Resource):
+
+    def get(self):
+        user_id = get_jwt_identity()
+        prices = facade.get_custom_prices(user_id)
+        return [{'id': cp.id, 'ingredient_name': cp.ingredient_name,
+                 'price_per_kg': cp.price_per_kg} for cp in prices], 200
+
+    def post(self):
+        user_id = get_jwt_identity()
+        data = api.payload
+        existing = facade.get_custom_price(user_id, data['ingredient_name'])
+        if existing:
+            return {'error': 'Price for this ingredient already exists. Use PUT to update it.'}, 409
+        cp = facade.create_custom_price(user_id, data['ingredient_name'], data['price_per_kg'])
+        return {'id': cp.id, 'ingredient_name': cp.ingredient_name,
+                'price_per_kg': cp.price_per_kg}, 201
+```
+-   `GET` lista todos los precios custom del usuario autenticado
+    +   Cada usuario ve solo sus propios precios — `get_custom_prices` filtra por `user_id`
+-   `POST` crea un nuevo precio custom
+    +   Primero verifica que no exista ya uno para ese ingrediente → 409 si ya existe
+    +   409 Conflict es el código correcto para "recurso duplicado" en REST
+    +   Si no existe, lo crea y devuelve 201 Created
+
+#### `PriceDetail` — GET, PUT y DELETE en `/prices/<name>`
+```py
+@api.route('/prices/<string:ingredient_name>')
+class PriceDetail(Resource):
+
+    def get(self, ingredient_name):
+        user_id = get_jwt_identity()
+        cp = facade.get_custom_price(user_id, ingredient_name)
+        if not cp:
+            return {'error': 'Custom price not found'}, 404
+        return {'id': cp.id, 'ingredient_name': cp.ingredient_name,
+                'price_per_kg': cp.price_per_kg}, 200
+
+    def put(self, ingredient_name):
+        user_id = get_jwt_identity()
+        cp = facade.update_custom_price(user_id, ingredient_name, api.payload['price_per_kg'])
+        if not cp:
+            return {'error': 'Custom price not found'}, 404
+        return {'id': cp.id, 'ingredient_name': cp.ingredient_name,
+                'price_per_kg': cp.price_per_kg}, 200
+
+    def delete(self, ingredient_name):
+        user_id = get_jwt_identity()
+        if not facade.delete_custom_price(user_id, ingredient_name):
+            return {'error': 'Custom price not found'}, 404
+        return '', 204
+```
+-   `<string:ingredient_name>` en la URL identifica el precio a operar
+    +   La facade normaliza el nombre (`.lower().strip()`) antes de buscar
+-   `GET` devuelve un precio custom específico — útil para verificar si ya existe
+-   `PUT` actualiza el `price_per_kg` — el nombre del ingrediente no cambia
+    +   `update_custom_price` devuelve `None` si no existe → 404
+-   `DELETE` elimina el precio custom — a partir de ese momento el ingrediente vuelve a usar OFF + fallback
+    +   `delete_custom_price` devuelve `False` si no existe → 404
+    +   204 No Content es el código correcto para DELETE exitoso (sin body en la respuesta)
+
+---
+
+## Registro del namespace en `app/__init__.py`
+
+```python
+from app.api.v1.costs import api as costs_ns
+api.add_namespace(costs_ns, path='/api/v1')
+```
+
+#### Lógica
+```py
+api.add_namespace(costs_ns, path='/api/v1')
+```
+-   `path='/api/v1'` y no `/api/v1/costs` porque la ruta completa ya está definida en el Namespace
+    +   `'/api/v1'` + `'/recipes/<id>/cost'` = `/api/v1/recipes/<id>/cost`
+
+---
+
+## Respuesta del endpoint
+
+```json
+GET /api/v1/recipes/<id>/cost  →  200
+
+{
+  "recipe_id": "a2a1bb8e-...",
+  "recipe_title": "Torta de Ricota Invertida",
+  "ingredients": [
+    {
+      "name": "Ricota",
+      "quantity": "500",
+      "unit": "g",
+      "price_per_kg": 8.50,
+      "estimated_price": 4.25
+    },
+    {
+      "name": "Harina",
+      "quantity": "200",
+      "unit": "g",
+      "price_per_kg": 1.20,
+      "estimated_price": 0.24
+    }
+  ],
+  "total_estimated_cost": 4.49,
+  "currency": "EUR",
+  "note": "Estimated prices in EUR/kg. Source: Open Food Facts + average prices France."
+}
+```
+
+---
+
+## Casos especiales
+
+| Caso | Comportamiento |
+|---|---|
+| Usuario tiene precio custom para un ingrediente | Usa ese precio, ignora OFF y FALLBACK_PRICES |
+| `quantity = "al gusto"` | `float()` falla → qty = 0.0 → estimated_price = 0.0 |
+| `quantity = "1/2"` | `float()` falla → qty = 0.0 (limitación actual) |
+| Ingrediente no en FALLBACK_PRICES | Precio default: €5.00/kg |
+| Open Food Facts timeout | Ignora OFF, usa fallback por nombre |
+| Open Food Facts error HTTP | `except Exception` lo captura, usa fallback |
+| Recipe sin ingredientes | `total_estimated_cost: 0.0`, lista vacía |
+| Usuario intenta ver costo de receta ajena | 403 Forbidden |
+| POST precio que ya existe | 409 Conflict — usar PUT para actualizar |
+| DELETE precio que no existe | 404 Not Found |
