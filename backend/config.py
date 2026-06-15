@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,6 +11,8 @@ class Config:
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'dev-jwt-key-not-for-production')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Set token expiration to 1 hour (or days=1 for a full day)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
 
 class DevelopmentConfig(Config):
     """Local development environment."""

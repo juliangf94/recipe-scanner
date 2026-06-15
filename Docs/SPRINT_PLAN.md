@@ -46,9 +46,11 @@ Solo project — Julian Gonzalez
 
 ---
 
-## Sprint 1 — Foundation
+## Sprint 1 — Foundation ✅ COMPLETE
 
 **Goal:** Flask application running on localhost:5000 with all 5 domain models defined as Python dataclasses.
+
+**Sesiones:** 1 y 2 → ver explicación detallada en `CODE_NOTES.md` (Sesión 1 · Sesión 2)
 
 **Duration:** Week 1
 
@@ -58,11 +60,11 @@ Solo project — Julian Gonzalez
 | Environment config | `config.py` | Must Have | Done |
 | Entry point | `run.py` | Must Have | Done |
 | Git setup + GitHub | `.gitignore`, `.env` | Must Have | Done |
-| User model | `models/user.py` | Must Have | In Progress |
-| Recipe model | `models/recipe.py` | Must Have | In Progress |
-| Ingredient model | `models/ingredient.py` | Must Have | In Progress |
-| Step model | `models/step.py` | Must Have | In Progress |
-| PdfScan model | `models/pdf_scan.py` | Must Have | In Progress |
+| User model | `models/user.py` | Must Have | Done |
+| Recipe model | `models/recipe.py` | Must Have | Done |
+| Ingredient model | `models/ingredient.py` | Must Have | Done |
+| Step model | `models/step.py` | Must Have | Done |
+| PdfScan model | `models/pdf_scan.py` | Must Have | Done |
 
 **Definition of Done:**
 - `python run.py` starts Flask on port 5000 with no errors
@@ -71,44 +73,58 @@ Solo project — Julian Gonzalez
 
 ---
 
-## Sprint 2 — Data Layer + Authentication
+## Sprint 2 — Data Layer + Authentication ✅ COMPLETE (except unit tests)
 
 **Goal:** Full CRUD operations working in memory and users can register and log in with JWT.
+
+**Sesiones:** 3 y 4 → ver explicación detallada en `CODE_NOTES.md` (Sesión 3 · Sesión 4)
 
 **Duration:** Week 2
 
 | Task | File | Priority | Status |
 |---|---|---|---|
-| BaseRepository ABC | `persistence/repository.py` | Must Have | Pending |
-| InMemoryStorage | `persistence/memory_storage.py` | Must Have | Pending |
-| Password hashing | `utils/security.py` | Must Have | Pending |
-| JWT generation + validation | `utils/jwt_helper.py` | Must Have | Pending |
-| Auth endpoints | `api/v1/auth.py` | Must Have | Pending |
+| BaseRepository ABC + InMemoryStorage | `persistence/repository.py` | Must Have | Done |
+| Password hashing | `utils/security.py` | Must Have | Done |
+| ~~JWT helper manual~~ → flask_jwt_extended | ~~`utils/jwt_helper.py`~~ | Must Have | Removed |
+| Auth endpoints (flask_restx Namespace) | `api/v1/auth.py` | Must Have | Done |
+| Postman collection | `tests/postman/` | Must Have | Done |
 | Unit tests — models | `tests/test_models.py` | Must Have | Pending |
 | Unit tests — repository | `tests/test_repository.py` | Must Have | Pending |
 
+**Architectural changes from original plan:**
+- `InMemoryStorage` vive en `repository.py` (mismo archivo que `BaseRepository`) — no en `memory_storage.py`
+- `jwt_helper.py` eliminado — `flask_jwt_extended` provee `@jwt_required()`, `create_access_token` y `get_jwt_identity()` directamente
+- `auth.py` usa `flask_restx` (Namespace + Resource) en lugar de Blueprint puro — genera Swagger automático en `/api/docs`
+- `flask-restx==1.3.0` y `Flask-JWT-Extended==4.6.0` agregados a `requirements.txt`
+
 **Definition of Done:**
-- `POST /auth/register` creates a user with hashed password
-- `POST /auth/login` returns a valid JWT token
+- `POST /api/v1/auth/register` creates a user with hashed password
+- `POST /api/v1/auth/login` returns a valid JWT token
 - CRUD operations on InMemoryStorage pass all unit tests
 - Tests run with `pytest backend/` — no failures
 
 ---
 
-## Sprint 3 — Business Logic + PDF Scan
+## Sprint 3 — Business Logic + PDF Scan ✅ COMPLETE
 
 **Goal:** Full recipe CRUD through the Facade and PDF scanning working with Groq API.
+
+**Sesiones:** 5, 6, 7 y 8 → ver explicación detallada en `CODE_NOTES.md` (Sesión 5 · Sesión 6 · Sesión 7 · Sesión 8)
 
 **Duration:** Weeks 3–4
 
 | Task | File | Priority | Status |
 |---|---|---|---|
-| Facade service | `services/facade.py` | Must Have | Pending |
-| Recipe endpoints | `api/v1/recipes.py` | Must Have | Pending |
-| Ingredient endpoints | `api/v1/ingredients.py` | Should Have | Pending |
-| PDF scan endpoint | `api/v1/scan.py` | Must Have | Pending |
-| Groq integration in Facade | `services/facade.py` | Must Have | Pending |
-| Integration tests — API | `tests/test_api.py` | Must Have | Pending |
+| Facade service | `services/facade.py` | Must Have | Done |
+| Recipe endpoints | `api/v1/recipes.py` | Must Have | Done |
+| Ingredient endpoints | `api/v1/ingredients.py` | Should Have | Done |
+| PDF scan endpoint | `api/v1/scan.py` | Must Have | Done |
+| Groq integration in Facade | `services/facade.py` | Must Have | Done |
+| Register all namespaces | `app/__init__.py` | Must Have | Done |
+| CRUD completo en auth (GET/PUT/DELETE /me) | `api/v1/auth.py` | Must Have | Done |
+| Ownership check en recetas (403) | `api/v1/recipes.py` | Must Have | Done |
+| Validación automática con validate=True | todos los endpoints | Must Have | Done |
+| Colección Postman — 89 assertions | `tests/postman/` | Must Have | Done |
 
 **Definition of Done:**
 - Authenticated user can create, read, update, delete recipes

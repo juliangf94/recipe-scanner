@@ -124,7 +124,7 @@ flowchart TD
     end
 
     subgraph Backend["Backend — Flask API"]
-        API["Blueprints /api/v1/\nauth · recipes · ingredients · scan"]
+        API["flask_restx Namespaces /api/v1/\nauth · recipes · ingredients · scan\nSwagger UI → /api/docs"]
     end
 
     subgraph Services["Services"]
@@ -177,58 +177,59 @@ flowchart TD
 
 | Componente | Archivo | Responsabilidad |
 |---|---|---|
-| Application Factory | `app/__init__.py` | Crea e inicializa la app Flask |
-| Config | `backend/config.py` | Configuración por entornos |
-| Auth Blueprint | `api/v1/auth.py` | Endpoints de registro y login |
-| Recipes Blueprint | `api/v1/recipes.py` | CRUD de recetas |
-| Ingredients Blueprint | `api/v1/ingredients.py` | Consulta de ingredientes y precios |
-| Scan Blueprint | `api/v1/scan.py` | Subida y procesamiento de PDFs |
+| Application Factory | `app/__init__.py` | Crea e inicializa la app Flask con flask_restx y JWTManager |
+| Config | `backend/config.py` | Configuración por entornos (dev/test/prod) |
+| Auth Namespace | `api/v1/auth.py` | Endpoints de registro y login (flask_restx) |
+| Recipes Namespace | `api/v1/recipes.py` | CRUD de recetas (flask_restx) |
+| Ingredients Namespace | `api/v1/ingredients.py` | Gestión de ingredientes y precios |
+| Scan Namespace | `api/v1/scan.py` | Subida y procesamiento de PDFs |
 | Facade | `services/facade.py` | Punto de entrada único para la lógica de negocio |
-| Repository (ABC) | `persistence/repository.py` | Interfaz abstracta de acceso a datos |
-| InMemoryStorage | `persistence/memory_storage.py` | Implementación en RAM (fase 1) |
-| DbStorage | `persistence/db_storage.py` | Implementación SQLAlchemy (fase 2) |
-| JWT Helper | `utils/jwt_helper.py` | Generación y verificación de tokens |
-| Security | `utils/security.py` | Hash y verificación de contraseñas |
+| Repository (ABC) + InMemoryStorage | `persistence/repository.py` | Interfaz abstracta + implementación en RAM (fase 1) |
+| DbStorage | `persistence/db_storage.py` | Implementación SQLAlchemy (Sesión 8) |
+| Security | `utils/security.py` | Hash y verificación de contraseñas (bcrypt) |
 
 ### Domain Models (Dataclasses)
 
 ```python
 User
-├── id: int
-├── username: str
-├── email: str
-├── password_hash: str
-└── created_at: datetime
+├── id: str               # UUID generado automáticamente
+├── first_name: str
+├── last_name: str
+├── email: str            # identificador único de login
+└── password_hash: str
 
 Recipe
-├── id: int
-├── user_id: int          # FK → User
+├── id: str               # UUID
+├── user_id: str          # FK → User (UUID)
 ├── title: str
 ├── description: str
 ├── servings: int
 ├── prep_time_min: int
-└── created_at: datetime
+└── category: str
 
 Ingredient
-├── id: int
-├── recipe_id: int        # FK → Recipe
+├── id: str               # UUID
+├── recipe_id: str        # FK → Recipe (UUID)
 ├── name: str
-├── quantity: float
+├── quantity: str         # str porque Groq puede retornar "al gusto", "una pizca"
 ├── unit: str
-└── off_product_id: str   # ID en Open Food Facts (puede ser None)
+├── off_product_id: str   # ID en Open Food Facts
+├── estimated_cost: float
+└── cost_is_manual: bool
 
 Step
-├── id: int
-├── recipe_id: int        # FK → Recipe
-├── order_num: int
-└── description: str
+├── id: str               # UUID
+├── recipe_id: str        # FK → Recipe (UUID)
+├── order_num: int        # 'order' es keyword reservado en SQL
+├── description: str
+└── duration_min: int
 
 PdfScan
-├── id: int
-├── recipe_id: int        # FK → Recipe
+├── id: str               # UUID
+├── recipe_id: str        # FK → Recipe (UUID)
 ├── filename: str
-├── status: str           # 'pending' | 'processing' | 'done' | 'error'
-└── scanned_at: datetime
+├── status: str           # 'pending' | 'done' | 'error'
+└── scanned_at: str
 ```
 
 ### Class Diagram
@@ -236,45 +237,48 @@ PdfScan
 ```mermaid
 classDiagram
     class User {
-        +int id
-        +String username
+        +String id
+        +String first_name
+        +String last_name
         +String email
         +String password_hash
-        +DateTime created_at
     }
 
     class Recipe {
-        +int id
-        +int user_id
+        +String id
+        +String user_id
         +String title
         +String description
         +int servings
         +int prep_time_min
-        +DateTime created_at
+        +String category
     }
 
     class Ingredient {
-        +int id
-        +int recipe_id
+        +String id
+        +String recipe_id
         +String name
-        +float quantity
+        +String quantity
         +String unit
         +String off_product_id
+        +float estimated_cost
+        +bool cost_is_manual
     }
 
     class Step {
-        +int id
-        +int recipe_id
+        +String id
+        +String recipe_id
         +int order_num
         +String description
+        +int duration_min
     }
 
     class PdfScan {
-        +int id
-        +int recipe_id
+        +String id
+        +String recipe_id
         +String filename
         +String status
-        +DateTime scanned_at
+        +String scanned_at
     }
 
     class BaseRepository {
@@ -304,17 +308,21 @@ classDiagram
         +delete(id)
     }
 
-    class Facade {
-        -BaseRepository _repository
-        +register_user(username, email, password)
-        +login(email, password)
-        +get_recipes(user_id)
-        +get_recipe(id, user_id)
-        +create_recipe(data, user_id)
-        +update_recipe(id, data, user_id)
-        +delete_recipe(id, user_id)
-        +scan_pdf(file, user_id)
-        +get_ingredient_prices(recipe_id)
+    class RecipeScannerFacade {
+        -InMemoryStorage _users
+        -InMemoryStorage _recipes
+        -InMemoryStorage _ingredients
+        -InMemoryStorage _steps
+        +register_user(first_name, last_name, email, password)
+        +get_user_by_email(email)
+        +get_user_by_id(user_id)
+        +create_recipe(user_id, title, ...)
+        +get_recipe(recipe_id)
+        +get_recipes_by_user(user_id)
+        +update_recipe(recipe_id, kwargs)
+        +delete_recipe(recipe_id)
+        +add_ingredient(recipe_id, name, quantity, unit)
+        +get_ingredients_by_recipe(recipe_id)
     }
 
     User "1" --> "0..*" Recipe : owns
@@ -505,7 +513,8 @@ Formato: JSON
 ```
 Input:
 {
-  "username": "julian",
+  "first_name": "Julian",
+  "last_name": "Gonzalez",
   "email": "julian@example.com",
   "password": "securepassword123"
 }
@@ -513,7 +522,7 @@ Input:
 Output 201:
 {
   "message": "User created successfully",
-  "user_id": 1
+  "user_id": "3f8a1c2d-..."
 }
 
 Output 400:
@@ -528,7 +537,12 @@ Input:
 Output 200:
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": { "id": 1, "username": "julian", "email": "julian@example.com" }
+  "user": {
+    "id": "3f8a1c2d-...",
+    "first_name": "Julian",
+    "last_name": "Gonzalez",
+    "email": "julian@example.com"
+  }
 }
 
 Output 401:
@@ -547,40 +561,34 @@ Output 401:
 | PUT | `/recipes/<id>` | Editar una receta | Yes |
 | DELETE | `/recipes/<id>` | Eliminar una receta | Yes |
 
-**GET /recipes**
+**GET /recipes/**
 ```
 Output 200:
 [
   {
-    "id": 1,
+    "id": "3f8a1c2d-...",
     "title": "Tarta de manzana",
     "description": "Receta clásica francesa",
     "servings": 4,
     "prep_time_min": 45,
-    "created_at": "2025-05-10T14:30:00"
+    "category": "Postres",
+    "user_id": "a1b2c3d4-..."
   }
 ]
 ```
 
-**GET /recipes/<id>**
+**GET /recipes/<recipe_id>**
 ```
 Output 200:
 {
-  "id": 1,
+  "id": "3f8a1c2d-...",
   "title": "Tarta de manzana",
   "description": "Receta clásica francesa",
   "servings": 4,
   "prep_time_min": 45,
-  "ingredients": [
-    { "id": 1, "name": "harina", "quantity": 300.0, "unit": "g", "price": 0.45 }
-  ],
-  "steps": [
-    { "id": 1, "order_num": 1, "description": "Mezclar harina y mantequilla" }
-  ]
+  "category": "Postres",
+  "user_id": "a1b2c3d4-..."
 }
-
-Output 403:
-{ "error": "Access denied" }
 
 Output 404:
 { "error": "Recipe not found" }
@@ -647,25 +655,21 @@ Output 200:
 ```
 main
   └── develop
-        ├── feature/auth
-        ├── feature/models
-        ├── feature/repository
-        ├── feature/facade
-        ├── feature/scan-pdf
-        └── feature/frontend
+        └── feature/sqlalchemy   ← solo para el swap a SQLAlchemy (Session 8)
 ```
 
 | Branch | Propósito |
 |---|---|
-| `main` | Código listo para producción. Solo recibe merges de `develop` tras revisión. |
-| `develop` | Rama de integración. Código estable pero en desarrollo activo. |
-| `feature/*` | Una rama por funcionalidad. Se crea desde `develop` y se mergea a `develop`. |
+| `main` | Código listo para producción. Solo recibe merges de `develop` al final de cada sprint. |
+| `develop` | Rama principal de desarrollo. Todo el trabajo del MVP va aquí directamente. |
+| `feature/sqlalchemy` | Única feature branch — aísla el swap de InMemoryStorage → SQLAlchemy (Session 8). Se crea desde `develop` y se mergea a `develop` una vez validado. |
 
 **Reglas:**
 - Nunca hacer commits directamente en `main`.
-- Cada feature branch cubre una fase del DEVLOG (Fase 2, Fase 3, etc.).
+- El trabajo diario va directamente a `develop` (proyecto solo, sin equipo que revisar en paralelo).
+- `feature/sqlalchemy` se crea únicamente en Session 8 para aislar el cambio de base de datos.
 - Commits con mensajes descriptivos: `feat: add User dataclass`, `fix: jwt expiration bug`.
-- Pull Request requerido antes de mergear a `develop`.
+- Merge a `main` solo al completar cada sprint con todos los tests pasando.
 
 **Convención de commits (Conventional Commits):**
 ```
@@ -713,12 +717,11 @@ instance/
 **Pipeline de QA:**
 
 ```
-1. Desarrollador escribe código en feature branch
+1. Desarrollador escribe código en develop (o feature/sqlalchemy para Session 8)
 2. Corre tests localmente: pytest backend/
-3. Hace pull request a develop
-4. Revisión manual del código
-5. Merge a develop si tests pasan
-6. Merge a main solo cuando el feature está completo y validado
+3. Verifica con Postman los endpoints afectados
+4. Hace commit con mensaje Conventional Commits
+5. Merge a main solo cuando el sprint está completo y todos los tests pasan
 ```
 
 **Tests manuales para el flujo crítico:**

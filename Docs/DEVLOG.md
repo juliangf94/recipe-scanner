@@ -11,13 +11,14 @@ Fecha de entrega: finales de junio 2025
 |---|---|---|
 | Backend framework | Flask 3.x | Microframework Python: simple, explícito, ideal para APIs REST |
 | ORM | SQLAlchemy 2.x | Abstracción de SQL, soporta SQLite y PostgreSQL sin cambiar código |
-| Autenticación | PyJWT + bcrypt | JWT = stateless (sin sesiones en servidor); bcrypt = hash lento por diseño |
+| Autenticación | flask_jwt_extended + bcrypt | JWT = stateless (sin sesiones en servidor); bcrypt = hash lento por diseño |
 | PDF parsing | PyMuPDF | Binding C de MuPDF, muy rápido para extraer texto |
 | IA | Groq API (LLaMA 3.3-70b) | Inferencia ultrarrápida, modelo open-source potente |
 | API externa | Open Food Facts | Base de datos de alimentos abierta y gratuita |
 | BDD desarrollo | SQLite | Sin servidor, archivo local, ideal para desarrollo |
 | BDD producción | PostgreSQL | Robusto, concurrente, estándar en producción |
-| Frontend | Por decidir (Jinja2 o React) | Ver sección Frontend en WORKFLOW.md |
+| API docs | flask_restx (Swagger UI) | Documentación automática en `/api/docs`, preparado para app móvil |
+| Frontend | Jinja2 (server-side) | Un solo servidor Flask, sin build process separado, desarrollo rápido |
 
 ### Justificación detallada de cada tecnología
 
@@ -36,14 +37,16 @@ SQLite en desarrollo a PostgreSQL en producción modificando solo una línea en
 consultas parametrizadas por defecto, lo que previene inyección SQL automáticamente.
 Es el ORM más usado en el ecosistema Python fuera de Django.
 
-**PyJWT + bcrypt — Autenticación**
-Son dos herramientas con roles distintos pero complementarios. PyJWT maneja la
-autenticación stateless — el servidor no guarda sesiones, el token contiene el
-`user_id` firmado con la `SECRET_KEY`. Cualquier instancia del servidor puede
-verificar el token sin consultar una base de datos de sesiones. bcrypt maneja el
-almacenamiento seguro de contraseñas — es lento por diseño, lo que hace que los
-ataques de fuerza bruta sean computacionalmente muy costosos. Incluye un salt
-aleatorio que previene ataques con tablas precomputadas.
+**flask_jwt_extended + bcrypt — Autenticación**
+Son dos herramientas con roles distintos pero complementarios. `flask_jwt_extended`
+maneja la autenticación stateless — el servidor no guarda sesiones, el token contiene
+el `user_id` firmado con `JWT_SECRET_KEY`. Provee `@jwt_required()`,
+`create_access_token()` y `get_jwt_identity()` listos para usar, sin necesidad de
+escribir la lógica de encode/decode manualmente (que era el enfoque PyJWT directo,
+descartado por ser más código sin beneficio real). bcrypt maneja el almacenamiento
+seguro de contraseñas — es lento por diseño, lo que hace que los ataques de fuerza
+bruta sean computacionalmente muy costosos. Incluye un salt aleatorio que previene
+ataques con tablas precomputadas.
 
 **PyMuPDF — PDF parsing**
 Es un binding Python de la librería C MuPDF, lo que lo hace significativamente más
@@ -111,12 +114,10 @@ recipe_Scanner/
 │       ├── services/
 │       │   └── facade.py
 │       ├── utils/
-│       │   ├── jwt_helper.py
-│       │   └── security.py
+│       │   └── security.py             # hash_password + check_password (bcrypt)
 │       └── persistence/
-│           ├── repository.py
-│           ├── memory_storage.py
-│           └── db_storage.py
+│           ├── repository.py           # BaseRepository (ABC) + InMemoryStorage
+│           └── db_storage.py           # SQLAlchemyRepository (Sesión 8)
 └── frontend/
     ├── templates/
     └── static/
@@ -129,16 +130,23 @@ recipe_Scanner/
 ## Modelo de datos
 
 ```
-User (int)      Recipe (int)      Ingredient        Step (int)      PdfScan
-────────────    ─────────────     ──────────────    ──────────      ───────────────
-id PK           id PK             id PK (int)       id PK           id PK (int)
-username Str    user_id FK        recipe_id FK(int) recipe_id FK    recipe_id FK (int)
-email Str       title Str         name Str          order_num int   filename Str
-password_hash   description Str   quantity float    description Str status Str
-created_at DT   servings int      unit Str                          scanned_at DT
-                prep_time_min int off_product_id Str
-                created_at DT
+User (UUID)       Recipe (UUID)       Ingredient (UUID)     Step (UUID)     PdfScan (UUID)
+──────────────    ───────────────     ─────────────────     ───────────     ──────────────
+id: str PK        id: str PK          id: str PK            id: str PK      id: str PK
+first_name: str   user_id: str FK     recipe_id: str FK     recipe_id FK    recipe_id FK
+last_name: str    title: str          name: str             order_num: int  filename: str
+email: str        description: str    quantity: str         description:str status: str
+password_hash:str servings: int       unit: str             duration_min:int scanned_at:str
+                  prep_time_min: int  off_product_id: str
+                  category: str       estimated_cost: float
+                                      cost_is_manual: bool
 ```
+
+**Nota sobre los tipos:**
+- `id` es `str` (UUID) en todos los modelos — más seguro que `int` (previene enumeración de IDs)
+- `quantity` es `str` — Groq puede retornar "al gusto", "una pizca", valores no numéricos
+- No hay `username` — el email es el identificador único de login
+- No hay `created_at` en los modelos Phase 1 — se agrega con SQLAlchemy en Sesión 8
 
 Relaciones:
 - `User` 1 → 0..* `Recipe`  (owns)
@@ -150,39 +158,38 @@ Relaciones:
 
 ## Progreso
 
-### Fase 1 — Fundamentos del backend
+### Fase 1 — Fundamentos del backend ✅
 
 - [x] Estructura de carpetas + `__init__.py`
 - [x] `backend/requirements.txt`
 - [x] `backend/config.py`
 - [x] `backend/.env` + `backend/.gitignore`
-- [ ] `backend/app/__init__.py` (application factory — `create_app`)
-- [ ] `backend/run.py` (punto de entrada)
+- [x] `backend/app/__init__.py` (application factory con flask_restx + JWTManager)
+- [x] `backend/run.py` (punto de entrada)
 
-### Fase 2 — Modelos del dominio (sin base de datos)
+### Fase 2 — Modelos del dominio (sin base de datos) ✅
 
-- [ ] `app/models/user.py`
-- [ ] `app/models/recipe.py`
-- [ ] `app/models/ingredient.py`
-- [ ] `app/models/step.py`
-- [ ] `app/models/pdf_scan.py`
+- [x] `app/models/user.py`
+- [x] `app/models/recipe.py`
+- [x] `app/models/ingredient.py`
+- [x] `app/models/step.py`
+- [x] `app/models/pdf_scan.py`
 
-### Fase 3 — Capa de persistencia en memoria (Repository Pattern)
+### Fase 3 — Capa de persistencia en memoria (Repository Pattern) ✅
 
-- [ ] `app/persistence/repository.py` — interfaz abstracta (ABC)
-- [ ] `app/persistence/memory_storage.py` — implementación con diccionarios
+- [x] `app/persistence/repository.py` — BaseRepository (ABC) + InMemoryStorage en un solo archivo
 
-### Fase 4 — Autenticación
+### Fase 4 — Autenticación ✅
 
-- [ ] `app/utils/security.py` (bcrypt)
-- [ ] `app/utils/jwt_helper.py` (PyJWT)
-- [ ] `app/api/v1/auth.py` (register + login)
+- [x] `app/utils/security.py` (bcrypt)
+- [x] `app/api/v1/auth.py` (register + login con flask_restx)
+- [x] `tests/postman/` (Postman collection para QA)
 
-### Fase 5 — Facade y API
+### Fase 5 — Facade y API 🔄
 
-- [ ] `app/services/facade.py`
-- [ ] `app/api/v1/recipes.py`
-- [ ] `app/api/v1/ingredients.py`
+- [x] `app/services/facade.py`
+- [x] `app/api/v1/recipes.py`
+- [ ] `app/api/v1/ingredients.py` ← en progreso
 
 ### Fase 6 — Integración IA
 
@@ -199,7 +206,7 @@ Relaciones:
 
 ### Fase 9 — Frontend
 
-- [ ] A decidir según tiempo disponible (Jinja2 o React)
+- [ ] Jinja2 (server-side) — templates/ + static/
 
 ---
 
@@ -337,41 +344,79 @@ from app.models.user import User   # ❌ sin __init__.py → ModuleNotFoundError
 
 ---
 
-### 8. Blueprint puro vs flask_restx (Swagger)
+### 8. Blueprint puro vs flask_restx (Swagger) — por qué elegimos flask_restx
 
-**Decisión inicial:** Blueprint puro de Flask para los endpoints de la API.
+**Decisión final:** `flask_restx` para todos los endpoints de la API.
 
-**Por qué no flask_restx desde el principio:**
-- Con frontend Jinja2 (server-side), no hay consumidor externo de la API que
-  necesite leer documentación Swagger.
-- Swagger es útil cuando tienes un frontend separado (React, app móvil) que
-  necesita conocer tus endpoints independientemente del backend.
-- Blueprint puro requiere menos dependencias y es más fácil de explicar línea
-  a línea al jury.
+**¿Qué es flask_restx?**
+Una extensión de Flask que reemplaza `Blueprint` con `Namespace` y `Resource`.
+Agrega automáticamente documentación Swagger UI (interfaz visual interactiva) y
+validación de input con `api.model()`. Se accede en `http://localhost:5000/api/docs`.
 
-**¿Cuándo tendría sentido agregar Swagger?**
-Si en el futuro se desarrolla una aplicación móvil (React Native, Flutter),
-`flask_restx` sería la librería a agregar. Los cambios serían:
+**Por qué elegimos flask_restx y no Blueprint puro:**
 
-| Qué cambia | Blueprint actual | Con flask_restx |
+1. **App móvil futura.** El objetivo es transformar RecipeScanner en una app
+   móvil (React Native o Flutter). Un cliente móvil es un consumidor externo de
+   la API que necesita documentación clara de todos los endpoints, tipos de datos
+   y respuestas posibles. Swagger genera esa documentación automáticamente.
+
+2. **Testing visual inmediato.** Swagger UI permite probar todos los endpoints
+   desde el navegador sin Postman. Es especialmente útil durante el desarrollo
+   del backend antes de tener frontend.
+
+3. **Validación automática de input.** `@api.expect(model)` valida el body de
+   la petición antes de que llegue al código. Con Blueprint había que hacerlo
+   manualmente con `if not data or not data.get('campo')`.
+
+4. **Estándar en la industria.** OpenAPI/Swagger es el estándar para documentar
+   APIs REST en entornos profesionales. Tenerlo desde el inicio demuestra buenas
+   prácticas al jury.
+
+**¿Qué cambia respecto a Blueprint puro?**
+
+| Aspecto | Blueprint puro | flask_restx |
 |---|---|---|
-| Dependencia | ninguna extra | `pip install flask-restx` |
 | Crear rutas | `Blueprint('auth', __name__)` | `Namespace('auth', description='...')` |
-| Definir endpoint | `@auth_bp.route('/login')` | `class Login(Resource):` |
+| Definir endpoint | función con `@auth_bp.route('/login')` | clase `Login(Resource)` con `def post(self)` |
 | Documentación | manual (README) | automática en `/api/docs` |
-| Validación input | manual | `api.model()` + `@api.expect()` |
+| Validación input | `if not data.get('campo')` manual | `api.model()` + `@api.expect()` |
+| Registrar en app | `app.register_blueprint(bp, url_prefix=...)` | `api.add_namespace(ns, path=...)` |
 
 La **lógica interna no cambia** — las llamadas a la Facade y las respuestas JSON
 son idénticas. Solo cambia la "envoltura" de cada endpoint.
 
-**Herramienta de testing usada en su lugar:** Postman — permite guardar
-colecciones de requests con JWT automático, validar respuestas y exportar
-evidencia de QA para el jury. Es la herramienta que el Stage 4 menciona
-explícitamente.
+**¿Por qué no nos preocupa el DeprecationWarning de flask_restx con Flask 3.x?**
+flask_restx 1.3.0 accede a `Flask.__version__`, que está deprecado en Flask 3.x.
+Es un `DeprecationWarning` — solo un aviso, no rompe nada. La funcionalidad
+completa sigue operativa. Para el MVP de fin de junio, este tradeoff es aceptable.
+La comunidad de flask_restx ya tiene una solución en progreso.
+
+**Herramienta de testing complementaria:** Postman — para guardar colecciones de
+requests con JWT automático y exportar evidencia de QA para el jury (Stage 4).
 
 ---
 
-### 9. Arquitectura en capas
+### 9. Metodología de desarrollo — ¿Agile?
+
+**Decisión:** Desarrollo iterativo estructurado con principios Agile, adaptado a proyecto individual.
+
+**¿Qué se aplica de Agile?**
+- **Desarrollo iterativo** — cada sesión entrega un incremento funcional del sistema.
+- **Backlog definido** — `SPRINT_PLAN.md` lista todas las tareas organizadas por sesión.
+- **Entregas incrementales** — al final de cada sesión existe algo que funciona y se puede probar.
+
+**¿Qué no aplica (y por qué)?**
+- Sin sprints de duración fija (2 semanas) — hay una fecha de entrega fija de fin de junio.
+- Sin daily standups ni retrospectivas — es un proyecto individual.
+- Sin user stories formales (`Como usuario quiero...`) — el scope está definido por los requisitos del RNCP.
+- Sin velocity tracking ni story points — no hay equipo que estimar.
+
+**Respuesta al jury si preguntan:**
+> *"Adopté principios Agile como desarrollo iterativo y planificación por backlog, adaptados a un proyecto individual con fecha de entrega fija. Usar Scrum completo hubiera sido overhead innecesario para un equipo de una persona."*
+
+---
+
+### 10. Arquitectura en capas
 
 | Carpeta | Responsabilidad |
 |---|---|

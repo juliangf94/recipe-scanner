@@ -129,8 +129,8 @@ gitGraph
 |---|---|---|---|
 | 1 | `develop` | `app/__init__.py`, `run.py`, `.env`, `.gitignore`, `requirements.txt` | Flask corriendo en localhost:5000 |
 | 2 | `develop` | `models/user.py`, `recipe.py`, `ingredient.py`, `step.py`, `pdf_scan.py` | 5 dataclasses definidas |
-| 3 | `develop` | `persistence/repository.py`, `memory_storage.py` | CRUD en memoria funcionando |
-| 4 | `develop` | `utils/security.py`, `utils/jwt_helper.py`, `api/v1/auth.py` | Register + Login con JWT |
+| 3 | `develop` | `persistence/repository.py` (BaseRepository + InMemoryStorage) | CRUD en memoria funcionando |
+| 4 | `develop` | `utils/security.py`, `api/v1/auth.py`, `app/__init__.py` (JWTManager + flask_restx) | Register + Login con JWT |
 | 5 | `develop` | `services/facade.py`, `api/v1/recipes.py`, `api/v1/ingredients.py` | CRUD recetas validado |
 | 6 | `develop` | `api/v1/scan.py` + Groq en facade | PDF → receta extraída |
 | 7 | `develop` | Open Food Facts en facade | Precios de ingredientes |
@@ -138,13 +138,9 @@ gitGraph
 | 9 | `develop` | `templates/`, `static/` | Jinja2 — UI server-side integrada en Flask |
 
 > **Nota — Sesión 9 (Frontend):**
-> Decisión tomada: **Jinja2 + HTML/CSS/JS**.
+> Decisión confirmada: **Jinja2 + HTML/CSS/JS** (React descartado).
 > Un solo servidor, sin build process separado, sin CORS, sin deploy adicional.
->
-> | Tiempo disponible | Opción | Motivo |
-> |---|---|---|
-> | Poco tiempo | Jinja2 (server-side) | Un solo servidor, integrado en Flask, desarrollo rápido |
-> | Tiempo suficiente | React | UI moderna e impactante, ya conocido, mejor portfolio visual |
+> Proyecto individual con deadline fin de junio 2025 — Jinja2 permite terminar en tiempo sin comprometer la funcionalidad core.
 
 ---
 
