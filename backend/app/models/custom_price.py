@@ -1,10 +1,11 @@
-from dataclasses import dataclass, field
+from app.extensions import db
 import uuid
 
 
-@dataclass
-class CustomPrice:
-    user_id: str
-    ingredient_name: str
-    price_per_kg: float
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+class CustomPrice(db.Model):
+    __tablename__ = 'custom_prices'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    ingredient_name = db.Column(db.String(100), nullable=False)
+    price_per_kg = db.Column(db.Float, nullable=False)

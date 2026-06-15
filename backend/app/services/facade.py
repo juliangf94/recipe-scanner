@@ -3,7 +3,7 @@ import json
 import os
 import requests
 from groq import Groq
-from app.persistence.repository import InMemoryStorage
+from app.persistence.db_storage import DbStorage
 from app.models.user import User
 from app.models.recipe import Recipe
 from app.models.ingredient import Ingredient
@@ -62,11 +62,11 @@ Recipe text:
 class RecipeScannerFacade:
 
     def __init__(self):
-        self._users = InMemoryStorage()
-        self._recipes = InMemoryStorage()
-        self._ingredients = InMemoryStorage()
-        self._steps = InMemoryStorage()
-        self._custom_prices = InMemoryStorage()
+        self._users = DbStorage(User)
+        self._recipes = DbStorage(Recipe)
+        self._ingredients = DbStorage(Ingredient)
+        self._steps = DbStorage(Step)
+        self._custom_prices = DbStorage(CustomPrice)
 
     # --- Users --- api/v1/auth.py ---
 

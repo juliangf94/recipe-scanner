@@ -4122,3 +4122,705 @@ GET /api/v1/recipes/<id>/cost  →  200
 | Usuario intenta ver costo de receta ajena | 403 Forbidden |
 | POST precio que ya existe | 409 Conflict — usar PUT para actualizar |
 | DELETE precio que no existe | 404 Not Found |
+
+---
+
+# Sesión 10 — Sprint 4 · SQLAlchemy (`persistence/db_storage.py` + models + `app/__init__.py`)
+
+## ¿Por qué una rama separada?
+
+```
+develop ──────────────────────────────────────► (producción)
+              │
+              └── feature/sqlalchemy ──► merge cuando esté listo
+```
+
+-   La rama `feature/sqlalchemy` parte del último commit de `develop` — tiene exactamente los mismos archivos
+-   A medida que hagamos commits aquí, las ramas divergen
+-   `git diff develop` mostrará los cambios — cuando todo funcione se hace merge de vuelta a `develop`
+-   Si algo sale mal, `develop` queda intacto con el InMemoryStorage funcionando
+
+## ¿Qué cambia con SQLAlchemy?
+
+| Ahora (InMemoryStorage) | Con SQLAlchemy (DbStorage) |
+|---|---|
+| Los datos viven en RAM | Los datos se guardan en SQLite |
+| Se pierden al reiniciar el servidor | Persisten entre reinicios |
+| Los modelos son `@dataclass` | Los modelos heredan de `db.Model` |
+| Cada storage es un dict `{}` | Cada storage habla con la DB |
+| Sin migraciones | `db.create_all()` crea las tablas |
+
+**Lo que NO cambia:** la facade, los endpoints, los tests de Postman. La interfaz pública es idéntica.
+
+## Archivos a crear/modificar
+
+| Archivo | Acción |
+|---|---|
+| `backend/app/extensions.py` | Crear — instancia `db = SQLAlchemy()` |
+| `backend/config.py` | Ya tiene `SQLALCHEMY_DATABASE_URI` ✅ |
+| `backend/app/models/user.py` | Modificar — de `@dataclass` a `db.Model` |
+| `backend/app/models/recipe.py` | Modificar |
+| `backend/app/models/ingredient.py` | Modificar |
+| `backend/app/models/step.py` | Modificar |
+| `backend/app/models/custom_price.py` | Modificar |
+| `backend/app/models/pdf_scan.py` | Modificar |
+| `backend/app/persistence/db_storage.py` | Crear — implementa `BaseRepository` con SQLAlchemy |
+| `backend/app/__init__.py` | Modificar — inicializar `db`, llamar `db.create_all()` |
+| `backend/app/services/facade.py` | Modificar — `InMemoryStorage` → `DbStorage` |
+
+---
+
+## `backend/app/extensions.py` — nuevo
+
+```python
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+```
+
+### Lógica
+
+#### ¿Por qué un archivo separado?
+```py
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+```
+-   `db` es el objeto central de SQLAlchemy — todos los modelos lo necesitan para definir sus columnas
+-   Si lo creamos directamente en `__init__.py` o en cada modelo, tendríamos importaciones circulares
+    +   `__init__.py` importa modelos → modelos importan `db` de `__init__.py` → círculo
+-   `extensions.py` rompe el ciclo: es un archivo sin dependencias internas que cualquiera puede importar
+-   `SQLAlchemy()` sin argumentos — la URI de conexión se configura después en `create_app()` con `db.init_app(app)`
+
+---
+
+## `backend/config.py` — sin cambios necesarios
+
+```python
+class Config:
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+class DevelopmentConfig(Config):
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///instance/development.db'
+
+class TestingConfig(Config):
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+
+class ProductionConfig(Config):
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+```
+
+### Lógica
+
+#### `SQLALCHEMY_TRACK_MODIFICATIONS = False`
+```py
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+```
+-   SQLAlchemy puede rastrear cada modificación de objeto y emitir señales — funcionalidad que casi nunca se usa
+-   En `False` desactiva eso y evita un warning de deprecación + ahorra memoria
+
+#### URIs de base de datos por entorno
+```py
+SQLALCHEMY_DATABASE_URI = 'sqlite:///instance/development.db'  # development
+SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'                  # testing
+SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')        # production
+```
+-   `sqlite:///` — protocolo SQLite. Las tres barras son parte del formato URI
+-   `instance/development.db` — ruta relativa al directorio de la app; Flask crea `instance/` automáticamente
+-   `sqlite:///:memory:` — base de datos en RAM, se borra al terminar el proceso; ideal para tests (aislados y rápidos)
+-   `DATABASE_URL` en producción viene de la variable de entorno — permite usar PostgreSQL sin cambiar código
+
+---
+
+## `backend/app/models/user.py` — modificado
+
+#### Antes — `@dataclass`
+```py
+from dataclasses import dataclass, field
+import uuid
+
+@dataclass
+class User:
+    first_name: str
+    last_name: str
+    email: str
+    password_hash: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+#### Después — `db.Model`
+```py
+from app.extensions import db
+import uuid
+
+
+class User(db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+```
+
+### Lógica
+
+#### Herencia de `db.Model`
+```py
+class User(db.Model):
+    __tablename__ = 'users'
+```
+-   `db.Model` es la clase base que SQLAlchemy usa para reconocer esta clase como una tabla
+-   `__tablename__` define el nombre de la tabla en la base de datos
+    +   Sin esto, SQLAlchemy usa el nombre de la clase en minúsculas (`user`); mejor ser explícito
+
+#### Columna `id` — clave primaria con UUID
+```py
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+```
+-   `db.String(36)` — SQLite guarda el UUID como texto de 36 caracteres (`"a1b2c3d4-..."`), no como tipo nativo
+-   `primary_key=True` — identifica esta columna como la clave primaria de la tabla
+-   `default=lambda: str(uuid.uuid4())` — genera un UUID nuevo automáticamente al crear cada fila
+    +   `lambda:` porque SQLAlchemy necesita una función, no un valor fijo
+
+#### Columnas de texto
+```py
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+```
+-   `nullable=False` — equivale a `NOT NULL` en SQL; la base de datos rechaza filas sin este campo
+-   `unique=True` en `email` — SQLite crea un índice único; intento de duplicado lanza `IntegrityError`
+-   Los tamaños (`50`, `120`, `256`) son límites en SQLite que se vuelven importantes al migrar a PostgreSQL
+
+---
+
+## `backend/app/models/recipe.py` — modificado
+
+#### Antes — `@dataclass`
+```py
+from dataclasses import dataclass, field
+import uuid
+
+@dataclass
+class Recipe:
+    title: str
+    user_id: str
+    description: str = ''
+    servings: int = 0
+    prep_time_min: int = 0
+    category: str = ''
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+#### Después — `db.Model`
+```py
+from app.extensions import db
+import uuid
+
+
+class Recipe(db.Model):
+    __tablename__ = 'recipes'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    title = db.Column(db.String(200), nullable=False)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    description = db.Column(db.Text, default='')
+    servings = db.Column(db.Integer, default=0)
+    prep_time_min = db.Column(db.Integer, default=0)
+    category = db.Column(db.String(100), default='')
+```
+
+### Lógica
+
+#### Foreign key a `users`
+```py
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+```
+-   `db.ForeignKey('users.id')` — declara la relación entre tablas
+    +   SQLite no fuerza foreign keys por defecto, pero la declara para cuando migremos a PostgreSQL
+-   `nullable=False` — toda receta debe pertenecer a un usuario; no puede existir receta huérfana
+
+#### `db.Text` vs `db.String`
+```py
+    description = db.Column(db.Text, default='')
+```
+-   `db.Text` — para textos largos sin límite fijo (descripciones de recetas pueden ser extensas)
+-   `db.String(n)` — para textos cortos con longitud máxima conocida
+
+---
+
+## `backend/app/models/ingredient.py` — modificado
+
+#### Antes — `@dataclass`
+```py
+from dataclasses import dataclass, field
+import uuid
+
+@dataclass
+class Ingredient:
+    name: str
+    quantity: str
+    unit: str
+    recipe_id: str
+    off_product_id: str = ''
+    estimated_cost: float = 0.0
+    cost_is_manual: bool = False
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+#### Después — `db.Model`
+```py
+from app.extensions import db
+import uuid
+
+
+class Ingredient(db.Model):
+    __tablename__ = 'ingredients'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = db.Column(db.String(100), nullable=False)
+    quantity = db.Column(db.String(50), default='')
+    unit = db.Column(db.String(30), default='')
+    recipe_id = db.Column(db.String(36), db.ForeignKey('recipes.id'), nullable=False)
+    off_product_id = db.Column(db.String(100), default='')
+    estimated_cost = db.Column(db.Float, default=0.0)
+    cost_is_manual = db.Column(db.Boolean, default=False)
+```
+
+### Lógica
+
+#### `quantity` como `String`
+```py
+    quantity = db.Column(db.String(50), default='')
+```
+-   Guardamos `quantity` como string igual que en el dataclass — permite `"200"`, `"1/2"`, `"al gusto"`
+-   No usamos `db.Float` porque la conversión numérica la hace la facade cuando necesita calcular
+
+#### `db.Boolean` y `db.Float`
+```py
+    estimated_cost = db.Column(db.Float, default=0.0)
+    cost_is_manual = db.Column(db.Boolean, default=False)
+```
+-   `db.Float` — SQLite lo guarda como `REAL`; suficiente precisión para precios en euros
+-   `db.Boolean` — SQLite lo guarda como `0`/`1`; SQLAlchemy lo convierte a `True`/`False` automáticamente
+
+---
+
+## `backend/app/models/step.py` — modificado
+
+#### Antes — `@dataclass`
+```py
+from dataclasses import dataclass, field
+import uuid
+
+@dataclass
+class Step:
+    order_num: int
+    description: str
+    recipe_id: str
+    duration_min: int = 0
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+#### Después — `db.Model`
+```py
+from app.extensions import db
+import uuid
+
+
+class Step(db.Model):
+    __tablename__ = 'steps'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    order_num = db.Column(db.Integer, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    recipe_id = db.Column(db.String(36), db.ForeignKey('recipes.id'), nullable=False)
+    duration_min = db.Column(db.Integer, default=0)
+```
+
+---
+
+## `backend/app/models/custom_price.py` — modificado
+
+#### Antes — `@dataclass`
+```py
+from dataclasses import dataclass, field
+import uuid
+
+@dataclass
+class CustomPrice:
+    user_id: str
+    ingredient_name: str
+    price_per_kg: float
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+#### Después — `db.Model`
+```py
+from app.extensions import db
+import uuid
+
+
+class CustomPrice(db.Model):
+    __tablename__ = 'custom_prices'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    ingredient_name = db.Column(db.String(100), nullable=False)
+    price_per_kg = db.Column(db.Float, nullable=False)
+```
+
+### Lógica
+
+#### Sin `unique` en `ingredient_name`
+```py
+    ingredient_name = db.Column(db.String(100), nullable=False)
+```
+-   No es `unique=True` porque el mismo nombre puede existir para distintos usuarios
+    +   "harina" para usuario A puede ser diferente de "harina" para usuario B
+-   La unicidad se controla en la facade: `get_custom_price(user_id, name)` antes de crear
+
+---
+
+## `backend/app/models/pdf_scan.py` — modificado
+
+#### Antes — `@dataclass`
+```py
+from dataclasses import dataclass, field
+import uuid
+
+@dataclass
+class PdfScan:
+    filename: str
+    recipe_id: str
+    status: str = 'pending'
+    scanned_at: str = ''
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+```
+
+#### Después — `db.Model`
+```py
+from app.extensions import db
+import uuid
+
+
+class PdfScan(db.Model):
+    __tablename__ = 'pdf_scans'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    filename = db.Column(db.String(255), nullable=False)
+    recipe_id = db.Column(db.String(36), db.ForeignKey('recipes.id'), nullable=False)
+    status = db.Column(db.String(20), default='pending')
+    scanned_at = db.Column(db.String(50), default='')
+```
+
+---
+
+## `backend/app/persistence/db_storage.py` — nuevo
+
+```python
+from app.extensions import db
+from app.persistence.repository import BaseRepository
+
+
+class DbStorage(BaseRepository):
+
+    def __init__(self, model):
+        self.model = model
+
+    def get_all(self):
+        return self.model.query.all()
+
+    def get_by_id(self, obj_id):
+        return db.session.get(self.model, obj_id)
+
+    def get_by_attribute(self, attr_name, attr_value):
+        return self.model.query.filter_by(**{attr_name: attr_value}).first()
+
+    def save(self, obj):
+        db.session.add(obj)
+        db.session.commit()
+        return obj
+
+    def update(self, obj):
+        db.session.commit()
+        return obj
+
+    def delete(self, obj_id):
+        obj = self.get_by_id(obj_id)
+        if obj:
+            db.session.delete(obj)
+            db.session.commit()
+```
+
+### Lógica
+
+#### Herencia de `BaseRepository`
+```py
+class DbStorage(BaseRepository):
+
+    def __init__(self, model):
+        self.model = model
+```
+-   Implementa la misma interfaz que `InMemoryStorage` — la facade no necesita saber con qué storage habla
+-   `self.model` es la clase SQLAlchemy (ej. `User`, `Recipe`) — permite reutilizar un único `DbStorage` para todos los modelos
+
+#### `get_all`
+```py
+    def get_all(self):
+        return self.model.query.all()
+```
+-   `Model.query` es la interfaz de consultas de Flask-SQLAlchemy
+-   `.all()` ejecuta `SELECT * FROM tabla` y devuelve una lista de objetos Python
+
+#### `get_by_id`
+```py
+    def get_by_id(self, obj_id):
+        return db.session.get(self.model, obj_id)
+```
+-   `db.session.get(Model, pk)` es la forma moderna de buscar por clave primaria en SQLAlchemy 2.x
+    +   Equivale a `SELECT * FROM tabla WHERE id = ?` con cache de sesión incluido
+
+#### `get_by_attribute`
+```py
+    def get_by_attribute(self, attr_name, attr_value):
+        return self.model.query.filter_by(**{attr_name: attr_value}).first()
+```
+-   `filter_by(**{attr_name: attr_value})` — convierte el string `"email"` en un filtro SQL: `WHERE email = ?`
+-   `.first()` — devuelve el primer resultado o `None` si no hay ninguno
+
+#### `save`
+```py
+    def save(self, obj):
+        db.session.add(obj)
+        db.session.commit()
+        return obj
+```
+-   `db.session.add(obj)` — registra el objeto en la sesión (equivale a un `INSERT` pendiente)
+-   `db.session.commit()` — escribe el `INSERT` en la base de datos de forma permanente
+-   Si el commit falla (ej. `unique` violado), SQLAlchemy lanza una excepción automáticamente
+
+#### `update`
+```py
+    def update(self, obj):
+        db.session.commit()
+        return obj
+```
+-   En SQLAlchemy, modificar atributos de un objeto ya en sesión lo marca como "dirty" automáticamente
+-   Solo hace falta `commit()` — no es necesario `add()` porque el objeto ya está rastreado
+    +   Ejemplo: `user.email = "nuevo@email.com"` → `db.session.commit()` → `UPDATE` en DB
+
+#### `delete`
+```py
+    def delete(self, obj_id):
+        obj = self.get_by_id(obj_id)
+        if obj:
+            db.session.delete(obj)
+            db.session.commit()
+```
+-   Primero busca el objeto por ID — `delete` en SQLAlchemy necesita el objeto, no el ID
+-   `db.session.delete(obj)` marca para `DELETE`
+-   `db.session.commit()` ejecuta el `DELETE FROM tabla WHERE id = ?`
+
+---
+
+## `backend/app/__init__.py` — modificado
+
+```python
+import os
+from flask import Flask
+from flask_restx import Api
+from flask_jwt_extended import JWTManager
+from config import config
+from app.extensions import db
+
+
+def create_app(config_name=None):
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'default')
+
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+
+    JWTManager(app)
+    db.init_app(app)
+
+    authorizations = {
+        'Bearer Auth': {
+            'type': 'apiKey',
+            'in': 'header',
+            'name': 'Authorization',
+            'description': "Type in the *'Value'* input box below: **'Bearer &lt;JWT&gt;'**, where JWT is the token"
+        }
+    }
+
+    api = Api(
+        app,
+        doc='/api/docs',
+        title='RecipeScanner API',
+        version='1.0',
+        description='API for scanning and managing recipes',
+        security='Bearer Auth',
+        authorizations=authorizations
+    )
+
+    from app.api.v1.auth import api as auth_ns
+    from app.api.v1.recipes import api as recipes_ns
+    from app.api.v1.ingredients import api as ingredients_ns
+    from app.api.v1.scan import api as scan_ns
+    from app.api.v1.costs import api as costs_ns
+
+    api.add_namespace(auth_ns, path='/api/v1/auth')
+    api.add_namespace(recipes_ns, path='/api/v1/recipes')
+    api.add_namespace(ingredients_ns, path='/api/v1')
+    api.add_namespace(scan_ns, path='/api/v1/scan')
+    api.add_namespace(costs_ns, path='/api/v1')
+
+    with app.app_context():
+        db.create_all()
+
+    return app
+```
+
+### Lógica
+
+#### Inicialización de `db`
+```py
+from app.extensions import db
+
+    db.init_app(app)
+```
+-   `db.init_app(app)` conecta la instancia `db` con la aplicación Flask
+    +   Le pasa la configuración (`SQLALCHEMY_DATABASE_URI`, etc.) que cargamos con `app.config.from_object`
+-   Se hace después de `JWTManager(app)` — el orden de inicialización de extensiones importa
+
+#### `db.create_all()`
+```py
+    with app.app_context():
+        db.create_all()
+```
+-   `app.app_context()` — SQLAlchemy necesita el contexto de la app para saber a qué base de datos conectarse
+-   `db.create_all()` lee todos los modelos que heredan de `db.Model` y crea sus tablas si no existen
+    +   Si la tabla ya existe, no la toca — es seguro llamarlo en cada arranque
+    +   En producción se reemplazaría por migraciones con Flask-Migrate, pero para desarrollo es suficiente
+
+---
+
+## `backend/app/services/facade.py` — modificado
+
+Solo cambia el `__init__` — el resto del archivo queda igual:
+
+```python
+from app.persistence.db_storage import DbStorage
+# eliminar: from app.persistence.repository import InMemoryStorage
+
+class RecipeScannerFacade:
+
+    def __init__(self):
+        self._users = DbStorage(User)
+        self._recipes = DbStorage(Recipe)
+        self._ingredients = DbStorage(Ingredient)
+        self._steps = DbStorage(Step)
+        self._custom_prices = DbStorage(CustomPrice)
+```
+
+### Lógica
+
+#### Swap de storage
+```py
+        self._users = DbStorage(User)
+        self._recipes = DbStorage(Recipe)
+        self._ingredients = DbStorage(Ingredient)
+        self._steps = DbStorage(Step)
+        self._custom_prices = DbStorage(CustomPrice)
+```
+-   Cada `DbStorage(ModelClass)` reemplaza un `InMemoryStorage()`
+-   Todos los métodos de la facade (`register_user`, `create_recipe`, etc.) llaman a `self._users.save(...)`, `self._recipes.get_all()`, etc. — exactamente la misma interfaz, sin cambios
+-   Esto es el patrón Repository en acción: la facade no sabe si habla con RAM o con SQLite
+
+---
+
+## Orden de implementación
+
+1. `pip install Flask-SQLAlchemy` → `pip freeze > requirements.txt`
+2. Crear `extensions.py`
+3. Modificar todos los modelos
+4. Crear `db_storage.py`
+5. Modificar `__init__.py`
+6. Modificar `facade.py` — swap `InMemoryStorage` → `DbStorage`
+7. Correr el servidor → verificar que `instance/development.db` se crea
+8. Correr los 116 tests de Postman — deben seguir pasando
+
+---
+
+## Tests — Newman (Postman CLI)
+
+Newman es la versión de línea de comandos de Postman. Permite correr la colección sin abrir la interfaz gráfica.
+
+### Instalación
+
+```bash
+npm install -g newman
+```
+
+### Correr los tests
+
+Se necesitan dos terminales abiertas al mismo tiempo:
+
+**Terminal 1 — levantar el servidor:**
+```bash
+cd backend
+source venv/bin/activate
+python run.py
+```
+
+**Terminal 2 — correr Newman:**
+```bash
+newman run tests/postman/RecipeScanner_collection.json \
+  -e tests/postman/RecipeScanner_environment.json
+```
+
+### Lógica
+
+#### ¿Por qué dos archivos?
+```
+RecipeScanner_collection.json   — los requests y assertions
+RecipeScanner_environment.json  — las variables (base_url, token, ids)
+```
+-   La colección define qué se prueba — rutas, métodos, assertions
+-   El environment define con qué valores — `base_url = http://localhost:5000`, tokens JWT generados en los pre-request scripts
+    +   Los tokens se generan automáticamente: el pre-request script hace login y guarda el token en `pm.environment.set('token', ...)`
+
+#### Resultado esperado
+```
+assertions    116    failed 0
+```
+-   Si `failed > 0` — hay un endpoint roto; Newman muestra exactamente qué assertion falló y en qué request
+-   Si el servidor no está corriendo — todos los requests fallan con `ECONNREFUSED`
+
+---
+
+## Ver la base de datos — SQLite Viewer
+
+### Instalación
+
+Instalar la extensión **SQLite Viewer** de Florian Klampfer desde el marketplace de VSCode.
+
+### Abrir la base de datos
+
+En el explorador de VSCode abrir:
+```
+backend/instance/development.db
+```
+
+Se abre directamente en el viewer sin comandos adicionales.
+
+### Lógica
+
+-   La barra lateral muestra las 6 tablas creadas por SQLAlchemy: `users`, `recipes`, `ingredients`, `steps`, `custom_prices`, `pdf_scans`
+-   Hacer click en una tabla ejecuta `SELECT * FROM tabla LIMIT 100` automáticamente
+-   Las tablas aparecen vacías después de correr Newman — los tests hacen cleanup y borran todo lo que crean
+    +   Para ver datos reales: hacer un request manual desde Postman o Swagger (`/api/docs`) y luego refrescar la tabla en el viewer

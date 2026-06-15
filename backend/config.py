@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+basedir = os.path.abspath(os.path.dirname(__file__))
+
 
 class Config:
     """Base configuration shared across all environments."""
@@ -17,7 +19,7 @@ class Config:
 class DevelopmentConfig(Config):
     """Local development environment."""
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///instance/development.db'
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'instance', 'development.db')
 
 
 class TestingConfig(Config):
