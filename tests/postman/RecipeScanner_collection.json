@@ -176,9 +176,9 @@
                   "});",
                   "pm.test('Response has JWT token — saved to {{token}}', function () {",
                   "    var json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('token');",
-                  "    pm.expect(json.token).to.be.a('string');",
-                  "    pm.environment.set('token', json.token);",
+                  "    pm.expect(json).to.have.property('access_token');",
+                  "    pm.expect(json.access_token).to.be.a('string');",
+                  "    pm.environment.set('token', json.access_token);",
                   "});",
                   "pm.test('Response has user object', function () {",
                   "    var json = pm.response.json();",
@@ -702,8 +702,8 @@
                   "});",
                   "pm.test('Token refreshed', function () {",
                   "    var json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('token');",
-                  "    pm.environment.set('token', json.token);",
+                  "    pm.expect(json).to.have.property('access_token');",
+                  "    pm.environment.set('token', json.access_token);",
                   "});"
                 ]
               }
@@ -1784,6 +1784,56 @@
               }
             }
           ]
+        },
+        {
+          "name": "PUT /ingredients/{id} — preferred_brand_id (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/ingredients/{{ingredient_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recipes",
+                "{{recipe_id}}",
+                "ingredients",
+                "{{ingredient_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferred_brand_id\": \"{{brand_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('preferred_brand_id guardado correctamente', function () {",
+                  "    pm.expect(pm.response.json().preferred_brand_id).to.eql(pm.environment.get('brand_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
@@ -2009,7 +2059,7 @@
                   "});",
                   "pm.test('token2 saved', function () {",
                   "    var json = pm.response.json();",
-                  "    pm.environment.set('token2', json.token);",
+                  "    pm.environment.set('token2', json.access_token);",
                   "});"
                 ]
               }
@@ -2389,6 +2439,654 @@
       ]
     },
     {
+      "name": "10 — Stores",
+      "description": "Gestión de tiendas del usuario. Ejecutar después de Auth.",
+      "item": [
+        {
+          "name": "POST /stores — crear tienda (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Intermarché\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — tienda creada', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Response tiene id y name', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json.name).to.eql('Intermarché');",
+                  "    pm.environment.set('store_id', json.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /stores — listar tiendas (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response es array con al menos 1 tienda', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.be.an('array');",
+                  "    pm.expect(json.length).to.be.at.least(1);",
+                  "});",
+                  "pm.test('Items tienen id y name', function () {",
+                  "    pm.expect(pm.response.json()[0]).to.have.property('id');",
+                  "    pm.expect(pm.response.json()[0]).to.have.property('name');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /stores — idempotente mismo nombre (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Intermarché\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — tienda ya existía, devuelve la existente', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('ID es el mismo que el creado antes', function () {",
+                  "    pm.expect(pm.response.json().id).to.eql(pm.environment.get('store_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /stores — segunda tienda para delete (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lidl\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — segunda tienda creada', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Guarda store_id_to_delete', function () {",
+                  "    pm.environment.set('store_id_to_delete', pm.response.json().id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /stores/{id} — borrar tienda (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores/{{store_id_to_delete}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores",
+                "{{store_id_to_delete}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 — tienda borrada', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /stores — Lidl no aparece, Intermarché sigue (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Intermarché sigue en la lista', function () {",
+                  "    var names = pm.response.json().map(function(s){ return s.name; });",
+                  "    pm.expect(names).to.include('Intermarché');",
+                  "});",
+                  "pm.test('Lidl ya no aparece', function () {",
+                  "    var names = pm.response.json().map(function(s){ return s.name; });",
+                  "    pm.expect(names).to.not.include('Lidl');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /stores sin auth (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — requiere autenticación', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 — Brands",
+      "description": "Gestión de marcas del usuario. Ejecutar después de Auth.",
+      "item": [
+        {
+          "name": "POST /brands — crear marca (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hacendado\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — marca creada', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Response tiene id y name', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json.name).to.eql('Hacendado');",
+                  "    pm.environment.set('brand_id', json.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /brands — listar marcas (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response es array con al menos 1 marca', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.be.an('array');",
+                  "    pm.expect(json.length).to.be.at.least(1);",
+                  "});",
+                  "pm.test('Items tienen id y name', function () {",
+                  "    pm.expect(pm.response.json()[0]).to.have.property('id');",
+                  "    pm.expect(pm.response.json()[0]).to.have.property('name');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /brands — idempotente mismo nombre (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hacendado\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — marca ya existía, devuelve la existente', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('ID es el mismo que el creado antes', function () {",
+                  "    pm.expect(pm.response.json().id).to.eql(pm.environment.get('brand_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /brands — segunda marca para delete (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dia\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — segunda marca creada', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Guarda brand_id_to_delete', function () {",
+                  "    pm.environment.set('brand_id_to_delete', pm.response.json().id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /brands/{id} — borrar marca (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/brands/{{brand_id_to_delete}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "{{brand_id_to_delete}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 — marca borrada', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /brands — Dia no aparece, Hacendado sigue (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Hacendado sigue en la lista', function () {",
+                  "    var names = pm.response.json().map(function(b){ return b.name; });",
+                  "    pm.expect(names).to.include('Hacendado');",
+                  "});",
+                  "pm.test('Dia ya no aparece', function () {",
+                  "    var names = pm.response.json().map(function(b){ return b.name; });",
+                  "    pm.expect(names).to.not.include('Dia');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /brands sin auth (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 — requiere autenticación', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "8 — Custom Prices",
       "item": [
         {
@@ -2434,6 +3132,7 @@
                   "    pm.expect(json).to.have.property('id');",
                   "    pm.expect(json).to.have.property('ingredient_name');",
                   "    pm.expect(json).to.have.property('price_per_kg');",
+                  "    pm.environment.set('price_id_harina', json.id);",
                   "});",
                   "pm.test('ingredient_name es harina', function () {",
                   "    pm.expect(pm.response.json().ingredient_name).to.eql('harina');",
@@ -2498,7 +3197,7 @@
           ]
         },
         {
-          "name": "GET /prices/harina — obtener precio (200)",
+          "name": "GET /prices — harina aparece en la lista (200)",
           "request": {
             "method": "GET",
             "header": [
@@ -2512,15 +3211,14 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/prices/harina",
+              "raw": "{{base_url}}/api/v1/prices",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "prices",
-                "harina"
+                "prices"
               ]
             }
           },
@@ -2532,11 +3230,13 @@
                   "pm.test('Status 200', function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "pm.test('ingredient_name es harina', function () {",
-                  "    pm.expect(pm.response.json().ingredient_name).to.eql('harina');",
-                  "});",
-                  "pm.test('price_per_kg es 2', function () {",
-                  "    pm.expect(pm.response.json().price_per_kg).to.eql(2);",
+                  "pm.test('harina aparece en la lista con price_per_kg 2', function () {",
+                  "    var found = pm.response.json().filter(function(p) {",
+                  "        return p.id === pm.environment.get('price_id_harina');",
+                  "    });",
+                  "    pm.expect(found.length).to.eql(1);",
+                  "    pm.expect(found[0].ingredient_name).to.eql('harina');",
+                  "    pm.expect(found[0].price_per_kg).to.eql(2);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2592,7 +3292,7 @@
           ]
         },
         {
-          "name": "PUT /prices/harina — actualizar precio (200)",
+          "name": "PUT /prices/{id} — actualizar precio (200)",
           "request": {
             "method": "PUT",
             "header": [
@@ -2610,7 +3310,7 @@
               "raw": "{\n  \"price_per_kg\": 3.00\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/prices/harina",
+              "raw": "{{base_url}}/api/v1/prices/{{price_id_harina}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -2618,7 +3318,7 @@
                 "api",
                 "v1",
                 "prices",
-                "harina"
+                "{{price_id_harina}}"
               ]
             }
           },
@@ -2643,7 +3343,7 @@
           ]
         },
         {
-          "name": "DELETE /prices/harina — eliminar precio (204)",
+          "name": "DELETE /prices/{id} — eliminar precio (204)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -2657,7 +3357,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/prices/harina",
+              "raw": "{{base_url}}/api/v1/prices/{{price_id_harina}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -2665,7 +3365,7 @@
                 "api",
                 "v1",
                 "prices",
-                "harina"
+                "{{price_id_harina}}"
               ]
             }
           },
@@ -2684,7 +3384,7 @@
           ]
         },
         {
-          "name": "GET /prices/harina — después del delete (404)",
+          "name": "GET /prices — harina ya no aparece tras delete (200)",
           "request": {
             "method": "GET",
             "header": [
@@ -2698,15 +3398,14 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/prices/harina",
+              "raw": "{{base_url}}/api/v1/prices",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "prices",
-                "harina"
+                "prices"
               ]
             }
           },
@@ -2715,11 +3414,14 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 404 — precio no existe', function () {",
-                  "    pm.response.to.have.status(404);",
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
                   "});",
-                  "pm.test('Response tiene campo error', function () {",
-                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "pm.test('harina eliminada ya no está en la lista', function () {",
+                  "    var found = pm.response.json().filter(function(p) {",
+                  "        return p.id === pm.environment.get('price_id_harina');",
+                  "    });",
+                  "    pm.expect(found.length).to.eql(0);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2728,7 +3430,7 @@
           ]
         },
         {
-          "name": "DELETE /prices/harina — ya eliminado (404)",
+          "name": "DELETE /prices/{id} — ya eliminado (404)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -2742,7 +3444,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/prices/harina",
+              "raw": "{{base_url}}/api/v1/prices/{{price_id_harina}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -2750,7 +3452,7 @@
                 "api",
                 "v1",
                 "prices",
-                "harina"
+                "{{price_id_harina}}"
               ]
             }
           },
@@ -2769,7 +3471,7 @@
           ]
         },
         {
-          "name": "PUT /prices/ingrediente-inexistente — 404",
+          "name": "PUT /prices/{id} — no encontrado (404)",
           "request": {
             "method": "PUT",
             "header": [
@@ -2787,7 +3489,7 @@
               "raw": "{\"price_per_kg\": 5.0}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/prices/ingrediente-inexistente",
+              "raw": "{{base_url}}/api/v1/prices/00000000-0000-0000-0000-000000000000",
               "host": [
                 "{{base_url}}"
               ],
@@ -2795,7 +3497,7 @@
                 "api",
                 "v1",
                 "prices",
-                "ingrediente-inexistente"
+                "00000000-0000-0000-0000-000000000000"
               ]
             }
           },
@@ -2892,11 +3594,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 201', function () {",
+                  "pm.test('Status 201 — precio normalizado creado', function () {",
                   "    pm.response.to.have.status(201);",
                   "});",
-                  "pm.test('ingredient_name guardado en minúsculas aunque se envió en mayúsculas', function () {",
-                  "    pm.expect(pm.response.json().ingredient_name).to.equal('mantequilla');",
+                  "pm.test('ingredient_name normalizado a minúsculas', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.ingredient_name).to.eql('mantequilla');",
+                  "    pm.environment.set('price_id_mantequilla', json.id);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2905,7 +3609,7 @@
           ]
         },
         {
-          "name": "GET /prices/mantequilla — case insensitive lookup (200)",
+          "name": "GET /prices — mantequilla aparece en la lista (200)",
           "request": {
             "method": "GET",
             "header": [
@@ -2919,15 +3623,14 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/prices/mantequilla",
+              "raw": "{{base_url}}/api/v1/prices",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "prices",
-                "mantequilla"
+                "prices"
               ]
             }
           },
@@ -2936,8 +3639,15 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 200 — precio encontrado por nombre en minúsculas', function () {",
+                  "pm.test('Status 200 — precio encontrado en lista', function () {",
                   "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('mantequilla aparece en la lista', function () {",
+                  "    var found = pm.response.json().filter(function(p) {",
+                  "        return p.id === pm.environment.get('price_id_mantequilla');",
+                  "    });",
+                  "    pm.expect(found.length).to.eql(1);",
+                  "    pm.expect(found[0].ingredient_name).to.eql('mantequilla');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2946,7 +3656,7 @@
           ]
         },
         {
-          "name": "DELETE /prices/mantequilla — cleanup (204)",
+          "name": "DELETE /prices/{id} — cleanup mantequilla (204)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -2960,7 +3670,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/prices/mantequilla",
+              "raw": "{{base_url}}/api/v1/prices/{{price_id_mantequilla}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -2968,7 +3678,7 @@
                 "api",
                 "v1",
                 "prices",
-                "mantequilla"
+                "{{price_id_mantequilla}}"
               ]
             }
           },
@@ -2979,6 +3689,211 @@
                 "exec": [
                   "pm.test('Status 204 — cleanup correcto', function () {",
                   "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /prices — con store_id (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ingredient_name\": \"leche\",\n  \"price_per_kg\": 1.2,\n  \"bought_qty\": 1,\n  \"bought_unit\": \"l\",\n  \"bought_price\": 1.2,\n  \"store_id\": \"{{store_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — precio con tienda creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('store_id y store_name correctos', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.store_id).to.eql(pm.environment.get('store_id'));",
+                  "    pm.expect(json.store_name).to.eql('Intermarché');",
+                  "});",
+                  "pm.test('brand_id es null cuando no se envía', function () {",
+                  "    pm.expect(pm.response.json().brand_id).to.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /prices — con brand_id (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ingredient_name\": \"manteca\",\n  \"price_per_kg\": 9.0,\n  \"bought_qty\": 250,\n  \"bought_unit\": \"g\",\n  \"bought_price\": 2.25,\n  \"brand_id\": \"{{brand_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — precio con marca creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('brand_id y brand_name correctos', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.brand_id).to.eql(pm.environment.get('brand_id'));",
+                  "    pm.expect(json.brand_name).to.eql('Hacendado');",
+                  "});",
+                  "pm.test('store_id es null cuando no se envía', function () {",
+                  "    pm.expect(pm.response.json().store_id).to.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /prices — con store_id + brand_id (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ingredient_name\": \"azucar\",\n  \"price_per_kg\": 1.0,\n  \"bought_qty\": 1,\n  \"bought_unit\": \"kg\",\n  \"bought_price\": 1.0,\n  \"store_id\": \"{{store_id}}\",\n  \"brand_id\": \"{{brand_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — precio con tienda y marca creado', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('store_name y brand_name correctos', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.store_name).to.eql('Intermarché');",
+                  "    pm.expect(json.brand_name).to.eql('Hacendado');",
+                  "    pm.environment.set('price_with_store_brand_id', json.id);",
+                  "});",
+                  "pm.test('price_per_kg es 1.00', function () {",
+                  "    pm.expect(pm.response.json().price_per_kg).to.eql(1.00);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /prices — store_name y brand_name en la lista (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/prices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "prices"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Al menos un precio tiene store_name', function () {",
+                  "    var withStore = pm.response.json().filter(function(p){ return p.store_name && p.store_name !== ''; });",
+                  "    pm.expect(withStore.length).to.be.at.least(1);",
+                  "});",
+                  "pm.test('Al menos un precio tiene brand_name', function () {",
+                  "    var withBrand = pm.response.json().filter(function(p){ return p.brand_name && p.brand_name !== ''; });",
+                  "    pm.expect(withBrand.length).to.be.at.least(1);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -3034,7 +3949,6 @@
                   "    pm.expect(json).to.have.property('ingredients');",
                   "    pm.expect(json).to.have.property('total_estimated_cost');",
                   "    pm.expect(json).to.have.property('currency');",
-                  "    pm.expect(json).to.have.property('note');",
                   "});",
                   "pm.test('currency es EUR', function () {",
                   "    pm.expect(pm.response.json().currency).to.eql('EUR');",
