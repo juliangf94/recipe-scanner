@@ -179,45 +179,83 @@ Solo project — Julian Gonzalez
 
 ---
 
-## Sprint 5 — Frontend 🔄 IN PROGRESS
+## Sprint 5 — Frontend ✅ COMPLETE
 
-**Goal:** Functional Jinja2 frontend covering all user stories.
+**Goal:** Functional frontend covering all user stories.
 
-**Sesión:** 11 → ver explicación detallada en `CODE_NOTES_FRONT.md` (Sesión 11)
+**Architectural decision:** Jinja2 descartado en favor de frontend estático HTML + JS puro.
+Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Sesión 11).
 
-**Duration:** Week 6
+**Sesiones:** 11 y 12 → ver explicación detallada en `CODE_NOTES_FRONT.md`
+
+**Duration:** Weeks 6–7
 
 | Task | File | Priority | Status |
 |---|---|---|---|
-| Base template + layout | `templates/base.html` | Must Have | Pending |
-| Blueprint views/auth | `views/auth.py` | Must Have | Pending |
-| Login + register pages | `templates/auth/login.html`, `register.html` | Must Have | Pending |
-| Blueprint views/recipes | `views/recipes.py` | Must Have | Pending |
-| Recipe list (dashboard) | `templates/recipes/list.html` | Must Have | Pending |
-| Recipe detail page | `templates/recipes/detail.html` | Must Have | Pending |
-| Recipe form (crear/editar) | `templates/recipes/form.html` | Must Have | Pending |
-| PDF upload page | `templates/scan/upload.html` | Must Have | Pending |
-| Static CSS | `static/css/style.css` | Must Have | Pending |
-| Registrar blueprints en factory | `app/__init__.py` | Must Have | Pending |
-| End-to-end manual test | Full user flow en navegador | Must Have | Pending |
+| Decisión arquitectural: HTML estático vs Jinja2 | `CODE_NOTES_FRONT.md` | Must Have | ✅ Done |
+| Login page | `frontend/index.html` + `js/auth.js` | Must Have | ✅ Done |
+| Register page | `frontend/register.html` | Must Have | ✅ Done |
+| Dashboard (recipe list + search) | `frontend/dashboard.html` + `js/dashboard.js` | Must Have | ✅ Done |
+| Recipe detail (ingredientes, costos, secciones) | `frontend/recipe.html` + `js/recipe.js` | Must Have | ✅ Done |
+| PDF scan page | `frontend/scan.html` + `js/scan.js` | Must Have | ✅ Done |
+| My Prices — custom prices CRUD | `frontend/prices.html` + `js/prices.js` | Should Have | ✅ Done |
+| Stores y Brands como entidades gestionadas | `api/v1/stores.py`, `api/v1/brands.py` | Should Have | ✅ Done |
+| i18n EN/ES | `frontend/js/i18n.js` | Could Have | ✅ Done |
+| Centralización HTTP + JWT | `frontend/js/api.js` | Must Have | ✅ Done |
+| Store + Brand por ingrediente en receta | `js/recipe.js` | Should Have | ✅ Done |
+| Resolución de precio 4 casos | `services/facade.py` | Should Have | ✅ Done |
+| Fuzzy matching de nombres de ingredientes | `services/facade.py` | Should Have | ✅ Done |
+| Avatar + imagen de receta | `api/v1/auth.py`, `api/v1/recipes.py` | Could Have | ✅ Done |
+| CSS responsive — dark/light mode | `frontend/css/style.css` | Must Have | ✅ Done |
+| Fix seguridad: ownership check en GET recipe | `api/v1/recipes.py` | Must Have | ✅ Done |
+| Tests — models, repository, API (60 tests) | `tests/` | Must Have | ✅ Done |
+| End-to-end manual test | Full user flow en navegador | Must Have | ✅ Done |
 | Deploy to production | Render / Railway | Should Have | Pending |
 
+**Architectural notes:**
+- Jinja2 descartado: el frontend estático consume la API REST igual que lo haría una app móvil futura.
+  Esta decisión mantiene el backend como API pura y el frontend desacoplado.
+- `Store` y `Brand` son entidades gestionadas (no campos de texto libre) para evitar errores de ortografía
+  y permitir filtrado/ordenamiento consistente.
+- La resolución de precio sigue 4 casos en orden de preferencia:
+  `store+brand > store > brand > más barato global`
+- Fuzzy matching: exact → word-prefix (con padding de espacio) → singular/plural en español.
+- Se descubrió y corrigió bug de seguridad: `GET /recipes/<id>` no verificaba ownership —
+  cualquier usuario autenticado podía leer recetas ajenas conociendo el ID.
+
 **Definition of Done:**
-- Full user flow works in the browser: register → login → upload PDF → view recipe with prices
-- Application deployed and accessible via public URL
-- README updated with production URL
-- Final merge `develop` → `main`
+- ✅ Full user flow funciona en el navegador: register → login → scan PDF → ver receta con precios
+- ✅ Precios custom con stores y brands funcionan end-to-end
+- ✅ 60 tests pasan: `pytest tests/` — 0 failures
+- ✅ Todo commiteado en `develop`
+- ⏳ Deploy a producción (Render/Railway) — pendiente para Sprint 6
+- ⏳ Merge `develop` → `main` — pendiente tras deploy
+
+---
+
+## Sprint 6 — Deploy ⏳ PENDING
+
+**Goal:** Deploy to production and final merge to main.
+
+**Duration:** Week 8
+
+| Task | Priority | Status |
+|---|---|---|
+| Deploy backend a Render / Railway | Should Have | Pending |
+| Variables de entorno de producción | Must Have | Pending |
+| README actualizado con URL de producción | Should Have | Pending |
+| Merge `develop` → `main` | Must Have | Pending |
 
 ---
 
 ## Metrics
 
-| Metric | Target |
-|---|---|
-| Test coverage | 70%+ on models, persistence, services |
-| Bugs at sprint end | 0 critical, under 3 minor |
-| Commits per sprint | Minimum 5 meaningful commits |
-| Branches | All work on `develop`, swap isolated to `feature/sqlalchemy` |
+| Metric | Target | Actual |
+|---|---|---|
+| Test coverage | 70%+ on models, persistence, services | 60 tests — models, repository, API ✅ |
+| Bugs at sprint end | 0 critical, under 3 minor | 0 critical ✅ |
+| Commits per sprint | Minimum 5 meaningful commits | ✅ |
+| Branches | All work on `develop`, swap isolated to `feature/sqlalchemy` | ✅ |
 
 ---
 

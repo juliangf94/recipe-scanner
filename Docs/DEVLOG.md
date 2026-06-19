@@ -18,7 +18,7 @@ Fecha de entrega: finales de junio 2025
 | BDD desarrollo | SQLite | Sin servidor, archivo local, ideal para desarrollo |
 | BDD producción | PostgreSQL | Robusto, concurrente, estándar en producción |
 | API docs | flask_restx (Swagger UI) | Documentación automática en `/api/docs`, preparado para app móvil |
-| Frontend | Jinja2 (server-side) | Un solo servidor Flask, sin build process separado, desarrollo rápido |
+| Frontend | HTML + JS estático | Desacoplado del backend, consume la misma API REST que consumiría una app móvil |
 
 ### Justificación detallada de cada tecnología
 
@@ -582,5 +582,139 @@ Podemos explicar cada línea porque nosotros integramos cada componente manualme
 | Tamaño | Micro | Full | Micro/Medio |
 | Flexibilidad | Alta | Baja | Alta |
 | Curva de aprendizaje | Baja | Media | Media |
-| Ideal para | APIs + Jinja2 | Proyectos grandes | APIs puras |
+| Ideal para | APIs + frontend estático | Proyectos grandes | APIs puras |
 | Control técnico | Total | Limitado | Total |
+
+---
+
+## Decisiones técnicas — Sprint 5 (Frontend)
+
+### Decisión 9 — Frontend estático vs Jinja2
+
+El plan original preveía usar Jinja2 para el frontend (server-side rendering dentro de Flask).
+Durante el Sprint 5 se tomó la decisión de usar HTML + JS estático puro consumiendo la API REST.
+
+**Problema con Jinja2:**
+- El frontend Jinja2 estaría acoplado al backend: cambiar de servidor invalida el frontend.
+- Una app móvil futura tendría que duplicar toda la lógica de presentación.
+- Flask entraría en conflicto al servir tanto la API REST (JSON) como las vistas HTML desde las mismas rutas.
+
+**Solución — Frontend estático:**
+```
+frontend/
+  index.html          ← login
+  register.html
+  dashboard.html      ← lista de recetas
+  recipe.html         ← detalle con precios
+  scan.html           ← subida de PDF
+  prices.html         ← precios personalizados
+  css/style.css
+  js/
+    api.js            ← fetch wrapper + JWT
+    auth.js           ← login/logout/localStorage
+    i18n.js           ← traducciones ES/EN
+    dashboard.js
+    recipe.js
+    scan.js
+    prices.js
+```
+
+El backend queda como API pura. El frontend consume los mismos endpoints que consumiría React, Vue, o una app móvil React Native.
+
+---
+
+### Decisión 10 — Stores y Brands como entidades gestionadas
+
+Los precios custom inicialmente tenían `store` y `brand` como campos de texto libre.
+
+**Problema:** el mismo supermercado podía estar escrito "Intermarche", "Intermarché", "intermarché" — tres entradas distintas que no se podían comparar.
+
+**Solución:** `Store` y `Brand` son modelos SQLAlchemy independientes con FK en `CustomPrice` e `Ingredient`.
+
+```python
+class Store(db.Model):
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+
+class Brand(db.Model):  # idéntica estructura
+    ...
+```
+
+`Ingredient` tiene `preferred_store_id` y `preferred_brand_id` para elegir en qué tienda/marca buscar el precio de ese ingrediente en la receta.
+
+---
+
+### Decisión 11 — Resolución de precio en 4 casos
+
+Cuando se calcula el costo de un ingrediente, la lógica de prioridad es:
+
+```
+1. store + brand coinciden → precio más barato de esa combinación
+2. solo store coincide    → precio más barato en esa tienda
+3. solo brand coincide    → precio más barato de esa marca
+4. ninguno                → precio más barato entre todos los precios del usuario
+```
+
+Si el usuario no tiene ningún precio custom → se usa Open Food Facts + tabla FALLBACK_PRICES.
+
+---
+
+### Decisión 12 — Fuzzy matching de nombres de ingredientes
+
+La receta extraída por IA puede escribir "huevo" y el usuario tiene guardado "huevos".
+La búsqueda exact-match fallaría. Solución en 3 pasos:
+
+```python
+# 1. Exact match
+exact = [cp for cp in all_user if cp.ingredient_name == name_lower]
+if exact: return exact
+
+# 2. Word-prefix (con padding de espacio para evitar "sal" → "salsa")
+prefix = [cp for cp in all_user
+          if (name_lower + ' ').startswith(cp.ingredient_name + ' ')
+          or (cp.ingredient_name + ' ').startswith(name_lower + ' ')]
+if prefix: return prefix
+
+# 3. Singular/plural en español (strip de -s, -es)
+norm = _strip_plural(name_lower)
+plural = [cp for cp in all_user if _strip_plural(cp.ingredient_name) == norm]
+if plural: return plural
+```
+
+Casos resueltos:
+- `huevo` ↔ `huevos` → paso 3
+- `harina` ↔ `harina 0000` → paso 2
+
+---
+
+### Decisión 13 — Optimización de re-renders en el frontend
+
+El problema: al cambiar el store o brand de un ingrediente, `saveRecipe()` llamaba a `loadPage()` que recargaba todo el contenido desde cero (equivalente a navigation reload).
+
+**Solución aplicada:**
+- `buildRecipeHeaderHtml(recipe)` — genera solo el HTML del header
+- `renderRecipeHeader(recipe)` — reemplaza solo el `.recipe-header-grid` con `outerHTML`
+- `saveRecipe()` ahora actualiza `currentRecipe` en memoria y llama `renderRecipeHeader()` — la tabla de ingredientes no se toca
+- `changeIngredientStore`/`changeIngredientBrand` solo llaman `loadCost()` que hace updates quirúrgicos célula por célula mediante `querySelector`
+- Los dropdowns se deshabilitan durante la API call para evitar doble-click
+
+---
+
+### Bug de seguridad corregido en Sprint 5
+
+`GET /api/v1/recipes/<recipe_id>` no verificaba ownership: cualquier usuario autenticado que conociera un UUID de receta ajena podía leerla (information disclosure).
+
+**Fix aplicado en `recipes.py`:**
+```python
+def get(self, recipe_id):
+    user_id = get_jwt_identity()        # ← agregado
+    recipe = facade.get_recipe(recipe_id)
+    if not recipe:
+        return {'error': 'Recipe not found'}, 404
+    if recipe.user_id != user_id:       # ← agregado
+        return {'error': 'Forbidden'}, 403
+    return {...}, 200
+```
+
+Este fix está cubierto por el test `test_get_other_user_recipe_returns_403` en `tests/test_api.py`.

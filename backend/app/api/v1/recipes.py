@@ -62,11 +62,15 @@ class RecipeDetail(Resource):
 
     @jwt_required()
     @api.response(200, 'Recipe found')
+    @api.response(403, 'Forbidden')
     @api.response(404, 'Recipe not found')
     def get(self, recipe_id):
+        user_id = get_jwt_identity()
         recipe = facade.get_recipe(recipe_id)
         if not recipe:
             return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
         return {'id': recipe.id, 'title': recipe.title,
                 'description': recipe.description, 'servings': recipe.servings,
                 'prep_time_min': recipe.prep_time_min, 'category': recipe.category,
