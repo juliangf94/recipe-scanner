@@ -1,7 +1,7 @@
 # RecipeScanner — Diario de desarrollo
 
 Proyecto portfolio para Holberton School — RNCP 5 DWWM  
-Fecha de entrega: finales de junio 2025
+Fecha de entrega: finales de junio 2026
 
 ---
 
@@ -19,6 +19,9 @@ Fecha de entrega: finales de junio 2025
 | BDD producción | PostgreSQL | Robusto, concurrente, estándar en producción |
 | API docs | flask_restx (Swagger UI) | Documentación automática en `/api/docs`, preparado para app móvil |
 | Frontend | HTML + JS estático | Desacoplado del backend, consume la misma API REST que consumiría una app móvil |
+| Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 60 tests, 0 failures |
+| Tests end-to-end | Newman + Postman | 186 assertions contra el servidor en vivo — 101 requests, 0 failures |
+| Variables de entorno | python-dotenv | Carga `.env` en desarrollo; en producción las claves van directo al servidor |
 
 ### Justificación detallada de cada tecnología
 
