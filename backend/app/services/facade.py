@@ -10,10 +10,13 @@ from app.models.ingredient import Ingredient
 from app.models.step import Step
 from app.models.pdf_scan import PdfScan
 from app.models.custom_price import CustomPrice
+from app.models.store import Store
+from app.models.brand import Brand
 from app.utils.security import hash_password
 
 
 OFF_SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
+OFF_PRICES_URL = "https://prices.openfoodfacts.org/api/v1/prices"
 
 FALLBACK_PRICES = {
     # Prices in EUR per kg — average French supermarket prices 2025
@@ -67,6 +70,8 @@ class RecipeScannerFacade:
         self._ingredients = DbStorage(Ingredient)
         self._steps = DbStorage(Step)
         self._custom_prices = DbStorage(CustomPrice)
+        self._stores = DbStorage(Store)
+        self._brands = DbStorage(Brand)
 
     # --- Users --- api/v1/auth.py ---
 
@@ -99,6 +104,12 @@ class RecipeScannerFacade:
 
     # --- Recipes --- api/v1/recipes.py ---
 
+    @staticmethod
+    def _normalize_category(category):
+        if not category:
+            return ''
+        return category.strip().title()
+
     def create_recipe(self, user_id, title, description='',
                       servings=0, prep_time_min=0, category=''):
         recipe = Recipe(
@@ -107,7 +118,7 @@ class RecipeScannerFacade:
             description=description,
             servings=servings,
             prep_time_min=prep_time_min,
-            category=category
+            category=self._normalize_category(category)
         )
         return self._recipes.save(recipe)
 
@@ -121,6 +132,8 @@ class RecipeScannerFacade:
         recipe = self._recipes.get_by_id(recipe_id)
         if not recipe:
             return None
+        if 'category' in kwargs:
+            kwargs['category'] = self._normalize_category(kwargs['category'])
         for key, value in kwargs.items():
             if hasattr(recipe, key):
                 setattr(recipe, key, value)
@@ -184,7 +197,7 @@ class RecipeScannerFacade:
             description=data.get('description', ''),
             servings=data.get('servings', 0),
             prep_time_min=data.get('prep_time_min', 0),
-            category=data.get('category', '')
+            category=self._normalize_category(data.get('category', ''))
         )
 
         ingredients = []
@@ -229,41 +242,165 @@ class RecipeScannerFacade:
         except Exception:
             return None
 
+    # --- Stores --- api/v1/stores.py ---
+
+    def get_stores(self, user_id):
+        return [s for s in self._stores.get_all() if s.user_id == user_id]
+
+    def get_store_by_name(self, user_id, name):
+        name_lower = name.lower().strip()
+        for s in self._stores.get_all():
+            if s.user_id == user_id and s.name.lower() == name_lower:
+                return s
+        return None
+
+    def create_store(self, user_id, name):
+        store = Store(user_id=user_id, name=name.strip())
+        return self._stores.save(store)
+
+    def delete_store(self, store_id, user_id):
+        store = self._stores.get_by_id(store_id)
+        if not store or store.user_id != user_id:
+            return False
+        self._stores.delete(store_id)
+        return True
+
+    # --- Brands --- api/v1/brands.py ---
+
+    def get_brands(self, user_id):
+        return [b for b in self._brands.get_all() if b.user_id == user_id]
+
+    def get_brand_by_name(self, user_id, name):
+        name_lower = name.lower().strip()
+        for b in self._brands.get_all():
+            if b.user_id == user_id and b.name.lower() == name_lower:
+                return b
+        return None
+
+    def get_brand_by_id(self, brand_id):
+        return self._brands.get_by_id(brand_id)
+
+    def create_brand(self, user_id, name):
+        brand = Brand(user_id=user_id, name=name.strip())
+        return self._brands.save(brand)
+
+    def delete_brand(self, brand_id, user_id):
+        brand = self._brands.get_by_id(brand_id)
+        if not brand or brand.user_id != user_id:
+            return False
+        self._brands.delete(brand_id)
+        return True
+
     # --- Custom Prices --- api/v1/costs.py ---
 
     def get_custom_prices(self, user_id):
         return [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
 
+    @staticmethod
+    def _strip_plural(name):
+        """Strip common Spanish/English plural endings for fuzzy matching."""
+        if name.endswith('es') and len(name) > 4:
+            return name[:-2]
+        if name.endswith('s') and len(name) > 3:
+            return name[:-1]
+        return name
+
+    def get_custom_prices_for_ingredient(self, user_id, ingredient_name):
+        name_lower = ingredient_name.lower().strip()
+        all_user = [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+
+        # 1. Exact match
+        exact = [cp for cp in all_user if cp.ingredient_name == name_lower]
+        if exact:
+            return exact
+
+        # 2. Word-prefix match: "harina" matches "harina 0000" and vice-versa
+        #    Uses ' ' padding so "sal" does NOT match "salsa"
+        prefix = [cp for cp in all_user
+                  if (name_lower + ' ').startswith(cp.ingredient_name + ' ')
+                  or (cp.ingredient_name + ' ').startswith(name_lower + ' ')]
+        if prefix:
+            return prefix
+
+        # 3. Singular/plural: "huevo" matches "huevos"
+        norm = self._strip_plural(name_lower)
+        plural = [cp for cp in all_user if self._strip_plural(cp.ingredient_name) == norm]
+        if plural:
+            return plural
+
+        return []
+
     def get_custom_price(self, user_id, ingredient_name):
+        """Returns cheapest custom price for an ingredient regardless of store."""
+        prices = self.get_custom_prices_for_ingredient(user_id, ingredient_name)
+        if not prices:
+            return None
+        return min(prices, key=lambda c: c.price_per_kg)
+
+    def get_custom_price_by_store(self, user_id, ingredient_name, store_id):
+        name_lower = ingredient_name.lower().strip()
+        matches = [cp for cp in self._custom_prices.get_all()
+                   if cp.user_id == user_id and cp.ingredient_name == name_lower
+                   and cp.store_id == store_id]
+        return min(matches, key=lambda c: c.price_per_kg) if matches else None
+
+    def get_custom_price_by_store_and_brand(self, user_id, ingredient_name, store_id, brand_id):
         name_lower = ingredient_name.lower().strip()
         for cp in self._custom_prices.get_all():
-            if cp.user_id == user_id and cp.ingredient_name == name_lower:
+            if (cp.user_id == user_id and cp.ingredient_name == name_lower
+                    and cp.store_id == store_id and cp.brand_id == brand_id):
                 return cp
         return None
 
-    def create_custom_price(self, user_id, ingredient_name, price_per_kg):
+    def get_custom_price_by_id(self, price_id):
+        return self._custom_prices.get_by_id(price_id)
+
+    def create_custom_price(self, user_id, ingredient_name, price_per_kg,
+                             store_id=None, brand_id=None, bought_qty=None, bought_unit=None, bought_price=None):
         cp = CustomPrice(
             user_id=user_id,
             ingredient_name=ingredient_name.lower().strip(),
-            price_per_kg=price_per_kg
+            price_per_kg=price_per_kg,
+            store_id=store_id,
+            brand_id=brand_id,
+            bought_qty=bought_qty,
+            bought_unit=bought_unit,
+            bought_price=bought_price
         )
         return self._custom_prices.save(cp)
 
-    def update_custom_price(self, user_id, ingredient_name, price_per_kg):
-        cp = self.get_custom_price(user_id, ingredient_name)
+    def update_custom_price(self, price_id, price_per_kg,
+                             store_id=None, brand_id=None, bought_qty=None, bought_unit=None, bought_price=None):
+        cp = self._custom_prices.get_by_id(price_id)
         if not cp:
             return None
         cp.price_per_kg = price_per_kg
+        if store_id is not None:
+            cp.store_id = store_id
+        cp.brand_id = brand_id  # always update (can be cleared to None)
+        if bought_qty is not None:
+            cp.bought_qty = bought_qty
+        if bought_unit is not None:
+            cp.bought_unit = bought_unit
+        if bought_price is not None:
+            cp.bought_price = bought_price
         return self._custom_prices.update(cp)
 
-    def delete_custom_price(self, user_id, ingredient_name):
-        cp = self.get_custom_price(user_id, ingredient_name)
-        if not cp:
+    def delete_custom_price_by_id(self, price_id, user_id):
+        cp = self._custom_prices.get_by_id(price_id)
+        if not cp or cp.user_id != user_id:
             return False
-        self._custom_prices.delete(cp.id)
+        self._custom_prices.delete(price_id)
         return True
 
-    # --- Costs (Open Food Facts) --- api/v1/costs.py ---
+    def set_ingredient_preferred_store(self, ing_id, store_id):
+        ing = self._ingredients.get_by_id(ing_id)
+        if not ing:
+            return None
+        ing.preferred_store_id = store_id
+        return self._ingredients.update(ing)
+
+    # --- Costs (Open Food Facts + custom DB + manual) --- api/v1/costs.py ---
 
     def get_recipe_cost(self, recipe_id, user_id):
         recipe = self.get_recipe(recipe_id)
@@ -272,19 +409,27 @@ class RecipeScannerFacade:
         total = 0.0
 
         for ing in ingredients:
-            price_per_kg = self._get_ingredient_price(ing.name, user_id)
+            price_per_kg, source, store_id = self._resolve_price(ing, user_id)
             try:
                 qty = float(ing.quantity)
             except (ValueError, TypeError):
                 qty = 0.0
-            estimated = round(qty * (price_per_kg / 1000), 2)
+            if source == 'manual':
+                estimated = round(qty * price_per_kg, 2)
+            else:
+                estimated = round(qty * (price_per_kg / 1000), 2)
             total += estimated
             result.append({
+                'ing_id': ing.id,
                 'name': ing.name,
                 'quantity': ing.quantity,
                 'unit': ing.unit,
                 'price_per_kg': price_per_kg,
-                'estimated_price': estimated
+                'estimated_price': estimated,
+                'source': source,
+                'active_store_id': store_id,
+                'preferred_store_id': ing.preferred_store_id,
+                'preferred_brand_id': getattr(ing, 'preferred_brand_id', None)
             })
 
         return {
@@ -292,45 +437,121 @@ class RecipeScannerFacade:
             'recipe_title': recipe.title,
             'ingredients': result,
             'total_estimated_cost': round(total, 2),
-            'currency': 'EUR',
-            'note': 'Estimated prices in EUR/kg. Source: Open Food Facts + average prices France.'
+            'currency': 'EUR'
         }
 
-    def _get_ingredient_price(self, name, user_id=None):
-        name_lower = name.lower().strip()
+    def _resolve_price(self, ing, user_id=None):
+        """Returns (price_per_kg, source, store_id)."""
+        # 1. Manual override
+        if ing.manual_price is not None:
+            return ing.manual_price, 'manual', None
 
+        name_lower = ing.name.lower().strip()
+
+        # 2. Custom DB — 4-case priority: store+brand > store only > brand only > cheapest
         if user_id:
-            custom = self.get_custom_price(user_id, name_lower)
-            if custom:
-                return custom.price_per_kg
+            customs = self.get_custom_prices_for_ingredient(user_id, name_lower)
+            if customs:
+                has_store = bool(ing.preferred_store_id)
+                has_brand = bool(getattr(ing, 'preferred_brand_id', None))
 
+                if has_store and has_brand:
+                    match = [c for c in customs
+                             if c.store_id == ing.preferred_store_id
+                             and c.brand_id == ing.preferred_brand_id]
+                    if match:
+                        best = min(match, key=lambda c: c.price_per_kg)
+                        return best.price_per_kg, 'custom', best.store_id
+
+                if has_store:
+                    at_store = [c for c in customs if c.store_id == ing.preferred_store_id]
+                    if at_store:
+                        best = min(at_store, key=lambda c: c.price_per_kg)
+                        return best.price_per_kg, 'custom', best.store_id
+
+                if has_brand:
+                    at_brand = [c for c in customs if c.brand_id == ing.preferred_brand_id]
+                    if at_brand:
+                        best = min(at_brand, key=lambda c: c.price_per_kg)
+                        return best.price_per_kg, 'custom', best.store_id
+
+                best = min(customs, key=lambda c: c.price_per_kg)
+                return best.price_per_kg, 'custom', best.store_id
+
+        # 3. Cached OFF price
+        if ing.price_source == 'off' and ing.estimated_cost and ing.estimated_cost > 0:
+            return ing.estimated_cost, 'off', None
+
+        # 4. Local fallback dict
+        for key, price in FALLBACK_PRICES.items():
+            if key in name_lower:
+                return price, 'fallback', None
+
+        return 5.00, 'fallback', None
+
+    def fetch_and_cache_off_price(self, ing_id):
+        """Calls OFF API, caches the result on the ingredient, returns (price, source) or None."""
+        ing = self._ingredients.get_by_id(ing_id)
+        if not ing:
+            return None
+        price = self._get_off_price(ing.name)
+        if price:
+            ing.estimated_cost = price
+            ing.price_source = 'off'
+            self._ingredients.update(ing)
+            return price
+        return None
+
+    def _get_off_price(self, name):
+        """Queries Open Food Facts → Open Prices for a real EUR/kg price."""
         try:
-            params = {
+            search_res = requests.get(OFF_SEARCH_URL, params={
                 'search_terms': name,
                 'json': 1,
                 'page_size': 1,
-                'action': 'process',
-                'fields': 'product_name,categories_tags'
-            }
-            response = requests.get(OFF_SEARCH_URL, params=params, timeout=5)
-            products = response.json().get('products', [])
+                'fields': 'code,product_name'
+            }, timeout=5)
+            products = search_res.json().get('products', [])
+            if not products:
+                return None
 
-            if products:
-                product = products[0]
-                product_name = product.get('product_name', '').lower()
-                categories = ' '.join(product.get('categories_tags', []))
-                combined = f"{product_name} {categories}"
-                for key, price in FALLBACK_PRICES.items():
-                    if key in combined:
-                        return price
+            code = products[0].get('code')
+            if not code:
+                return None
+
+            prices_res = requests.get(OFF_PRICES_URL, params={
+                'product_code': code,
+                'currency': 'EUR',
+                'price_per': 'KILOGRAM',
+                'size': 10
+            }, timeout=5)
+            items = prices_res.json().get('items', [])
+            if not items:
+                return None
+
+            values = [i['price'] for i in items if i.get('price') and i['price'] > 0]
+            if not values:
+                return None
+
+            return round(sum(values) / len(values), 2)
         except Exception:
-            pass
+            return None
 
-        for key, price in FALLBACK_PRICES.items():
-            if key in name_lower:
-                return price
+    def set_manual_price(self, ing_id, price):
+        ing = self._ingredients.get_by_id(ing_id)
+        if not ing:
+            return None
+        ing.manual_price = price
+        ing.cost_is_manual = True
+        return self._ingredients.update(ing)
 
-        return 5.00
+    def clear_manual_price(self, ing_id):
+        ing = self._ingredients.get_by_id(ing_id)
+        if not ing:
+            return None
+        ing.manual_price = None
+        ing.cost_is_manual = False
+        return self._ingredients.update(ing)
 
 
 facade = RecipeScannerFacade()

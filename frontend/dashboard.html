@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecipeScanner — My Recipes</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="lang-toggle lang-fixed">
+    <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="dashboard.html" class="logo">
+        <div class="logo-icon">🍴</div>
+        <span class="logo-text">Recipe<span>Scanner</span></span>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span data-i18n="nav_home">Home</span>
+      </a>
+      <a href="dashboard.html" class="nav-item">
+        <span class="nav-icon">📖</span>
+        <span data-i18n="nav_recipes">My Recipes</span>
+        <span class="nav-badge" id="recipe-badge">0</span>
+      </a>
+      <a href="scan.html" class="nav-item">
+        <span class="nav-icon">⚡</span>
+        <span data-i18n="nav_scan">Scan Recipe</span>
+      </a>
+      <a href="prices.html" class="nav-item">
+        <span class="nav-icon">🏷</span>
+        <span data-i18n="nav_prices">My Prices</span>
+      </a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="avatar" id="user-avatar" onclick="document.getElementById('avatar-input').click()" title="Upload photo">
+        <span id="avatar-initials">?</span>
+        <div class="avatar-overlay">📷</div>
+      </div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-firstname" id="user-firstname">…</span>
+        <span class="sidebar-user-lastname" id="user-lastname"></span>
+      </div>
+      <button class="sidebar-user-menu" onclick="logout()" data-i18n-title="nav_signout" title="Sign out">⏻</button>
+    </div>
+  </aside>
+  <input type="file" id="avatar-input" accept="image/*" style="display:none" onchange="uploadAvatar(event)">
+
+  <!-- Main content -->
+  <main class="app-layout">
+    <div class="page-header">
+      <div>
+        <h1 id="greeting">Hello! 👋</h1>
+        <p class="sub" id="recipe-count-label">…</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <button class="btn btn-outline btn-sm" data-i18n="btn_manual" onclick="openCreateModal()">+ Manual</button>
+        <a href="scan.html" class="btn btn-orange" data-i18n="btn_scan_recipe">⚡ Scan a recipe</a>
+      </div>
+    </div>
+
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" data-i18n-placeholder="search_ph" placeholder="Search recipes…" oninput="filterRecipes()">
+    </div>
+
+    <div class="filter-bar" id="filter-bar">
+      <button class="filter-pill active" data-cat="all" onclick="setCategory('all', this)" data-i18n="filter_all">All</button>
+    </div>
+
+    <div id="recipes-container">
+      <div class="loading-center"><div class="spinner"></div></div>
+    </div>
+  </main>
+
+  <!-- Modal: create recipe manually -->
+  <div class="modal-overlay" id="create-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_new_recipe">New recipe</h2>
+      <div id="create-error" class="alert alert-error" style="display:none"></div>
+      <div class="form-group">
+        <label data-i18n="label_title_req">Title *</label>
+        <input type="text" id="c-title" data-i18n-placeholder="ph_recipe_title" placeholder="Apple pie">
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_desc">Description</label>
+        <textarea id="c-desc" data-i18n-placeholder="ph_desc" placeholder="Short description…" rows="2"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="label_servings">Servings</label>
+          <input type="number" id="c-servings" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label data-i18n="label_prep">Prep time (min)</label>
+          <input type="number" id="c-prep" min="0" value="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_category">Category</label>
+        <input type="text" id="c-category" list="category-list" data-i18n-placeholder="ph_category" placeholder="Pasta, Desserts, Meat…" autocomplete="off">
+        <datalist id="category-list">
+          <option value="Desserts"><option value="Main Course"><option value="Pasta">
+          <option value="Meat"><option value="Chicken"><option value="Fish">
+          <option value="Seafood"><option value="Soup"><option value="Salad">
+          <option value="Breakfast"><option value="Rice"><option value="Bread">
+          <option value="Bakery"><option value="Cake"><option value="Vegan">
+          <option value="Vegetarian"><option value="Appetizer"><option value="Drink">
+          <option value="Sandwich"><option value="Snack">
+        </datalist>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeCreateModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_create_recipe" onclick="createRecipe()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

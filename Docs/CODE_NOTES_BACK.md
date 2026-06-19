@@ -4824,3 +4824,527 @@ Se abre directamente en el viewer sin comandos adicionales.
 -   Hacer click en una tabla ejecuta `SELECT * FROM tabla LIMIT 100` automáticamente
 -   Las tablas aparecen vacías después de correr Newman — los tests hacen cleanup y borran todo lo que crean
     +   Para ver datos reales: hacer un request manual desde Postman o Swagger (`/api/docs`) y luego refrescar la tabla en el viewer
+
+---
+
+# Sesión 11 — Sprint 5 · Sistema de precios v2 (`models/store.py` · `models/custom_price.py` · `models/ingredient.py` · `api/v1/stores.py` · `api/v1/costs.py` · `services/facade.py`)
+
+## Contexto
+
+El sistema de precios original (Sesión 9) tenía una sola tabla `custom_prices` con un precio por ingrediente y ningún concepto de tienda. En esta sesión se rediseña el sistema completo para soportar:
+
+-   **Tiendas normalizadas** — dropdown en lugar de texto libre, para poder filtrar precios por supermercado
+-   **Múltiples precios por ingrediente** — un precio por tienda (ej: leche en Lidl €0.80, leche en Intermarché €1.10)
+-   **Entrada "por cantidad"** — el usuario ve "500g €1.50" en el ticket y la app calcula €/kg automáticamente
+-   **Precio manual por ingrediente de receta** — override puntual para un ingrediente específico dentro de una receta
+-   **Precio preferido por tienda** — cada ingrediente de una receta recuerda en qué tienda se compra habitualmente
+
+---
+
+## `backend/app/models/store.py` — nuevo
+
+```python
+import uuid
+from app.extensions import db
+
+class Store(db.Model):
+    __tablename__ = 'stores'
+
+    id      = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    name    = db.Column(db.String(100), nullable=False)
+```
+
+### Explicación línea por línea
+
+```python
+__tablename__ = 'stores'
+```
+Nombre explícito de la tabla en SQLite. Sin esto SQLAlchemy usa el nombre de la clase en minúscula — convención explícita es más clara.
+
+```python
+id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+```
+-   `db.String(36)` — UUID como string de 36 caracteres (`"a2b3c4d5-..."`). No usamos `Integer` autoincremental porque los UUIDs son únicos globalmente, útil cuando en el futuro haya múltiples instancias o sincronización mobile.
+-   `primary_key=True` — SQLAlchemy usa este campo como clave primaria; garantiza unicidad.
+-   `default=lambda: str(uuid.uuid4())` — genera el UUID en Python en el momento de crear el objeto, antes de ir a la base de datos. `lambda:` es necesario porque `default` necesita un callable (función), no un valor fijo.
+
+```python
+user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+```
+-   `db.ForeignKey('users.id')` — referencia a la tabla `users`. Cada tienda pertenece a un usuario específico — dos usuarios pueden tener tiendas con el mismo nombre sin conflicto.
+-   `nullable=False` — toda tienda debe tener dueño; no puede existir una tienda sin usuario.
+
+### ¿Por qué un modelo separado y no texto libre?
+
+Si el usuario escribiese el nombre de la tienda libremente en cada precio ("Lidl", "lidl", "LIDL", "Lidl "), quedarían cuatro entradas distintas imposibles de agrupar. Con un modelo normalizado:
+-   El nombre vive en un solo lugar
+-   Se puede renombrar una tienda y todos los precios se actualizan solos
+-   Se puede filtrar por tienda con una JOIN simple
+-   No hay duplicados por error tipográfico
+
+---
+
+## `backend/app/models/custom_price.py` — modificado
+
+Se agregaron cuatro columnas nuevas:
+
+```python
+store_id    = db.Column(db.String(36), db.ForeignKey('stores.id'), nullable=True)
+bought_qty  = db.Column(db.Float, nullable=True)
+bought_unit = db.Column(db.String(30), nullable=True)
+bought_price = db.Column(db.Float, nullable=True)
+```
+
+### Explicación
+
+```python
+store_id = db.Column(db.String(36), db.ForeignKey('stores.id'), nullable=True)
+```
+`nullable=True` — un precio puede existir sin asociarse a ninguna tienda ("precio genérico"). La clave única del precio es `(user_id, ingredient_name, store_id)` — el mismo ingrediente puede tener un precio en Lidl y otro en Intermarché.
+
+```python
+bought_qty  = db.Column(db.Float, nullable=True)
+bought_unit = db.Column(db.String(30), nullable=True)
+bought_price = db.Column(db.Float, nullable=True)
+```
+Estos tres campos guardan los datos crudos de la compra tal como el usuario los ingresó: "compré 500g a €1.50". A partir de ellos se calcula `price_per_kg` (columna ya existente). Se guardan para que el usuario pueda ver y editar los datos originales sin tener que hacer la conversión inversa.
+
+---
+
+## `backend/app/models/ingredient.py` — modificado
+
+Se agregaron tres columnas nuevas:
+
+```python
+manual_price      = db.Column(db.Float, nullable=True)
+price_source      = db.Column(db.String(20), nullable=True)
+preferred_store_id = db.Column(db.String(36), nullable=True)
+section           = db.Column(db.String(100), nullable=True)
+```
+
+### Explicación
+
+```python
+manual_price = db.Column(db.Float, nullable=True)
+```
+Override puntual de precio para este ingrediente dentro de esta receta. Si está definido, tiene prioridad sobre cualquier otro precio (base de datos custom, OFF, fallback). Representa el escenario "para esta receta, este ingrediente cuesta exactamente X".
+
+```python
+price_source = db.Column(db.String(20), nullable=True)
+```
+Registra de dónde viene el precio cacheado. Valores posibles: `'off'` (Open Food Facts). Cuando el usuario hace click en "Fetch from OFF", el precio se guarda en `estimated_cost` y `price_source = 'off'` — así las siguientes consultas de costo no necesitan llamar a la API externa.
+
+```python
+preferred_store_id = db.Column(db.String(36), nullable=True)
+```
+La tienda que el usuario eligió para comprar este ingrediente específico dentro de la receta. No es una FK con `db.ForeignKey()` para evitar restricciones de integridad — si el usuario borra la tienda, el campo queda como `None` y el sistema cae al siguiente nivel de la cascada de precios.
+
+```python
+section = db.Column(db.String(100), nullable=True)
+```
+Nombre de la sección dentro de la receta (ej: "Masa", "Relleno"). Permite agrupar ingredientes sin crear una tabla nueva — el texto libre es suficiente para uso personal y simplifica la implementación.
+
+---
+
+## `backend/app/__init__.py` — migraciones
+
+```python
+for stmt in [
+    'ALTER TABLE ingredients ADD COLUMN manual_price REAL',
+    'ALTER TABLE ingredients ADD COLUMN price_source VARCHAR(20)',
+    'ALTER TABLE ingredients ADD COLUMN preferred_store_id VARCHAR(36)',
+    'ALTER TABLE ingredients ADD COLUMN section VARCHAR(100)',
+    'ALTER TABLE custom_prices ADD COLUMN store_id VARCHAR(36)',
+    'ALTER TABLE custom_prices ADD COLUMN bought_qty REAL',
+    'ALTER TABLE custom_prices ADD COLUMN bought_unit VARCHAR(30)',
+    'ALTER TABLE custom_prices ADD COLUMN bought_price REAL',
+]:
+    try:
+        db.session.execute(text(stmt))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+```
+
+### ¿Por qué ALTER TABLE en lugar de borrar y recrear?
+
+SQLAlchemy `db.create_all()` crea tablas que no existen, pero **no modifica tablas que ya existen**. Para agregar columnas a una tabla existente con datos reales hay que usar `ALTER TABLE`.
+
+El patrón `try/except` es clave: si la columna ya existe (segunda ejecución del servidor), SQLite lanza `OperationalError: duplicate column name`. El `except` lo captura silenciosamente y sigue. Así el código de migración es idempotente — se puede correr infinitas veces sin error.
+
+---
+
+## `backend/app/api/v1/stores.py` — nuevo
+
+```python
+@api.route('')
+class StoreList(Resource):
+
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        stores = facade.get_stores(user_id)
+        return [{'id': s.id, 'name': s.name} for s in stores], 200
+
+    @jwt_required()
+    @api.expect(store_model, validate=True)
+    def post(self):
+        user_id = get_jwt_identity()
+        name = api.payload['name'].strip()
+        existing = facade.get_store_by_name(user_id, name)
+        if existing:
+            return {'id': existing.id, 'name': existing.name}, 200
+        store = facade.create_store(user_id, name)
+        return {'id': store.id, 'name': store.name}, 201
+
+
+@api.route('/<string:store_id>')
+class StoreDetail(Resource):
+
+    @jwt_required()
+    def delete(self, store_id):
+        user_id = get_jwt_identity()
+        if not facade.delete_store(store_id, user_id):
+            return {'error': 'Store not found'}, 404
+        return '', 204
+```
+
+### Explicación
+
+#### `POST /stores` — idempotente por nombre
+
+```python
+existing = facade.get_store_by_name(user_id, name)
+if existing:
+    return {'id': existing.id, 'name': existing.name}, 200
+```
+Si el usuario intenta crear "Lidl" dos veces, el segundo POST devuelve la tienda existente con `200` en vez de `201`. Esto es **idempotencia** — el resultado es el mismo sin importar cuántas veces se ejecute. Evita duplicados si el usuario hace doble click o reenvía el formulario.
+
+#### `DELETE /stores/<store_id>` — ownership check
+
+```python
+if not facade.delete_store(store_id, user_id):
+    return {'error': 'Store not found'}, 404
+```
+`facade.delete_store` verifica que `store.user_id == user_id` antes de borrar. Si no coincide, retorna `False` y el endpoint responde `404` (no `403`) — por seguridad, no confirmar que el recurso existe para otros usuarios.
+
+---
+
+## `backend/app/api/v1/costs.py` — reescrito
+
+### Función auxiliar `_calc_price_per_kg`
+
+```python
+_G_UNITS  = {'g', 'gr', 'gram', 'grams', 'gramo', 'gramos', 'ml', 'milliliter', 'milliliters'}
+_KG_UNITS = {'kg', 'kilogram', 'kilograms', 'kilo', 'kilos', 'l', 'liter', 'liters', 'litro', 'litros'}
+
+def _calc_price_per_kg(qty, unit, price_paid):
+    u = unit.lower().strip()
+    if u in _KG_UNITS:
+        return round(price_paid / qty, 4)
+    elif u in _G_UNITS:
+        return round((price_paid / qty) * 1000, 4)
+    else:
+        return round(price_paid / qty, 4)
+```
+
+#### Lógica de conversión
+
+El sistema almacena todos los precios en `€/kg` como unidad canónica. Cuando el usuario ingresa "500g — €1.50":
+
+```
+precio_por_kg = (1.50 / 500) × 1000 = €3.00/kg
+```
+
+Cuando ingresa "2kg — €4.00":
+
+```
+precio_por_kg = 4.00 / 2 = €2.00/kg
+```
+
+Para unidades no-peso (unidad, pieza, cdas), la fórmula es precio/qty — se guarda como "precio por unidad" aunque la columna diga `price_per_kg`. Es un compromiso práctico: el campo representa "precio unitario normalizado" independientemente de la unidad real.
+
+Los sets `_G_UNITS` y `_KG_UNITS` usan tanto español como inglés porque el usuario puede ingresar en cualquier idioma.
+
+### `POST /prices` — lógica de entrada dual
+
+```python
+if bought_qty and bought_unit and bought_price:
+    price_per_kg = _calc_price_per_kg(bought_qty, bought_unit, bought_price)
+elif data.get('price_per_kg') is not None:
+    price_per_kg = data['price_per_kg']
+else:
+    return {'error': 'Provide price_per_kg or bought_qty+bought_unit+bought_price'}, 400
+```
+
+Dos formas de ingresar un precio:
+1. **Por cantidad** — el usuario da los datos crudos del ticket; el backend calcula `price_per_kg`
+2. **Por kg** — el usuario ya sabe el precio por kg y lo ingresa directamente
+
+El backend acepta ambas y siempre guarda `price_per_kg` como valor normalizado.
+
+### `DELETE /prices/<price_id>` — por ID en lugar de nombre
+
+El endpoint anterior era `DELETE /prices/<name>` — borrar por nombre del ingrediente. Problema: si el mismo ingrediente tiene precios en múltiples tiendas, ¿cuál se borra? Con `DELETE /prices/<price_id>` cada precio tiene su propio ID y se puede borrar independientemente.
+
+### Cascada de precios en `_resolve_price`
+
+```python
+def _resolve_price(self, ing, user_id=None):
+    # 1. Manual override (máxima prioridad)
+    if ing.manual_price is not None:
+        return ing.manual_price, 'manual', None
+
+    name_lower = ing.name.lower().strip()
+
+    # 2. Custom DB — tienda preferida primero, luego la más barata
+    if user_id:
+        if ing.preferred_store_id:
+            custom = self.get_custom_price_by_store(user_id, name_lower, ing.preferred_store_id)
+            if custom:
+                return custom.price_per_kg, 'custom', custom.store_id
+        customs = self.get_custom_prices_for_ingredient(user_id, name_lower)
+        if customs:
+            cheapest = min(customs, key=lambda c: c.price_per_kg)
+            return cheapest.price_per_kg, 'custom', cheapest.store_id
+
+    # 3. Precio cacheado de Open Food Facts
+    if ing.price_source == 'off' and ing.estimated_cost and ing.estimated_cost > 0:
+        return ing.estimated_cost, 'off', None
+
+    # 4. Diccionario de fallback local
+    for key, price in FALLBACK_PRICES.items():
+        if key in name_lower:
+            return price, 'fallback', None
+
+    # 5. Default absoluto
+    return 5.00, 'fallback', None
+```
+
+#### La cascada explicada nivel por nivel
+
+| Nivel | Fuente | Cuándo se usa |
+|---|---|---|
+| 1 | `manual_price` en el ingrediente | El usuario hizo override puntual desde la receta |
+| 2a | `custom_prices` con `preferred_store_id` | El usuario eligió una tienda para este ingrediente |
+| 2b | `custom_prices` más barato | Hay precios en DB pero sin tienda preferida |
+| 3 | `estimated_cost` cacheado de OFF | El usuario hizo "Fetch from OFF" en algún momento |
+| 4 | `FALLBACK_PRICES` dict local | El nombre del ingrediente matchea una clave del dict |
+| 5 | €5.00 hardcoded | No hay información de ninguna fuente |
+
+**¿Por qué OFF no está en automático?**
+En la versión anterior OFF se llamaba automáticamente para cada ingrediente al calcular el costo. Con 14 ingredientes y un timeout de 5s por request a la API, el endpoint podía tardar hasta 70 segundos. Se separó a un botón explícito "Fetch from OFF" que el usuario activa ingrediente por ingrediente, y el resultado se cachea en la DB para no volver a llamar.
+
+#### `_resolve_price` retorna 3-tupla
+
+```python
+return price_per_kg, source, store_id
+```
+
+La función retorna `(precio, fuente, store_id)`. `source` alimenta los badges de color en el frontend (`manual` = naranja, `custom` = azul, `off` = verde, `fallback` = gris). `store_id` permite al frontend saber qué tienda está activa para ese ingrediente.
+
+---
+
+## `backend/app/services/facade.py` — métodos nuevos
+
+### Métodos de tiendas
+
+```python
+def get_stores(self, user_id):
+    return [s for s in self._stores.get_all() if s.user_id == user_id]
+
+def get_store_by_name(self, user_id, name):
+    name_lower = name.lower().strip()
+    for s in self._stores.get_all():
+        if s.user_id == user_id and s.name.lower() == name_lower:
+            return s
+    return None
+
+def create_store(self, user_id, name):
+    store = Store(user_id=user_id, name=name.strip())
+    return self._stores.save(store)
+
+def delete_store(self, store_id, user_id):
+    store = self._stores.get_by_id(store_id)
+    if not store or store.user_id != user_id:
+        return False
+    self._stores.delete(store_id)
+    return True
+```
+
+`get_store_by_name` normaliza a minúsculas antes de comparar — "Lidl" y "lidl" son la misma tienda. El `strip()` en `create_store` evita tiendas con espacios invisibles al inicio o fin.
+
+### `_normalize_category` en recetas
+
+```python
+@staticmethod
+def _normalize_category(category):
+    if not category:
+        return ''
+    return category.strip().title()
+```
+
+`str.title()` convierte la primera letra de cada palabra a mayúscula: `"desserts"` → `"Desserts"`, `"main course"` → `"Main Course"`. Se aplica en `create_recipe`, `update_recipe` y en el resultado del scan de PDF (Groq puede devolver cualquier capitalización). Evita que "Desserts" y "desserts" aparezcan como categorías distintas en los filtros del dashboard.
+
+---
+
+# Sesión 12 — Sprint 5 · Autenticación con tokens de refresco (`config.py` · `api/v1/auth.py`)
+
+## ¿Por qué el sistema anterior era insuficiente?
+
+El sistema original generaba un único **access token** con 1 hora de vida:
+
+```python
+# Antes
+token = create_access_token(identity=user.id)
+return {'token': token, ...}
+```
+
+Problemas:
+1.  **Expiración silenciosa** — el usuario tenía la app abierta, el token expiraba, el próximo request devolvía 401 y era redirigido al login sin aviso, perdiendo cualquier cambio no guardado.
+2.  **`requireAuth()` no verificaba expiración** — solo comprobaba que el string existía en localStorage. Un token expirado pasaba la guardia y el error ocurría en el primer request real.
+3.  **Sin recuperación automática** — no había forma de renovar la sesión sin volver a pedir la contraseña.
+
+---
+
+## El estándar: access token + refresh token
+
+El patrón estándar de la industria usa dos tokens con roles distintos:
+
+| Token | Vida | Propósito |
+|---|---|---|
+| **Access token** | 15 minutos | Se envía en cada request HTTP como `Bearer`. Corta vida = si alguien lo roba, expira rápido. |
+| **Refresh token** | 30 días | Solo se usa para pedir un nuevo access token. Nunca se envía en requests normales a la API. |
+
+```
+Login ──► access_token (15 min) + refresh_token (30 días)
+                 │
+    [Cada request de la app usa access_token]
+                 │
+    [Access token expira a los 15 min]
+                 │
+    Frontend detecta expiración ──► POST /auth/refresh (con refresh_token)
+                 │
+    Servidor valida refresh_token ──► nuevo access_token
+                 │
+    Usuario nunca nota nada ──► sesión continúa sin interrupciones
+                 │
+    [30 días después, refresh_token expira]
+                 │
+    Usuario va al login (una vez al mes)
+```
+
+---
+
+## `backend/config.py` — modificado
+
+```python
+JWT_ACCESS_TOKEN_EXPIRES  = timedelta(minutes=15)
+JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+```
+
+`flask_jwt_extended` lee estas variables automáticamente al crear tokens — no hace falta pasarlas explícitamente a `create_access_token()` o `create_refresh_token()`.
+
+---
+
+## `backend/app/api/v1/auth.py` — modificado
+
+### Imports actualizados
+
+```python
+from flask_jwt_extended import (create_access_token, create_refresh_token,
+                                jwt_required, get_jwt_identity)
+```
+
+Se agrega `create_refresh_token` — función de `flask_jwt_extended` que genera un token con el tipo interno `"refresh"`. Este tipo es verificado por `@jwt_required(refresh=True)` y rechazado por `@jwt_required()` (sin parámetro). Esto garantiza que un refresh token no puede usarse como access token y viceversa.
+
+### Login — respuesta actualizada
+
+```python
+access_token  = create_access_token(identity=user.id)
+refresh_token = create_refresh_token(identity=user.id)
+return {
+    'access_token':  access_token,
+    'refresh_token': refresh_token,
+    'user': { ... }
+}, 200
+```
+
+El login ahora devuelve dos tokens. El campo antes se llamaba `'token'` — se renombró a `'access_token'` para mayor claridad. El frontend tiene un bloque de migración automática que mueve el valor viejo al nuevo key si el usuario tenía sesión activa antes del cambio.
+
+### Endpoint nuevo: `POST /auth/refresh`
+
+```python
+@api.route('/refresh')
+class Refresh(Resource):
+    @jwt_required(refresh=True)
+    def post(self):
+        user_id = get_jwt_identity()
+        access_token = create_access_token(identity=user_id)
+        return {'access_token': access_token}, 200
+```
+
+#### Explicación línea por línea
+
+```python
+@jwt_required(refresh=True)
+```
+Decorador de `flask_jwt_extended`. El parámetro `refresh=True` indica que este endpoint requiere un **refresh token** en el header `Authorization: Bearer <refresh_token>`. Si se envía un access token normal, el decorador lo rechaza con 401 — los dos tipos de token son incompatibles entre sí a nivel de validación interna.
+
+```python
+user_id = get_jwt_identity()
+```
+Extrae el `identity` del refresh token — el mismo `user.id` que se pasó al crear el token en el login. No hace falta consultar la base de datos para saber quién es el usuario.
+
+```python
+access_token = create_access_token(identity=user_id)
+```
+Genera un nuevo access token para el mismo usuario. La vida del nuevo token es siempre 15 minutos desde el momento de creación — el refresh no "extiende" el token viejo, crea uno nuevo.
+
+```python
+return {'access_token': access_token}, 200
+```
+Solo devuelve el nuevo access token. No devuelve un nuevo refresh token — el refresh token original sigue válido hasta sus 30 días.
+
+#### ¿Por qué no se invalida el refresh token al usarlo?
+
+En una implementación más robusta ("token rotation"), cada uso del refresh token genera uno nuevo e invalida el anterior, almacenando los tokens usados en una lista negra en la DB. Esto protege contra el robo del refresh token.
+
+Para esta aplicación personal, omitimos la lista negra por simplicidad — implicaría una tabla extra en la DB y lógica adicional en cada request. El riesgo es bajo porque la app es de un solo usuario y el refresh token se guarda en localStorage del mismo dispositivo.
+
+---
+
+## Flujo completo end-to-end
+
+```
+1. Usuario hace login
+   POST /auth/login  →  { access_token (15min), refresh_token (30d), user }
+   Frontend guarda ambos en localStorage
+
+2. Usuario usa la app normalmente
+   GET /recipes  →  Authorization: Bearer <access_token>
+   Servidor valida access_token → 200 OK
+
+3. Pasan 15 minutos — access_token expira
+
+4. Frontend detecta que el token está por vencer (antes de enviarlo)
+   parseJwt(token).exp * 1000 < Date.now() + 10_000  →  true
+
+5. Frontend llama silenciosamente al refresh
+   POST /auth/refresh  →  Authorization: Bearer <refresh_token>
+   Servidor valida refresh_token → { access_token (nuevo, 15min) }
+   Frontend guarda el nuevo access_token
+
+6. Frontend reintenta el request original con el nuevo access_token
+   GET /recipes  →  Authorization: Bearer <nuevo_access_token>
+   Servidor → 200 OK
+
+7. El usuario nunca vio nada — la sesión continuó sin interrupciones
+
+8. 30 días después, el refresh_token expira
+   POST /auth/refresh → 401
+   Frontend borra ambos tokens y redirige al login
+   → El usuario inicia sesión una vez al mes
+```
+

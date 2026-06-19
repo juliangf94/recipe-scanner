@@ -86,7 +86,8 @@ SQLAlchemy, el cambio entre ambos es transparente para el código.
 ```
 recipe_Scanner/
 ├── DEVLOG.md
-├── CODE_NOTES.md               # Explicaciones de código línea a línea
+├── CODE_NOTES_BACK.md          # Explicaciones de código línea a línea — backend (Sesiones 1–10)
+├── CODE_NOTES_FRONT.md         # Explicaciones de código línea a línea — frontend (Sesión 11+)
 ├── WORKFLOW.md                 # Flujo de trabajo y plan de sesiones
 ├── STAGE3.md                   # Documentación técnica para Holberton
 ├── class_Diagram.png
@@ -100,29 +101,44 @@ recipe_Scanner/
 │   └── app/                        # Paquete principal de la aplicación
 │       ├── __init__.py             # Application factory (create_app)
 │       ├── api/
-│       │   └── v1/                 # API versionada
+│       │   └── v1/                 # API REST (JSON) — Swagger en /api/docs
 │       │       ├── auth.py
 │       │       ├── recipes.py
 │       │       ├── ingredients.py
-│       │       └── scan.py
+│       │       ├── scan.py
+│       │       └── costs.py
+│       ├── views/                  # Blueprints HTML (Jinja2) — Sesión 11
+│       │   ├── auth.py
+│       │   └── recipes.py
+│       ├── templates/              # Plantillas Jinja2
+│       │   ├── base.html
+│       │   ├── auth/
+│       │   │   ├── login.html
+│       │   │   └── register.html
+│       │   ├── recipes/
+│       │   │   ├── list.html
+│       │   │   ├── detail.html
+│       │   │   └── form.html
+│       │   └── scan/
+│       │       └── upload.html
+│       ├── static/
+│       │   └── css/
+│       │       └── style.css
 │       ├── models/
-│       │   ├── user.py
+│       │   ├── user.py             # db.Model — SQLAlchemy
 │       │   ├── recipe.py
 │       │   ├── ingredient.py
 │       │   ├── step.py
-│       │   └── pdf_scan.py
+│       │   ├── pdf_scan.py
+│       │   └── custom_price.py
+│       ├── extensions.py           # db = SQLAlchemy() — evita imports circulares
 │       ├── services/
 │       │   └── facade.py
 │       ├── utils/
-│       │   └── security.py             # hash_password + check_password (bcrypt)
+│       │   └── security.py         # hash_password + check_password (bcrypt)
 │       └── persistence/
-│           ├── repository.py           # BaseRepository (ABC) + InMemoryStorage
-│           └── db_storage.py           # SQLAlchemyRepository (Sesión 8)
-└── frontend/
-    ├── templates/
-    └── static/
-        ├── css/
-        └── js/
+│           ├── repository.py       # BaseRepository (ABC) + InMemoryStorage
+│           └── db_storage.py       # DbStorage — SQLAlchemy session
 ```
 
 ---
@@ -185,28 +201,38 @@ Relaciones:
 - [x] `app/api/v1/auth.py` (register + login con flask_restx)
 - [x] `tests/postman/` (Postman collection para QA)
 
-### Fase 5 — Facade y API 🔄
+### Fase 5 — Facade y API ✅
 
 - [x] `app/services/facade.py`
 - [x] `app/api/v1/recipes.py`
-- [ ] `app/api/v1/ingredients.py` ← en progreso
+- [x] `app/api/v1/ingredients.py`
 
-### Fase 6 — Integración IA
+### Fase 6 — Integración IA ✅
 
-- [ ] `app/api/v1/scan.py` + Groq en facade
+- [x] `app/api/v1/scan.py` + Groq en facade
 
-### Fase 7 — Open Food Facts
+### Fase 7 — Open Food Facts + Precios custom ✅
 
-- [ ] Open Food Facts en facade
+- [x] Open Food Facts + FALLBACK_PRICES en facade
+- [x] `models/custom_price.py`
+- [x] `api/v1/costs.py` — GET /recipes/<id>/cost + CRUD /prices
 
-### Fase 8 — Swap a SQLAlchemy
+### Fase 8 — Swap a SQLAlchemy ✅
 
-- [ ] `app/persistence/db_storage.py`
-- [ ] Migraciones SQLite → PostgreSQL
+- [x] `app/extensions.py` — instancia db sin imports circulares
+- [x] `app/persistence/db_storage.py` — DbStorage con SQLAlchemy session
+- [x] Todos los modelos migrados de `@dataclass` a `db.Model`
+- [x] `config.py` — path absoluto SQLite con `basedir`
+- [x] `app/__init__.py` — `db.init_app` + `db.create_all`
+- [x] Fix seguridad ingredientes: ownership check en POST/PUT/DELETE
+- [x] 144 assertions Postman pasando (82 requests)
 
-### Fase 9 — Frontend
+### Fase 9 — Frontend 🔄
 
-- [ ] Jinja2 (server-side) — templates/ + static/
+- [ ] `app/views/auth.py` + templates login/register
+- [ ] `app/views/recipes.py` + templates list/detail/form
+- [ ] `app/templates/base.html`
+- [ ] `app/static/css/style.css`
 
 ---
 

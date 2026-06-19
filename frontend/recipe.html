@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecipeScanner — Recipe</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="lang-toggle lang-fixed">
+    <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="dashboard.html" class="logo">
+        <div class="logo-icon">🍴</div>
+        <span class="logo-text">Recipe<span>Scanner</span></span>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span data-i18n="nav_home">Home</span>
+      </a>
+      <a href="dashboard.html" class="nav-item active">
+        <span class="nav-icon">📖</span>
+        <span data-i18n="nav_recipes">My Recipes</span>
+      </a>
+      <a href="scan.html" class="nav-item">
+        <span class="nav-icon">⚡</span>
+        <span data-i18n="nav_scan">Scan Recipe</span>
+      </a>
+      <a href="prices.html" class="nav-item">
+        <span class="nav-icon">🏷</span>
+        <span data-i18n="nav_prices">My Prices</span>
+      </a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="avatar" id="user-avatar" onclick="document.getElementById('avatar-input').click()" title="Upload photo">
+        <span id="avatar-initials">?</span>
+        <div class="avatar-overlay">📷</div>
+      </div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-firstname" id="user-firstname">…</span>
+        <span class="sidebar-user-lastname" id="user-lastname"></span>
+      </div>
+      <button class="sidebar-user-menu" onclick="logout()" data-i18n-title="nav_signout" title="Sign out">⏻</button>
+    </div>
+  </aside>
+  <input type="file" id="avatar-input" accept="image/*" style="display:none" onchange="uploadAvatar(event)">
+
+  <!-- Main content -->
+  <main class="app-layout" id="main-content">
+    <div class="loading-center"><div class="spinner"></div></div>
+  </main>
+
+  <!-- Modal: edit recipe -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_edit_recipe">Edit recipe</h2>
+      <div id="edit-error" class="alert alert-error" style="display:none"></div>
+      <div class="form-group">
+        <label data-i18n="label_title_req">Title *</label>
+        <input type="text" id="e-title">
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_desc">Description</label>
+        <textarea id="e-desc" rows="2"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="label_servings">Servings</label>
+          <input type="number" id="e-servings" min="0">
+        </div>
+        <div class="form-group">
+          <label data-i18n="label_prep">Prep time (min)</label>
+          <input type="number" id="e-prep" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_category">Category</label>
+        <input type="text" id="e-category" list="category-list" autocomplete="off">
+        <datalist id="category-list">
+          <option value="Desserts"><option value="Main Course"><option value="Pasta">
+          <option value="Meat"><option value="Chicken"><option value="Fish">
+          <option value="Seafood"><option value="Soup"><option value="Salad">
+          <option value="Breakfast"><option value="Rice"><option value="Bread">
+          <option value="Bakery"><option value="Cake"><option value="Vegan">
+          <option value="Vegetarian"><option value="Appetizer"><option value="Drink">
+          <option value="Sandwich"><option value="Snack">
+        </datalist>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeEditModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_save" onclick="saveRecipe()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: add ingredient -->
+  <div class="modal-overlay" id="ing-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_add_ing">Add ingredient</h2>
+      <div id="ing-error" class="alert alert-error" style="display:none"></div>
+      <div class="form-group">
+        <label data-i18n="label_name_req">Name *</label>
+        <input type="text" id="ing-name" data-i18n-placeholder="ph_ing_name" placeholder="Flour">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="label_qty_req">Quantity *</label>
+          <input type="text" id="ing-qty" placeholder="500">
+        </div>
+        <div class="form-group">
+          <label data-i18n="label_unit_req">Unit *</label>
+          <input type="text" id="ing-unit" placeholder="g">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeIngModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_add" onclick="addIngredient()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: set ingredient price (manual override) -->
+  <div class="modal-overlay" id="price-modal">
+    <div class="modal" style="max-width:500px;">
+      <h2 data-i18n="modal_set_price">Set ingredient price</h2>
+      <p id="price-modal-ing-name" style="color:var(--text-muted);font-size:0.95rem;margin-bottom:0.75rem;font-weight:600;"></p>
+      <div id="price-error" class="alert alert-error" style="display:none"></div>
+
+      <!-- Entry mode toggle -->
+      <div class="price-mode-toggle" style="margin-bottom:1rem;">
+        <button class="mode-btn active" id="pm-mode-qty" onclick="setPriceMode('qty')" data-i18n="input_mode_qty">By amount</button>
+        <button class="mode-btn" id="pm-mode-kg" onclick="setPriceMode('kg')" data-i18n="input_mode_kg">Per kg</button>
+      </div>
+
+      <!-- By-amount fields -->
+      <div id="pm-qty-fields">
+        <div style="display:flex;gap:0.75rem;align-items:flex-end;">
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_qty">Quantity bought</label>
+            <input type="text" id="pm-bought-qty" inputmode="decimal" placeholder="500">
+          </div>
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_unit">Unit</label>
+            <select id="pm-bought-unit">
+              <option value="g">g</option>
+              <option value="kg">kg</option>
+              <option value="ml">ml</option>
+              <option value="l">l</option>
+              <option value="unidad">unidad</option>
+              <option value="pieza">pieza</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_price">Price paid (€)</label>
+            <input type="text" id="pm-bought-price" inputmode="decimal" placeholder="1.50">
+          </div>
+        </div>
+        <p id="pm-price-preview" class="price-preview-text" style="display:none;"></p>
+      </div>
+
+      <!-- Per-kg / per-unit field -->
+      <div id="pm-kg-field" style="display:none;">
+        <div class="form-group">
+          <label data-i18n="label_price_unit_req">Price per unit (€) *</label>
+          <div style="display:flex;gap:0.5rem;">
+            <input type="text" id="price-input" inputmode="decimal" placeholder="2.50" style="flex:1;">
+            <button class="btn btn-outline btn-sm" id="off-fetch-btn" onclick="fetchOffPrice()" data-i18n="btn_fetch_off" style="white-space:nowrap;">🌐 Fetch from OFF</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:0.6rem;">
+        <button class="btn btn-danger btn-sm" id="price-clear-btn" onclick="clearManualPrice()" data-i18n="btn_clear_price">Clear override</button>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closePriceModal()">Cancel</button>
+          <button class="btn btn-orange" data-i18n="btn_save_price" onclick="saveManualPrice()">Save price</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: upload recipe image -->
+  <input type="file" id="recipe-img-input" accept="image/*" style="display:none" onchange="uploadRecipeImage(event)">
+
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/recipe.js"></script>
+</body>
+</html>

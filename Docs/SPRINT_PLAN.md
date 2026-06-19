@@ -50,7 +50,7 @@ Solo project — Julian Gonzalez
 
 **Goal:** Flask application running on localhost:5000 with all 5 domain models defined as Python dataclasses.
 
-**Sesiones:** 1 y 2 → ver explicación detallada en `CODE_NOTES.md` (Sesión 1 · Sesión 2)
+**Sesiones:** 1 y 2 → ver explicación detallada en `CODE_NOTES_BACK.md` (Sesión 1 · Sesión 2)
 
 **Duration:** Week 1
 
@@ -77,7 +77,7 @@ Solo project — Julian Gonzalez
 
 **Goal:** Full CRUD operations working in memory and users can register and log in with JWT.
 
-**Sesiones:** 3 y 4 → ver explicación detallada en `CODE_NOTES.md` (Sesión 3 · Sesión 4)
+**Sesiones:** 3 y 4 → ver explicación detallada en `CODE_NOTES_BACK.md` (Sesión 3 · Sesión 4)
 
 **Duration:** Week 2
 
@@ -109,7 +109,7 @@ Solo project — Julian Gonzalez
 
 **Goal:** Full recipe CRUD through the Facade and PDF scanning working with Groq API.
 
-**Sesiones:** 5, 6, 7 y 8 → ver explicación detallada en `CODE_NOTES.md` (Sesión 5 · Sesión 6 · Sesión 7 · Sesión 8)
+**Sesiones:** 5, 6, 7 y 8 → ver explicación detallada en `CODE_NOTES_BACK.md` (Sesión 5 · Sesión 6 · Sesión 7 · Sesión 8)
 
 **Duration:** Weeks 3–4
 
@@ -134,11 +134,11 @@ Solo project — Julian Gonzalez
 
 ---
 
-## Sprint 4 — Prices + Database 🔄 IN PROGRESS
+## Sprint 4 — Prices + Database ✅ COMPLETE
 
 **Goal:** Ingredient prices fetched from Open Food Facts and full swap from InMemoryStorage to SQLAlchemy.
 
-**Sesiones:** 9 y 10 → ver explicación detallada en `CODE_NOTES.md` (Sesión 9 · Sesión 10)
+**Sesiones:** 9 y 10 → ver explicación detallada en `CODE_NOTES_BACK.md` (Sesión 9 · Sesión 10)
 
 **Duration:** Week 5
 
@@ -150,12 +150,15 @@ Solo project — Julian Gonzalez
 | Custom Prices CRUD — facade | `services/facade.py` | Should Have | ✅ Done |
 | Custom Prices endpoints (GET/POST/PUT/DELETE) | `api/v1/costs.py` | Should Have | ✅ Done |
 | Registrar namespace costs | `app/__init__.py` | Should Have | ✅ Done |
-| Postman — 116 tests pasando | `tests/postman/` | Should Have | ✅ Done |
-| DbStorage with SQLAlchemy | `persistence/db_storage.py` | Must Have | Pending |
-| SQLAlchemy models | `models/*.py` updated | Must Have | Pending |
-| Config update for DB | `config.py` | Must Have | Pending |
-| Swap InMemoryStorage → DbStorage | `app/__init__.py` | Must Have | Pending |
-| Integration tests — DB | `tests/test_db.py` | Must Have | Pending |
+| `extensions.py` para evitar imports circulares | `app/extensions.py` | Must Have | ✅ Done |
+| `DbStorage` con SQLAlchemy | `persistence/db_storage.py` | Must Have | ✅ Done |
+| Modelos migrados a `db.Model` | `models/*.py` | Must Have | ✅ Done |
+| Config con path absoluto SQLite | `config.py` | Must Have | ✅ Done |
+| Swap InMemoryStorage → DbStorage en facade | `services/facade.py` | Must Have | ✅ Done |
+| `db.init_app` + `db.create_all` en factory | `app/__init__.py` | Must Have | ✅ Done |
+| Fix de seguridad: ownership check en ingredientes | `api/v1/ingredients.py` | Must Have | ✅ Done |
+| Postman — 144 assertions, 82 requests pasando | `tests/postman/` | Must Have | ✅ Done |
+| Branch `feature/sqlalchemy` mergeada a `develop` | git | Must Have | ✅ Done |
 
 **Architectural note:**
 - Open Food Facts no tiene datos de precios confiables para ingredientes crudos.
@@ -163,32 +166,40 @@ Solo project — Julian Gonzalez
   de precios promedio (`FALLBACK_PRICES`) como estrategia de estimación.
 - El endpoint de costos va en un archivo separado `api/v1/costs.py` para mantener
   la separación de responsabilidades.
-- SQLAlchemy se desarrolla en rama `feature/sqlalchemy` (Sesión 10).
+- SQLAlchemy se desarrolló en rama `feature/sqlalchemy` (Sesión 10) y se mergeó a `develop`.
+- Se descubrió y corrigió un bug de seguridad: `ingredients.py` POST/PUT/DELETE no verificaba
+  ownership de la receta — cualquier usuario autenticado podía modificar ingredientes ajenos.
 
 **Definition of Done:**
-- `GET /api/v1/recipes/<id>/cost` devuelve precio estimado por ingrediente + total
-- Precio se calcula con Open Food Facts + tabla de fallback
-- Todos los tests de Postman existentes siguen pasando
-- Data persists after server restart (SQLite dev database)
-- Branch `feature/sqlalchemy` merged into `develop`
+- ✅ `GET /api/v1/recipes/<id>/cost` devuelve precio estimado por ingrediente + total
+- ✅ Precio se calcula con Open Food Facts + tabla de fallback + precios custom por usuario
+- ✅ Todos los tests de Postman pasan (144 assertions, 0 failures)
+- ✅ Datos persisten tras restart del servidor (SQLite — 6 tablas creadas)
+- ✅ Branch `feature/sqlalchemy` mergeada a `develop` y pusheada a GitHub
 
 ---
 
-## Sprint 5 — Frontend
+## Sprint 5 — Frontend 🔄 IN PROGRESS
 
 **Goal:** Functional Jinja2 frontend covering all user stories.
+
+**Sesión:** 11 → ver explicación detallada en `CODE_NOTES_FRONT.md` (Sesión 11)
 
 **Duration:** Week 6
 
 | Task | File | Priority | Status |
 |---|---|---|---|
 | Base template + layout | `templates/base.html` | Must Have | Pending |
-| Login + register pages | `templates/auth/` | Must Have | Pending |
+| Blueprint views/auth | `views/auth.py` | Must Have | Pending |
+| Login + register pages | `templates/auth/login.html`, `register.html` | Must Have | Pending |
+| Blueprint views/recipes | `views/recipes.py` | Must Have | Pending |
 | Recipe list (dashboard) | `templates/recipes/list.html` | Must Have | Pending |
 | Recipe detail page | `templates/recipes/detail.html` | Must Have | Pending |
+| Recipe form (crear/editar) | `templates/recipes/form.html` | Must Have | Pending |
 | PDF upload page | `templates/scan/upload.html` | Must Have | Pending |
 | Static CSS | `static/css/style.css` | Must Have | Pending |
-| End-to-end manual test | Full user flow | Must Have | Pending |
+| Registrar blueprints en factory | `app/__init__.py` | Must Have | Pending |
+| End-to-end manual test | Full user flow en navegador | Must Have | Pending |
 | Deploy to production | Render / Railway | Should Have | Pending |
 
 **Definition of Done:**

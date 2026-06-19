@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from flask_restx import Api
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 from config import config
 from app.extensions import db
 
@@ -16,6 +17,7 @@ def create_app(config_name=None):
     app.config.from_object(config[config_name])
 
     JWTManager(app)
+    CORS(app, resources={r"/api/*": {"origins": "*"}, r"/static/*": {"origins": "*"}})
     db.init_app(app)
 
     # Define the security scheme for Swagger UI
@@ -45,14 +47,45 @@ def create_app(config_name=None):
     from app.api.v1.ingredients import api as ingredients_ns
     from app.api.v1.scan import api as scan_ns
     from app.api.v1.costs import api as costs_ns
+    from app.api.v1.stores import api as stores_ns
+    from app.api.v1.brands import api as brands_ns
 
     api.add_namespace(auth_ns, path='/api/v1/auth')
     api.add_namespace(recipes_ns, path='/api/v1/recipes')
     api.add_namespace(ingredients_ns, path='/api/v1')
     api.add_namespace(scan_ns, path='/api/v1/scan')
     api.add_namespace(costs_ns, path='/api/v1')
+    api.add_namespace(stores_ns, path='/api/v1/stores')
+    api.add_namespace(brands_ns, path='/api/v1/brands')
 
     with app.app_context():
+        from app.models.brand import Brand  # ensure table is registered before create_all
         db.create_all()
+        # Add nullable columns to existing tables (safe ALTER TABLE — no-op if column already exists)
+        from sqlalchemy import text
+        for stmt in [
+            'ALTER TABLE recipes ADD COLUMN image_url VARCHAR(500)',
+            'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500)',
+            'ALTER TABLE ingredients ADD COLUMN manual_price REAL',
+            'ALTER TABLE ingredients ADD COLUMN price_source VARCHAR(20)',
+            'ALTER TABLE ingredients ADD COLUMN preferred_store_id VARCHAR(36)',
+            'ALTER TABLE custom_prices ADD COLUMN store_id VARCHAR(36)',
+            'ALTER TABLE custom_prices ADD COLUMN bought_qty REAL',
+            'ALTER TABLE custom_prices ADD COLUMN bought_unit VARCHAR(30)',
+            'ALTER TABLE custom_prices ADD COLUMN bought_price REAL',
+            'ALTER TABLE ingredients ADD COLUMN section VARCHAR(100)',
+            'ALTER TABLE custom_prices ADD COLUMN brand VARCHAR(100)',
+            'ALTER TABLE custom_prices ADD COLUMN brand_id VARCHAR(36)',
+            'ALTER TABLE ingredients ADD COLUMN preferred_brand_id VARCHAR(36)',
+        ]:
+            try:
+                db.session.execute(text(stmt))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+        # Ensure upload directories exist
+        for folder in ['recipes', 'avatars']:
+            os.makedirs(os.path.join(app.static_folder, 'uploads', folder), exist_ok=True)
 
     return app

@@ -7,13 +7,17 @@ api = Namespace('ingredients', description='Ingredient management')
 ingredient_model = api.model('Ingredient', {
     'name': fields.String(required=True, description='Ingredient name'),
     'quantity': fields.String(required=True, description='Amount (e.g. "200", "1/2")'),
-    'unit': fields.String(required=True, description='Unit of measure (e.g. "g", "ml", "cup")')
+    'unit': fields.String(required=True, description='Unit of measure (e.g. "g", "ml", "cup")'),
+    'section': fields.String(description='Recipe section (e.g. "Masa", "Relleno")')
 })
 
 ingredient_update_model = api.model('IngredientUpdate', {
     'name': fields.String(description='Ingredient name'),
     'quantity': fields.String(description='Amount'),
-    'unit': fields.String(description='Unit of measure')
+    'unit': fields.String(description='Unit of measure'),
+    'preferred_store_id': fields.String(description='Preferred store ID for price lookup'),
+    'preferred_brand_id': fields.String(description='Preferred brand ID for price lookup'),
+    'section': fields.String(description='Recipe section name')
 })
 
 
@@ -28,7 +32,10 @@ class IngredientList(Resource):
             return {'error': 'Recipe not found'}, 404
         ingredients = facade.get_ingredients_by_recipe(recipe_id)
         return [{'id': i.id, 'name': i.name, 'quantity': i.quantity,
-                 'unit': i.unit, 'recipe_id': i.recipe_id} for i in ingredients], 200
+                 'unit': i.unit, 'recipe_id': i.recipe_id,
+                 'preferred_store_id': i.preferred_store_id,
+                 'preferred_brand_id': i.preferred_brand_id,
+                 'section': i.section or ''} for i in ingredients], 200
     # POST
     @jwt_required()
     @api.expect(ingredient_model, validate=True)
@@ -51,7 +58,10 @@ class IngredientList(Resource):
         )
         return {'id': ingredient.id, 'name': ingredient.name,
                 'quantity': ingredient.quantity, 'unit': ingredient.unit,
-                'recipe_id': ingredient.recipe_id}, 201
+                'recipe_id': ingredient.recipe_id,
+                'preferred_store_id': ingredient.preferred_store_id,
+                'preferred_brand_id': ingredient.preferred_brand_id,
+                'section': ingredient.section or ''}, 201
 
 
 @api.route('/recipes/<string:recipe_id>/ingredients/<string:ingredient_id>')
@@ -66,7 +76,10 @@ class IngredientDetail(Resource):
             return {'error': 'Ingredient not found'}, 404
         return {'id': ingredient.id, 'name': ingredient.name,
                 'quantity': ingredient.quantity, 'unit': ingredient.unit,
-                'recipe_id': ingredient.recipe_id}, 200
+                'recipe_id': ingredient.recipe_id,
+                'preferred_store_id': ingredient.preferred_store_id,
+                'preferred_brand_id': ingredient.preferred_brand_id,
+                'section': ingredient.section or ''}, 200
     # PUT
     @jwt_required()
     @api.expect(ingredient_update_model)
@@ -83,7 +96,10 @@ class IngredientDetail(Resource):
             return {'error': 'Forbidden'}, 403
         updated = facade.update_ingredient(ingredient_id, **api.payload)
         return {'id': updated.id, 'name': updated.name,
-                'quantity': updated.quantity, 'unit': updated.unit}, 200
+                'quantity': updated.quantity, 'unit': updated.unit,
+                'preferred_store_id': updated.preferred_store_id,
+                'preferred_brand_id': updated.preferred_brand_id,
+                'section': updated.section or ''}, 200
     # DELETE
     @jwt_required()
     @api.response(204, 'Ingredient deleted')

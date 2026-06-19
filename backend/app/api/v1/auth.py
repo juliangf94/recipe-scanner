@@ -1,7 +1,12 @@
+import os
+from flask import request, current_app
 from flask_restx import Namespace, Resource, fields
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import (create_access_token, create_refresh_token,
+                                jwt_required, get_jwt_identity)
 from app.services.facade import facade
 from app.utils.security import check_password, hash_password
+
+ALLOWED_IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'webp'}
 
 api = Namespace('auth', description='Authentication operations')
 
@@ -57,13 +62,30 @@ class Login(Resource):
         if not user or not check_password(data['password'], user.password_hash):
             return {'error': 'Invalid credentials'}, 401
 
-        token = create_access_token(identity=user.id)
-        return {'token': token, 'user': {
-            'id': user.id,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'email': user.email
-        }}, 200
+        access_token = create_access_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=user.id)
+        return {
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'user': {
+                'id': user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'avatar_url': user.avatar_url
+            }
+        }, 200
+
+
+@api.route('/refresh')
+class Refresh(Resource):
+    @jwt_required(refresh=True)
+    @api.response(200, 'New access token issued')
+    @api.response(401, 'Invalid or expired refresh token')
+    def post(self):
+        user_id = get_jwt_identity()
+        access_token = create_access_token(identity=user_id)
+        return {'access_token': access_token}, 200
 
 
 @api.route('/me')
@@ -80,7 +102,8 @@ class Me(Resource):
             'id': user.id,
             'first_name': user.first_name,
             'last_name': user.last_name,
-            'email': user.email
+            'email': user.email,
+            'avatar_url': user.avatar_url
         }, 200
 
     @jwt_required()
@@ -107,7 +130,8 @@ class Me(Resource):
             'id': user.id,
             'first_name': user.first_name,
             'last_name': user.last_name,
-            'email': user.email
+            'email': user.email,
+            'avatar_url': user.avatar_url
         }, 200
 
     @jwt_required()
@@ -119,3 +143,36 @@ class Me(Resource):
             return {'error': 'User not found'}, 404
         facade.delete_user(user_id)
         return '', 204
+
+
+@api.route('/me/avatar')
+class UserAvatar(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Avatar uploaded')
+    @api.response(400, 'Invalid file')
+    def post(self):
+        user_id = get_jwt_identity()
+        if 'file' not in request.files:
+            return {'error': 'No file provided'}, 400
+
+        file = request.files['file']
+        if not file.filename:
+            return {'error': 'No file selected'}, 400
+
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        if ext not in ALLOWED_IMAGE_EXTS:
+            return {'error': 'Only JPG, PNG or WebP files are accepted'}, 400
+
+        uploads_dir = os.path.join(current_app.static_folder, 'uploads', 'avatars')
+        for old_ext in ALLOWED_IMAGE_EXTS:
+            old_path = os.path.join(uploads_dir, f'{user_id}.{old_ext}')
+            if os.path.exists(old_path):
+                os.remove(old_path)
+
+        filename = f'{user_id}.{ext}'
+        file.save(os.path.join(uploads_dir, filename))
+
+        avatar_url = f'/static/uploads/avatars/{filename}'
+        facade.update_user(user_id, avatar_url=avatar_url)
+        return {'avatar_url': avatar_url}, 200

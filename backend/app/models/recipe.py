@@ -12,3 +12,4 @@ class Recipe(db.Model):
     servings = db.Column(db.Integer, default=0)
     prep_time_min = db.Column(db.Integer, default=0)
     category = db.Column(db.String(100), default='')
+    image_url = db.Column(db.String(500), nullable=True)

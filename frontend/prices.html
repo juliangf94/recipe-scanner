@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecipeScanner — My Prices</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="lang-toggle lang-fixed">
+    <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="dashboard.html" class="logo">
+        <div class="logo-icon">🍴</div>
+        <span class="logo-text">Recipe<span>Scanner</span></span>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span data-i18n="nav_home">Home</span>
+      </a>
+      <a href="dashboard.html" class="nav-item">
+        <span class="nav-icon">📖</span>
+        <span data-i18n="nav_recipes">My Recipes</span>
+      </a>
+      <a href="scan.html" class="nav-item">
+        <span class="nav-icon">⚡</span>
+        <span data-i18n="nav_scan">Scan Recipe</span>
+      </a>
+      <a href="prices.html" class="nav-item active">
+        <span class="nav-icon">🏷</span>
+        <span data-i18n="nav_prices">My Prices</span>
+      </a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="avatar" id="user-avatar" onclick="document.getElementById('avatar-input').click()" title="Upload photo">
+        <span id="avatar-initials">?</span>
+        <div class="avatar-overlay">📷</div>
+      </div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-firstname" id="user-firstname">…</span>
+        <span class="sidebar-user-lastname" id="user-lastname"></span>
+      </div>
+      <button class="sidebar-user-menu" onclick="logout()" data-i18n-title="nav_signout" title="Sign out">⏻</button>
+    </div>
+  </aside>
+  <input type="file" id="avatar-input" accept="image/*" style="display:none" onchange="uploadAvatar(event)">
+
+  <!-- Main content -->
+  <main class="app-layout">
+    <div class="page-header">
+      <div>
+        <h1 data-i18n="prices_title">My Prices</h1>
+        <p class="sub" data-i18n="prices_sub">Set custom ingredient prices for accurate cost estimates</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="openStoresModal()" data-i18n="manage_stores">Manage stores</button>
+        <button class="btn btn-outline" onclick="openBrandsModal()" data-i18n="manage_brands">Manage brands</button>
+        <button class="btn btn-orange" onclick="openAddModal()" data-i18n="btn_add_price">+ Add price</button>
+      </div>
+    </div>
+
+    <div id="prices-error" class="alert alert-error" style="display:none; margin-bottom:1rem;"></div>
+    <div id="prices-success" class="alert alert-success" style="display:none; margin-bottom:1rem;"></div>
+
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+      <label style="font-size:0.85rem;color:var(--text-muted);white-space:nowrap;" data-i18n="sort_by">Sort by</label>
+      <select id="sort-select" onchange="applySortAndRender()" style="font-size:0.85rem;padding:0.3rem 0.6rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);">
+        <option value="name-asc"  data-i18n="sort_name_az">Name A→Z</option>
+        <option value="name-desc" data-i18n="sort_name_za">Name Z→A</option>
+        <option value="price-asc" data-i18n="sort_price_asc">Price low→high</option>
+        <option value="price-desc"data-i18n="sort_price_desc">Price high→low</option>
+        <option value="store"     data-i18n="sort_store">By store</option>
+        <option value="brand"     data-i18n="sort_brand">By brand</option>
+      </select>
+    </div>
+
+    <div class="section-card" id="prices-table-wrap">
+      <div class="loading-center"><div class="spinner"></div></div>
+    </div>
+  </main>
+
+  <!-- ─── Modal: manage stores ───────────────────────────────────────────── -->
+  <div class="modal-overlay" id="stores-modal">
+    <div class="modal">
+      <h2 data-i18n="stores_title">My Stores</h2>
+      <div id="stores-list" style="margin-bottom:1rem;min-height:2rem;"></div>
+      <div class="form-group" style="display:flex;gap:0.5rem;align-items:center;">
+        <input type="text" id="new-store-name" data-i18n-placeholder="label_new_store" placeholder="New store name" style="flex:1;">
+        <button class="btn btn-orange" onclick="createStore()" data-i18n="btn_add_store">+ Add store</button>
+      </div>
+      <div id="stores-error" class="alert alert-error" style="display:none;margin-top:0.5rem;"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeStoresModal()" data-i18n="btn_cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Modal: manage brands ────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="brands-modal">
+    <div class="modal">
+      <h2 data-i18n="brands_title">My Brands</h2>
+      <div id="brands-list" style="margin-bottom:1rem;min-height:2rem;"></div>
+      <div class="form-group" style="display:flex;gap:0.5rem;align-items:center;">
+        <input type="text" id="new-brand-name" data-i18n-placeholder="label_new_brand" placeholder="New brand name" style="flex:1;">
+        <button class="btn btn-orange" onclick="createBrand()" data-i18n="btn_add_brand">+ Add brand</button>
+      </div>
+      <div id="brands-error" class="alert alert-error" style="display:none;margin-top:0.5rem;"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeBrandsModal()" data-i18n="btn_cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Modal: add price ───────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="add-modal">
+    <div class="modal" style="max-width:500px;">
+      <h2 data-i18n="modal_add_price">Add custom price</h2>
+      <div id="add-error" class="alert alert-error" style="display:none"></div>
+
+      <!-- Ingredient name -->
+      <div class="form-group">
+        <label data-i18n="label_ing_name_req2">Ingredient name *</label>
+        <input type="text" id="add-name" data-i18n-placeholder="ph_price_ing" placeholder="e.g. flour, tomatoes">
+      </div>
+
+      <!-- Store + Brand row -->
+      <div style="display:flex;gap:0.75rem;">
+        <div class="form-group" style="flex:1;margin-bottom:1rem;">
+          <label data-i18n="label_store">Store</label>
+          <select id="add-store">
+            <option value="" data-i18n="no_store">Any store</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;margin-bottom:1rem;">
+          <label data-i18n="label_brand">Brand</label>
+          <select id="add-brand">
+            <option value="" data-i18n="no_brand">Any brand</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Entry mode toggle -->
+      <div class="price-mode-toggle" style="margin-bottom:1rem;">
+        <button class="mode-btn active" id="add-mode-qty" onclick="setAddMode('qty')" data-i18n="input_mode_qty">By amount</button>
+        <button class="mode-btn" id="add-mode-kg" onclick="setAddMode('kg')" data-i18n="input_mode_kg">Per kg</button>
+      </div>
+
+      <!-- By-amount fields -->
+      <div id="add-qty-fields">
+        <div style="display:flex;gap:0.75rem;align-items:flex-end;">
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_qty">Quantity bought</label>
+            <input type="text" id="add-bought-qty" inputmode="decimal" placeholder="500">
+          </div>
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_unit">Unit</label>
+            <select id="add-bought-unit">
+              <option value="g">g</option>
+              <option value="kg">kg</option>
+              <option value="ml">ml</option>
+              <option value="l">l</option>
+              <option value="unidad">unidad</option>
+              <option value="pieza">pieza</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_price">Price paid (€)</label>
+            <input type="text" id="add-bought-price" inputmode="decimal" placeholder="1.50">
+          </div>
+        </div>
+        <p id="add-price-preview" class="price-preview-text" style="display:none;"></p>
+      </div>
+
+      <!-- Per-kg field -->
+      <div id="add-kg-field" style="display:none;">
+        <div class="form-group">
+          <label data-i18n="label_price_kg_req">Price per kg (€) *</label>
+          <input type="text" id="add-price-kg" inputmode="decimal" placeholder="3.00">
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAddModal()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn-orange" onclick="saveAdd()" data-i18n="btn_save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Modal: edit price ─────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal" style="max-width:500px;">
+      <h2 data-i18n="modal_edit_price">Edit price</h2>
+      <div id="edit-error" class="alert alert-error" style="display:none"></div>
+
+      <div class="form-group">
+        <label data-i18n="label_ing_name_req2">Ingredient name *</label>
+        <input type="text" id="edit-name" readonly style="background:var(--bg); color:var(--text-muted); cursor:not-allowed;">
+      </div>
+
+      <!-- Store + Brand row -->
+      <div style="display:flex;gap:0.75rem;">
+        <div class="form-group" style="flex:1;margin-bottom:1rem;">
+          <label data-i18n="label_store">Store</label>
+          <select id="edit-store"></select>
+        </div>
+        <div class="form-group" style="flex:1;margin-bottom:1rem;">
+          <label data-i18n="label_brand">Brand</label>
+          <select id="edit-brand">
+            <option value="" data-i18n="no_brand">Any brand</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Entry mode toggle -->
+      <div class="price-mode-toggle" style="margin-bottom:1rem;">
+        <button class="mode-btn active" id="edit-mode-qty" onclick="setEditMode('qty')" data-i18n="input_mode_qty">By amount</button>
+        <button class="mode-btn" id="edit-mode-kg" onclick="setEditMode('kg')" data-i18n="input_mode_kg">Per kg</button>
+      </div>
+
+      <div id="edit-qty-fields">
+        <div style="display:flex;gap:0.75rem;align-items:flex-end;">
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_qty">Quantity bought</label>
+            <input type="text" id="edit-bought-qty" inputmode="decimal" placeholder="500">
+          </div>
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_unit">Unit</label>
+            <select id="edit-bought-unit">
+              <option value="g">g</option>
+              <option value="kg">kg</option>
+              <option value="ml">ml</option>
+              <option value="l">l</option>
+              <option value="unidad">unidad</option>
+              <option value="pieza">pieza</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_price">Price paid (€)</label>
+            <input type="text" id="edit-bought-price" inputmode="decimal" placeholder="1.50">
+          </div>
+        </div>
+        <p id="edit-price-preview" class="price-preview-text" style="display:none;"></p>
+      </div>
+
+      <div id="edit-kg-field" style="display:none;">
+        <div class="form-group">
+          <label data-i18n="label_price_kg_req">Price per kg (€) *</label>
+          <input type="text" id="edit-price-kg" inputmode="decimal" placeholder="3.00">
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeEditModal()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn-orange" onclick="saveEdit()" data-i18n="btn_save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/prices.js"></script>
+</body>
+</html>
