@@ -17,8 +17,14 @@ recipe_model = api.model('Recipe', {
 })
 
 recipe_update_model = api.model('RecipeUpdate', {
-    'title': fields.String(description='Recipe title'),
-    'description': fields.String(description='Recipe description'),
+    'title': fields.String(description='Recipe title (original)'),
+    'description': fields.String(description='Recipe description (original)'),
+    'title_en': fields.String(description='Title in English'),
+    'title_es': fields.String(description='Title in Spanish'),
+    'title_fr': fields.String(description='Title in French'),
+    'description_en': fields.String(description='Description in English'),
+    'description_es': fields.String(description='Description in Spanish'),
+    'description_fr': fields.String(description='Description in French'),
     'servings': fields.Integer(description='Number of servings'),
     'prep_time_min': fields.Integer(description='Preparation time in minutes'),
     'category': fields.String(description='Recipe category')
@@ -33,7 +39,11 @@ class RecipeList(Resource):
     def get(self):
         user_id = get_jwt_identity()
         recipes = facade.get_recipes_by_user(user_id)
-        return [{'id': r.id, 'title': r.title, 'description': r.description,
+        return [{'id': r.id,
+                 'title': r.title,
+                 'title_en': r.title_en or '', 'title_es': r.title_es or '', 'title_fr': r.title_fr or '',
+                 'description': r.description,
+                 'description_en': r.description_en or '', 'description_es': r.description_es or '', 'description_fr': r.description_fr or '',
                  'servings': r.servings, 'prep_time_min': r.prep_time_min,
                  'category': r.category, 'user_id': r.user_id,
                  'image_url': r.image_url}
@@ -71,8 +81,12 @@ class RecipeDetail(Resource):
             return {'error': 'Recipe not found'}, 404
         if recipe.user_id != user_id:
             return {'error': 'Forbidden'}, 403
-        return {'id': recipe.id, 'title': recipe.title,
-                'description': recipe.description, 'servings': recipe.servings,
+        return {'id': recipe.id,
+                'title': recipe.title,
+                'title_en': recipe.title_en or '', 'title_es': recipe.title_es or '', 'title_fr': recipe.title_fr or '',
+                'description': recipe.description,
+                'description_en': recipe.description_en or '', 'description_es': recipe.description_es or '', 'description_fr': recipe.description_fr or '',
+                'servings': recipe.servings,
                 'prep_time_min': recipe.prep_time_min, 'category': recipe.category,
                 'user_id': recipe.user_id, 'image_url': recipe.image_url}, 200
 
@@ -109,6 +123,24 @@ class RecipeDetail(Resource):
         return '', 204
 
 
+@api.route('/<string:recipe_id>/cook')
+class RecipeCook(Resource):
+
+    @jwt_required()
+    @api.response(201, 'Cook logged')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Recipe not found')
+    def post(self, recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        entry = facade.log_cook(recipe_id, user_id)
+        return {'id': entry.id, 'cooked_at': entry.cooked_at.isoformat()}, 201
+
+
 @api.route('/<string:recipe_id>/steps')
 class RecipeSteps(Resource):
 
@@ -121,8 +153,79 @@ class RecipeSteps(Resource):
             return {'error': 'Recipe not found'}, 404
         steps = facade.get_steps_by_recipe(recipe_id)
         steps_sorted = sorted(steps, key=lambda s: s.order_num)
+        for step in steps_sorted:
+            if not step.description_en or not step.description_es or not step.description_fr:
+                facade._translate_step(step)
         return [{'id': s.id, 'order_num': s.order_num,
-                 'description': s.description} for s in steps_sorted], 200
+                 'description': s.description,
+                 'description_en': s.description_en or '',
+                 'description_es': s.description_es or '',
+                 'description_fr': s.description_fr or ''} for s in steps_sorted], 200
+
+    @jwt_required()
+    @api.response(201, 'Step created')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Recipe not found')
+    def post(self, recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        data = request.get_json() or {}
+        description = (data.get('description') or '').strip()
+        if not description:
+            return {'error': 'Description required'}, 400
+        existing = facade.get_steps_by_recipe(recipe_id)
+        auto_num = max((s.order_num for s in existing), default=0) + 1
+        order_num = int(data['order_num']) if data.get('order_num') else auto_num
+        step = facade.add_step(recipe_id=recipe_id, order_num=order_num, description=description)
+        facade._translate_step(step)
+        return {'id': step.id, 'order_num': step.order_num,
+                'description': step.description,
+                'description_en': step.description_en or '',
+                'description_es': step.description_es or '',
+                'description_fr': step.description_fr or ''}, 201
+
+
+@api.route('/<string:recipe_id>/steps/<string:step_id>')
+class RecipeStep(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Step updated')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Step not found')
+    def put(self, recipe_id, step_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        data = request.get_json() or {}
+        updated = facade.update_step(step_id, **data)
+        if not updated:
+            return {'error': 'Step not found'}, 404
+        return {'id': updated.id, 'order_num': updated.order_num,
+                'description': updated.description,
+                'description_en': updated.description_en or '',
+                'description_es': updated.description_es or '',
+                'description_fr': updated.description_fr or ''}, 200
+
+    @jwt_required()
+    @api.response(204, 'Step deleted')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Step not found')
+    def delete(self, recipe_id, step_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        facade.delete_step(step_id)
+        return '', 204
 
 
 @api.route('/<string:recipe_id>/image')

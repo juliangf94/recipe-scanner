@@ -46,6 +46,83 @@ manual_price_model = api.model('ManualPrice', {
 })
 
 
+@api.route('/cook-log/week')
+class WeekCookLog(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Recipe IDs cooked this week')
+    def get(self):
+        user_id = get_jwt_identity()
+        return {'recipe_ids': facade.get_week_cooked_recipe_ids(user_id)}, 200
+
+
+@api.route('/summary')
+class CostSummary(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Cost summary')
+    def get(self):
+        user_id = get_jwt_identity()
+        recipes = facade.get_recipes_by_user(user_id)
+
+        recipe_costs = []
+        ing_totals = {}
+
+        for recipe in recipes:
+            cost_data = facade.get_recipe_cost(recipe.id, user_id)
+            total = cost_data['total_estimated_cost']
+            recipe_costs.append({
+                'id': recipe.id,
+                'title': recipe.title,
+                'title_en': recipe.title_en or '',
+                'title_es': recipe.title_es or '',
+                'title_fr': recipe.title_fr or '',
+                'image_url': recipe.image_url,
+                'category': recipe.category,
+                'cost': total,
+                'ingredient_count': len(cost_data['ingredients']),
+            })
+            for ing in cost_data['ingredients']:
+                if ing['estimated_price'] > 0:
+                    key = ing['name'].lower().strip()
+                    if key not in ing_totals:
+                        ing_totals[key] = {
+                            'name': ing['name'],
+                            'name_en': ing.get('name_en', ''),
+                            'name_es': ing.get('name_es', ''),
+                            'name_fr': ing.get('name_fr', ''),
+                            'total': 0.0,
+                            'recipe_id': recipe.id,
+                            'recipe_title': recipe.title,
+                            'recipe_title_en': recipe.title_en or '',
+                            'recipe_title_es': recipe.title_es or '',
+                            'recipe_title_fr': recipe.title_fr or '',
+                            '_max': 0.0,
+                        }
+                    ing_totals[key]['total'] = round(ing_totals[key]['total'] + ing['estimated_price'], 2)
+                    if ing['estimated_price'] > ing_totals[key]['_max']:
+                        ing_totals[key]['_max'] = ing['estimated_price']
+                        ing_totals[key]['recipe_id'] = recipe.id
+                        ing_totals[key]['recipe_title'] = recipe.title
+                        ing_totals[key]['recipe_title_en'] = recipe.title_en or ''
+                        ing_totals[key]['recipe_title_es'] = recipe.title_es or ''
+                        ing_totals[key]['recipe_title_fr'] = recipe.title_fr or ''
+
+        recipe_costs.sort(key=lambda r: r['cost'], reverse=True)
+        top_ings_raw = sorted(ing_totals.values(), key=lambda x: x['total'], reverse=True)[:5]
+        top_ings = [{k: v for k, v in ing.items() if k != '_max'} for ing in top_ings_raw]
+
+        week_cooks = facade.get_week_cook_count(user_id)
+
+        return {
+            'total_cost': round(sum(r['cost'] for r in recipe_costs), 2),
+            'recipe_count': len(recipe_costs),
+            'recipes': recipe_costs[:5],
+            'top_ingredients': top_ings,
+            'week_cooks': week_cooks,
+        }, 200
+
+
 @api.route('/recipes/<string:recipe_id>/cost')
 class RecipeCost(Resource):
 

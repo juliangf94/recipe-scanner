@@ -1,7 +1,14 @@
+from collections import Counter
+from datetime import datetime, timedelta
+import deepl
 import fitz
 import json
+import logging
 import os
+import re
 import requests
+import unicodedata
+import uuid
 from groq import Groq
 from app.persistence.db_storage import DbStorage
 from app.models.user import User
@@ -9,6 +16,8 @@ from app.models.recipe import Recipe
 from app.models.ingredient import Ingredient
 from app.models.step import Step
 from app.models.pdf_scan import PdfScan
+from app.models.cook_log import CookLog
+from app.extensions import db
 from app.models.custom_price import CustomPrice
 from app.models.store import Store
 from app.models.brand import Brand
@@ -48,7 +57,7 @@ object with this exact structure, no explanation, no markdown:
   "description": "brief description",
   "servings": 4,
   "prep_time_min": 30,
-  "category": "category (e.g. Desserts, Main course, Soup)",
+  "category": "MUST be exactly one of: Desserts, Cake, Main Course, Meat, Pasta, Chicken, Fish, Seafood, Soup, Salad, Breakfast, Rice, Bread, Bakery, Vegan, Vegetarian, Appetizer, Drink, Sandwich, Snack",
   "ingredients": [
     {"name": "ingredient name", "quantity": "200", "unit": "g"}
   ],
@@ -144,14 +153,26 @@ class RecipeScannerFacade:
 
     # --- Ingredients --- api/v1/ingredients.py ---
 
-    def add_ingredient(self, recipe_id, name, quantity, unit):
+    def _translate_ingredient(self, ingredient):
+        """Translate a single ingredient name to EN/ES/FR and persist."""
+        name = ingredient.name
+        source_lang = self._detect_source_lang(name)
+        for lang, col in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]:
+            translated, _ = self._translate_batch([name], lang, source_lang=source_lang)
+            setattr(ingredient, f'name_{col}', translated[0] or name)
+        self._ingredients.update(ingredient)
+
+    def add_ingredient(self, recipe_id, name, quantity, unit, skip_translate=False):
         ingredient = Ingredient(
             name=name,
             quantity=quantity,
             unit=unit,
             recipe_id=recipe_id
         )
-        return self._ingredients.save(ingredient)
+        saved = self._ingredients.save(ingredient)
+        if not skip_translate:
+            self._translate_ingredient(saved)
+        return saved
 
     def get_ingredient(self, ingredient_id):
         return self._ingredients.get_by_id(ingredient_id)
@@ -163,15 +184,28 @@ class RecipeScannerFacade:
         ingredient = self._ingredients.get_by_id(ingredient_id)
         if not ingredient:
             return None
+        name_changed = 'name' in kwargs and kwargs['name'] != ingredient.name
         for key, value in kwargs.items():
             if hasattr(ingredient, key):
                 setattr(ingredient, key, value)
-        return self._ingredients.update(ingredient)
+        result = self._ingredients.update(ingredient)
+        if name_changed:
+            self._translate_ingredient(ingredient)
+        return result
 
     def delete_ingredient(self, ingredient_id):
         self._ingredients.delete(ingredient_id)
 
     # --- Steps --- api/v1/scan.py ---
+
+    def _translate_step(self, step):
+        """Translate a single step description to EN/ES/FR and persist."""
+        desc = step.description
+        source_lang = self._detect_source_lang(desc)
+        for lang, col in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]:
+            translated, _ = self._translate_batch([desc], lang, source_lang=source_lang)
+            setattr(step, f'description_{col}', translated[0] or desc)
+        self._steps.update(step)
 
     def add_step(self, recipe_id, order_num, description):
         step = Step(order_num=order_num, description=description, recipe_id=recipe_id)
@@ -180,16 +214,136 @@ class RecipeScannerFacade:
     def get_steps_by_recipe(self, recipe_id):
         return [s for s in self._steps.get_all() if s.recipe_id == recipe_id]
 
+    def update_step(self, step_id, **kwargs):
+        step = self._steps.get_by_id(step_id)
+        if not step:
+            return None
+        desc_changed = 'description' in kwargs and kwargs['description'] != step.description
+        for key, value in kwargs.items():
+            if hasattr(step, key):
+                setattr(step, key, value)
+        result = self._steps.update(step)
+        if desc_changed:
+            self._translate_step(step)
+        return result
+
+    def delete_step(self, step_id):
+        self._steps.delete(step_id)
+
+    # --- Translations --- deepl + libretranslate fallback ---
+
+    # Maps DeepL lang codes to LibreTranslate lang codes
+    _LIBRE_LANG = {'EN-US': 'en', 'ES': 'es', 'FR': 'fr'}
+
+    def _detect_source_lang(self, text):
+        """Detect the language of a text using DeepL. Returns e.g. 'ES', 'FR', 'EN'."""
+        api_key = os.environ.get('DEEPL_API_KEY', '')
+        if not api_key or api_key == 'your-deepl-api-key-here':
+            return None
+        try:
+            translator = deepl.Translator(api_key)
+            result = translator.translate_text(text[:300], target_lang='EN-US')
+            return result.detected_source_lang.upper()
+        except Exception as e:
+            logging.warning('Language detection failed: %s', e)
+            return None
+
+    def _translate_batch(self, texts, target_lang, source_lang=None):
+        """Translate with DeepL; falls back to LibreTranslate. Returns (results, provider).
+        source_lang: explicit source language (e.g. 'ES') to prevent short-word misdetection."""
+        api_key = os.environ.get('DEEPL_API_KEY', '')
+        if api_key and api_key != 'your-deepl-api-key-here':
+            try:
+                translator = deepl.Translator(api_key)
+                target_base = target_lang.split('-')[0].upper()
+                if source_lang and source_lang.upper() == target_base:
+                    return texts, 'original'
+                results = translator.translate_text(
+                    texts, target_lang=target_lang,
+                    source_lang=source_lang or None
+                )
+                return [r.text for r in results], 'deepl'
+            except Exception as e:
+                logging.warning('DeepL failed (%s), trying LibreTranslate: %s', target_lang, e)
+
+        results = self._translate_with_libretranslate(texts, target_lang)
+        any_translated = any(r != o for r, o in zip(results, texts))
+        return results, 'libretranslate' if any_translated else 'none'
+
+    def _translate_with_libretranslate(self, texts, target_lang):
+        """Fallback translation via LibreTranslate public API."""
+        lt_lang = self._LIBRE_LANG.get(target_lang, target_lang.lower()[:2])
+        translated = []
+        for text in texts:
+            if not text or not text.strip():
+                translated.append(text)
+                continue
+            try:
+                res = requests.post(
+                    'https://libretranslate.de/translate',
+                    json={'q': text, 'source': 'auto', 'target': lt_lang},
+                    timeout=10
+                )
+                if res.ok:
+                    translated.append(res.json().get('translatedText', text))
+                else:
+                    translated.append(text)
+            except Exception as e:
+                logging.error('LibreTranslate failed (%s): %s', lt_lang, e)
+                translated.append(text)
+        return translated
+
+    def _translate_recipe(self, recipe, ingredients, steps):
+        """Populate *_en / *_es / *_fr columns on recipe, ingredients, and steps."""
+        ing_names  = [i.name for i in ingredients]
+        step_descs = [s.description for s in steps]
+        meta       = [recipe.title, recipe.description or '']
+        all_texts  = meta + ing_names + step_descs
+
+        sample_parts = [recipe.title] + [i.name for i in ingredients[:6]]
+        source_lang = self._detect_source_lang(' '.join(sample_parts))
+        logging.info('Detected source language for "%s": %s', recipe.title, source_lang)
+
+        used_provider = 'none'
+        all_failed = True
+
+        for lang, col in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]:
+            translated, provider = self._translate_batch(all_texts, lang, source_lang=source_lang)
+
+            if provider in ('deepl', 'libretranslate', 'original'):
+                all_failed = False
+                if provider not in ('original', 'none'):
+                    used_provider = provider
+
+            setattr(recipe, f'title_{col}', translated[0] or recipe.title)
+            setattr(recipe, f'description_{col}', translated[1] or recipe.description or '')
+
+            offset = 2
+            for ing in ingredients:
+                setattr(ing, f'name_{col}', translated[offset]); offset += 1
+
+            for step in steps:
+                setattr(step, f'description_{col}', translated[offset]); offset += 1
+
+        recipe.translation_provider = used_provider
+        recipe.translation_status = 'pending' if all_failed else 'done'
+
+        self._recipes.update(recipe)
+        for ing in ingredients:
+            self._ingredients.update(ing)
+        for step in steps:
+            self._steps.update(step)
+
     # --- Scan (PDF + Groq) --- api/v1/scan.py ---
 
     def scan_pdf(self, user_id, file_bytes, filename):
         text = self._extract_pdf_text(file_bytes)
         if not text.strip():
-            return None
+            return None, 'no_text'
 
         data = self._call_groq(text)
         if data is None:
-            return None
+            return None, 'groq_failed'
 
         recipe = self.create_recipe(
             user_id=user_id,
@@ -206,7 +360,8 @@ class RecipeScannerFacade:
                 recipe_id=recipe.id,
                 name=item.get('name', ''),
                 quantity=str(item.get('quantity', '')),
-                unit=item.get('unit', '')
+                unit=item.get('unit', ''),
+                skip_translate=True
             )
             ingredients.append(ing)
 
@@ -219,7 +374,9 @@ class RecipeScannerFacade:
             )
             steps.append(step)
 
-        return recipe, ingredients, steps
+        self._translate_recipe(recipe, ingredients, steps)
+
+        return (recipe, ingredients, steps), None
 
     def _extract_pdf_text(self, file_bytes):
         doc = fitz.open(stream=file_bytes, filetype='pdf')
@@ -237,9 +394,20 @@ class RecipeScannerFacade:
                 messages=[{'role': 'user', 'content': GROQ_PROMPT + text}],
                 temperature=0.1
             )
-            content = response.choices[0].message.content
-            return json.loads(content)
-        except Exception:
+            content = response.choices[0].message.content.strip()
+            logging.info('Groq raw response (first 200 chars): %s', content[:200])
+
+            # Extract the first {...} block — handles markdown fences, leading text, etc.
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if not match:
+                logging.error('No JSON object found in Groq response: %s', content[:500])
+                return None
+            return json.loads(match.group())
+        except json.JSONDecodeError as e:
+            logging.error('Groq response was not valid JSON: %s', e)
+            return None
+        except Exception as e:
+            logging.error('Groq API call failed: %s', e)
             return None
 
     # --- Stores --- api/v1/stores.py ---
@@ -305,26 +473,32 @@ class RecipeScannerFacade:
             return name[:-1]
         return name
 
+    @staticmethod
+    def _norm(s):
+        """Lowercase, strip whitespace, and remove diacritics for accent-insensitive matching."""
+        s = s.lower().strip()
+        return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+
     def get_custom_prices_for_ingredient(self, user_id, ingredient_name):
-        name_lower = ingredient_name.lower().strip()
+        name_n = self._norm(ingredient_name)
         all_user = [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
 
-        # 1. Exact match
-        exact = [cp for cp in all_user if cp.ingredient_name == name_lower]
+        # 1. Exact match (accent-insensitive)
+        exact = [cp for cp in all_user if self._norm(cp.ingredient_name) == name_n]
         if exact:
             return exact
 
-        # 2. Word-prefix match: "harina" matches "harina 0000" and vice-versa
+        # 2. Word-prefix match (accent-insensitive): "azucar" matches "azúcar en polvo"
         #    Uses ' ' padding so "sal" does NOT match "salsa"
         prefix = [cp for cp in all_user
-                  if (name_lower + ' ').startswith(cp.ingredient_name + ' ')
-                  or (cp.ingredient_name + ' ').startswith(name_lower + ' ')]
+                  if (name_n + ' ').startswith(self._norm(cp.ingredient_name) + ' ')
+                  or (self._norm(cp.ingredient_name) + ' ').startswith(name_n + ' ')]
         if prefix:
             return prefix
 
         # 3. Singular/plural: "huevo" matches "huevos"
-        norm = self._strip_plural(name_lower)
-        plural = [cp for cp in all_user if self._strip_plural(cp.ingredient_name) == norm]
+        norm = self._strip_plural(name_n)
+        plural = [cp for cp in all_user if self._strip_plural(self._norm(cp.ingredient_name)) == norm]
         if plural:
             return plural
 
@@ -338,16 +512,16 @@ class RecipeScannerFacade:
         return min(prices, key=lambda c: c.price_per_kg)
 
     def get_custom_price_by_store(self, user_id, ingredient_name, store_id):
-        name_lower = ingredient_name.lower().strip()
+        name_n = self._norm(ingredient_name)
         matches = [cp for cp in self._custom_prices.get_all()
-                   if cp.user_id == user_id and cp.ingredient_name == name_lower
+                   if cp.user_id == user_id and self._norm(cp.ingredient_name) == name_n
                    and cp.store_id == store_id]
         return min(matches, key=lambda c: c.price_per_kg) if matches else None
 
     def get_custom_price_by_store_and_brand(self, user_id, ingredient_name, store_id, brand_id):
-        name_lower = ingredient_name.lower().strip()
+        name_n = self._norm(ingredient_name)
         for cp in self._custom_prices.get_all():
-            if (cp.user_id == user_id and cp.ingredient_name == name_lower
+            if (cp.user_id == user_id and self._norm(cp.ingredient_name) == name_n
                     and cp.store_id == store_id and cp.brand_id == brand_id):
                 return cp
         return None
@@ -359,7 +533,7 @@ class RecipeScannerFacade:
                              store_id=None, brand_id=None, bought_qty=None, bought_unit=None, bought_price=None):
         cp = CustomPrice(
             user_id=user_id,
-            ingredient_name=ingredient_name.lower().strip(),
+            ingredient_name=self._norm(ingredient_name),
             price_per_kg=price_per_kg,
             store_id=store_id,
             brand_id=brand_id,
@@ -422,6 +596,9 @@ class RecipeScannerFacade:
             result.append({
                 'ing_id': ing.id,
                 'name': ing.name,
+                'name_en': ing.name_en or '',
+                'name_es': ing.name_es or '',
+                'name_fr': ing.name_fr or '',
                 'quantity': ing.quantity,
                 'unit': ing.unit,
                 'price_per_kg': price_per_kg,
@@ -450,7 +627,22 @@ class RecipeScannerFacade:
 
         # 2. Custom DB — 4-case priority: store+brand > store only > brand only > cheapest
         if user_id:
-            customs = self.get_custom_prices_for_ingredient(user_id, name_lower)
+            # Try primary name + all stored translations so that e.g. "farine de blé tendre"
+            # automatically matches a CustomPrice saved as "harina" (via name_es).
+            candidates = {name_lower}
+            for attr in ('name_en', 'name_es', 'name_fr'):
+                val = (getattr(ing, attr, None) or '').lower().strip()
+                if val:
+                    candidates.add(val)
+
+            seen_ids = set()
+            customs = []
+            for candidate in candidates:
+                for cp in self.get_custom_prices_for_ingredient(user_id, candidate):
+                    if cp.id not in seen_ids:
+                        seen_ids.add(cp.id)
+                        customs.append(cp)
+
             if customs:
                 has_store = bool(ing.preferred_store_id)
                 has_brand = bool(getattr(ing, 'preferred_brand_id', None))
@@ -552,6 +744,39 @@ class RecipeScannerFacade:
         ing.manual_price = None
         ing.cost_is_manual = False
         return self._ingredients.update(ing)
+
+    # ── Cook log ──────────────────────────────────────────────────────────────
+
+    def log_cook(self, recipe_id, user_id):
+        entry = CookLog(
+            id=str(uuid.uuid4()),
+            recipe_id=recipe_id,
+            user_id=user_id,
+            cooked_at=datetime.utcnow(),
+        )
+        db.session.add(entry)
+        db.session.commit()
+        return entry
+
+    def _week_start(self):
+        today = datetime.utcnow()
+        start = today - timedelta(days=today.weekday())
+        return start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    def get_week_cook_count(self, user_id):
+        return (
+            db.session.query(CookLog)
+            .filter(CookLog.user_id == user_id, CookLog.cooked_at >= self._week_start())
+            .count()
+        )
+
+    def get_week_cooked_recipe_ids(self, user_id):
+        rows = (
+            db.session.query(CookLog.recipe_id)
+            .filter(CookLog.user_id == user_id, CookLog.cooked_at >= self._week_start())
+            .all()
+        )
+        return list({row.recipe_id for row in rows})
 
 
 facade = RecipeScannerFacade()

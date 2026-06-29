@@ -21,3 +21,9 @@ instance/
 
 # Pyright config (local paths)
 pyrightconfig.json
+
+# User-uploaded files — never commit
+backend/app/static/uploads/avatars/*
+backend/app/static/uploads/recipes/*
+!backend/app/static/uploads/avatars/.gitkeep
+!backend/app/static/uploads/recipes/.gitkeep

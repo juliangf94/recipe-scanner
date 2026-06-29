@@ -309,7 +309,7 @@ function renderTable(prices) {
       : '';
     return `
     <tr>
-      <td class="ing-name">${p.ingredient_name}</td>
+      <td class="ing-name">${tIng(p.ingredient_name)}</td>
       <td>${storeName}</td>
       <td>${brandBadge}</td>
       <td>€${p.price_per_kg.toFixed(2)}<br>${boughtInfo}</td>

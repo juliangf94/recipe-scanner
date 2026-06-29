@@ -3,6 +3,29 @@ requireAuth();
 let selectedFile = null;
 let lastScanRecipe = null;
 let lastScanData = null;
+let lastScanSuccessId    = null;
+let lastScanSuccessTitle = null;
+
+function renderSuccessMessage(id, title) {
+  const el = document.getElementById('upload-success');
+  el.innerHTML = `${tf('scan_ok', { title })}
+    <div style="margin-top:0.6rem;">
+      <a href="recipe.html?id=${id}" class="btn btn-orange btn-sm">${t('btn_view_recipe')}</a>
+    </div>`;
+  el.style.display = '';
+}
+
+// ── Restore scan success after any page reload ────────────────────────────────
+(function restoreScanSuccess() {
+  const id    = sessionStorage.getItem('scan_success_id');
+  const title = sessionStorage.getItem('scan_success_title');
+  if (!id || !title) return;
+  sessionStorage.removeItem('scan_success_id');
+  sessionStorage.removeItem('scan_success_title');
+  lastScanSuccessId    = id;
+  lastScanSuccessTitle = title;
+  renderSuccessMessage(id, title);
+})();
 
 // ── Sidebar user info ─────────────────────────────────────────────────────────
 const user = getUser();
@@ -104,21 +127,27 @@ async function scanPdf() {
 
   if (!res || !res.ok) {
     const el = document.getElementById('upload-error');
-    el.textContent = res?.data?.error || t('err_scan');
+    const code = res?.data?.error_code;
+    el.textContent = code ? t(code) || t('err_scan') : t('err_scan');
     el.style.display = '';
     return;
   }
 
   const recipe = res.data.recipe;
-  const el = document.getElementById('upload-success');
-  el.textContent = tf('scan_ok', { title: recipe.title });
-  el.style.display = '';
+
+  // Persist success so it survives any page reload triggered by the browser
+  lastScanSuccessId    = recipe.id;
+  lastScanSuccessTitle = recipe.title;
+  sessionStorage.setItem('scan_success_id',    recipe.id);
+  sessionStorage.setItem('scan_success_title', recipe.title);
+
+  // Prevent a second scan from hiding this message
+  selectedFile = null;
+  document.getElementById('scan-btn').disabled = true;
+
+  renderSuccessMessage(recipe.id, recipe.title);
 
   showLastScan(recipe, res.data);
-
-  setTimeout(() => {
-    window.location.href = `recipe.html?id=${recipe.id}`;
-  }, 2000);
 }
 
 function showLastScan(recipe, data) {
@@ -170,6 +199,9 @@ function showLastScan(recipe, data) {
 function logout() { removeToken(); window.location.href = 'index.html'; }
 
 document.addEventListener('langchange', () => {
+  if (lastScanSuccessId) {
+    renderSuccessMessage(lastScanSuccessId, lastScanSuccessTitle);
+  }
   if (lastScanRecipe && lastScanData) {
     showLastScan(lastScanRecipe, lastScanData);
   }

@@ -8,10 +8,6 @@
 </head>
 <body>
 
-  <div class="lang-toggle lang-fixed">
-    <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
-    <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
-  </div>
 
   <!-- Sidebar -->
   <aside class="sidebar">
@@ -22,7 +18,7 @@
       </a>
     </div>
     <nav class="sidebar-nav">
-      <a href="dashboard.html" class="nav-item">
+      <a href="home.html" class="nav-item">
         <span class="nav-icon">🏠</span>
         <span data-i18n="nav_home">Home</span>
       </a>
@@ -39,6 +35,13 @@
         <span data-i18n="nav_prices">My Prices</span>
       </a>
     </nav>
+    <div class="sidebar-lang">
+      <div class="lang-toggle">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+        <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+      </div>
+    </div>
     <div class="sidebar-user">
       <div class="avatar" id="user-avatar" onclick="document.getElementById('avatar-input').click()" title="Upload photo">
         <span id="avatar-initials">?</span>
@@ -56,7 +59,11 @@
   <!-- Main content -->
   <main class="app-layout" id="main-content">
     <div class="loading-center"><div class="spinner"></div></div>
-  </main>
+  
+    <footer class="app-footer">
+      <p data-i18n="footer_disclaimer">RecipeScanner no está afiliado ni patrocinado por ninguna de las marcas o supermercados mencionados en esta aplicación.</p>
+    </footer>
+</main>
 
   <!-- Modal: edit recipe -->
   <div class="modal-overlay" id="edit-modal">
@@ -64,8 +71,12 @@
       <h2 data-i18n="modal_edit_recipe">Edit recipe</h2>
       <div id="edit-error" class="alert alert-error" style="display:none"></div>
       <div class="form-group">
-        <label data-i18n="label_title_req">Title *</label>
+        <label>
+          <span data-i18n="label_title_req">Title</span>
+          <span id="e-lang-badge" style="margin-left:0.4rem;font-size:0.72rem;font-weight:700;background:var(--orange);color:#fff;border-radius:4px;padding:1px 6px;vertical-align:middle;"></span>
+        </label>
         <input type="text" id="e-title">
+        <p id="e-title-original" style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem;"></p>
       </div>
       <div class="form-group">
         <label data-i18n="label_desc">Description</label>
@@ -84,19 +95,79 @@
       <div class="form-group">
         <label data-i18n="label_category">Category</label>
         <input type="text" id="e-category" list="category-list" autocomplete="off">
-        <datalist id="category-list">
-          <option value="Desserts"><option value="Main Course"><option value="Pasta">
-          <option value="Meat"><option value="Chicken"><option value="Fish">
-          <option value="Seafood"><option value="Soup"><option value="Salad">
-          <option value="Breakfast"><option value="Rice"><option value="Bread">
-          <option value="Bakery"><option value="Cake"><option value="Vegan">
-          <option value="Vegetarian"><option value="Appetizer"><option value="Drink">
-          <option value="Sandwich"><option value="Snack">
-        </datalist>
+        <datalist id="category-list"></datalist>
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeEditModal()">Cancel</button>
         <button class="btn btn-orange" data-i18n="btn_save" onclick="saveRecipe()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: edit ingredient -->
+  <div class="modal-overlay" id="ing-edit-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_edit_ing">Edit ingredient</h2>
+      <div id="ing-edit-error" class="alert alert-error" style="display:none"></div>
+      <input type="hidden" id="ing-edit-id">
+      <div class="form-group">
+        <label data-i18n="label_name_req">Name *</label>
+        <input type="text" id="ing-edit-name" data-i18n-placeholder="ph_ing_name" placeholder="Flour">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="label_qty_req">Quantity *</label>
+          <input type="text" id="ing-edit-qty" placeholder="500">
+        </div>
+        <div class="form-group">
+          <label data-i18n="label_unit_req">Unit *</label>
+          <input type="text" id="ing-edit-unit" placeholder="g">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeEditIngModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_save" onclick="saveEditIng()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: add step -->
+  <div class="modal-overlay" id="step-add-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_add_step">Add step</h2>
+      <div id="step-add-error" class="alert alert-error" style="display:none"></div>
+      <div class="form-group" style="max-width:120px;">
+        <label data-i18n="label_step_num">Step #</label>
+        <input type="number" id="step-add-num" min="1">
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_step_desc_req">Description *</label>
+        <textarea id="step-add-desc" rows="4"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeAddStepModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_add" onclick="saveNewStep()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: edit step -->
+  <div class="modal-overlay" id="step-edit-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_edit_step">Edit step</h2>
+      <div id="step-edit-error" class="alert alert-error" style="display:none"></div>
+      <input type="hidden" id="step-edit-id">
+      <div class="form-group" style="max-width:120px;">
+        <label data-i18n="label_step_num">Step #</label>
+        <input type="number" id="step-edit-num" min="1">
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_step_desc_req">Description *</label>
+        <textarea id="step-edit-desc" rows="4"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeEditStepModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_save" onclick="saveEditStep()">Save</button>
       </div>
     </div>
   </div>
@@ -190,8 +261,8 @@
   <!-- Modal: upload recipe image -->
   <input type="file" id="recipe-img-input" accept="image/*" style="display:none" onchange="uploadRecipeImage(event)">
 
-  <script src="js/i18n.js"></script>
+  <script src="js/i18n.js?v=20"></script>
   <script src="js/api.js"></script>
-  <script src="js/recipe.js"></script>
+  <script src="js/recipe.js?v=16"></script>
 </body>
 </html>

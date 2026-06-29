@@ -18,3 +18,7 @@ class Ingredient(db.Model):
     preferred_store_id = db.Column(db.String(36), nullable=True)
     preferred_brand_id = db.Column(db.String(36), nullable=True)
     section = db.Column(db.String(100), nullable=True)
+
+    name_en = db.Column(db.String(100), default='')
+    name_es = db.Column(db.String(100), default='')
+    name_fr = db.Column(db.String(100), default='')

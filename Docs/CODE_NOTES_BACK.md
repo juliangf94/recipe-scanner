@@ -5348,3 +5348,851 @@ Para esta aplicación personal, omitimos la lista negra por simplicidad — impl
    → El usuario inicia sesión una vez al mes
 ```
 
+---
+
+# Sesión 13 · Sprint 5 — Marcas como entidades gestionadas
+
+## Contexto
+
+En Sprint 4 la entidad `Store` permitió al usuario asociar un precio custom a una tienda específica. En Sprint 5 se añadió `Brand` (marca) con la misma lógica: un precio puede pertenecer a una tienda, a una marca, a ambas, o a ninguna.
+
+La decisión de hacer `Brand` una entidad (tabla SQL con UUID) en lugar de un campo de texto libre en `CustomPrice` es la misma que se tomó con `Store`:
+- Evita errores tipográficos ("Hacendado" vs "hacendado" vs "Haciendado")
+- Permite renombrar la marca y que todos los precios se actualicen solos
+- Permite filtrar y ordenar con un JOIN simple
+- El usuario gestiona su propia lista de marcas por cuenta (aislamiento)
+
+---
+
+## `backend/app/models/brand.py` — nuevo archivo
+
+```python
+from app.extensions import db
+import uuid
+
+
+class Brand(db.Model):
+    __tablename__ = 'brands'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+```
+
+### Explicación línea por línea
+
+```python
+__tablename__ = 'brands'
+```
+Nombre explícito de la tabla. La convención es plural en minúscula.
+
+```python
+id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+```
+UUID generado en Python antes de ir a la DB. Idéntico al patrón de `Store`, `Recipe`, y todos los demás modelos del proyecto.
+
+```python
+user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+```
+Cada marca pertenece a un usuario. Dos usuarios pueden tener marcas con el mismo nombre sin conflicto — la clave de unicidad real es `(user_id, name)` a nivel de negocio (verificada en el facade, no en la DB).
+
+```python
+name = db.Column(db.String(100), nullable=False)
+```
+El nombre no puede ser nulo — no tiene sentido crear una marca sin nombre.
+
+### ¿Por qué `Brand` es estructuralmente idéntico a `Store`?
+
+Porque cumplen el mismo rol en el dominio: son catálogos de referencia que pertenecen al usuario y que los precios custom referencian por ID. El patrón es deliberadamente consistente para facilitar lectura y mantenimiento.
+
+---
+
+## `backend/app/models/custom_price.py` — columna `brand_id` agregada
+
+```python
+class CustomPrice(db.Model):
+    __tablename__ = 'custom_prices'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    ingredient_name = db.Column(db.String(100), nullable=False)
+    price_per_kg = db.Column(db.Float, nullable=False)
+    store_id = db.Column(db.String(36), db.ForeignKey('stores.id'), nullable=True)
+    brand_id = db.Column(db.String(36), db.ForeignKey('brands.id'), nullable=True)
+    bought_qty = db.Column(db.Float, nullable=True)
+    bought_unit = db.Column(db.String(30), nullable=True)
+    bought_price = db.Column(db.Float, nullable=True)
+```
+
+### Explicación de `brand_id`
+
+```python
+brand_id = db.Column(db.String(36), db.ForeignKey('brands.id'), nullable=True)
+```
+-   `db.ForeignKey('brands.id')` — referencia a la tabla `brands`. SQLAlchemy valida la integridad referencial al insertar.
+-   `nullable=True` — un precio puede existir sin marca. Los cuatro escenarios posibles son:
+    -   `store_id=None, brand_id=None` → precio genérico (sin tienda ni marca)
+    -   `store_id=X, brand_id=None` → precio en tienda X, cualquier marca
+    -   `store_id=None, brand_id=Y` → precio de marca Y, cualquier tienda
+    -   `store_id=X, brand_id=Y` → precio específico de la marca Y en la tienda X
+
+Esta combinatoria es la que alimenta la lógica de resolución de precio en 4 casos (ver Sesión 14).
+
+---
+
+## `backend/app/models/ingredient.py` — columna `preferred_brand_id` agregada
+
+```python
+preferred_brand_id = db.Column(db.String(36), nullable=True)
+```
+
+-   No tiene `db.ForeignKey('brands.id')` — es intencional. Si el usuario borra la marca, el campo queda como `None` y el sistema cae al siguiente nivel de la cascada de precios sin lanzar un error de integridad referencial.
+-   `nullable=True` — la mayoría de los ingredientes no tendrán marca preferida inicialmente.
+-   Funciona igual que `preferred_store_id`: el frontend envía el ID de la marca elegida via `PUT /ingredients/<id>`, y el facade lo guarda en este campo.
+
+---
+
+## `backend/app/__init__.py` — migraciones de Sprint 5
+
+Al inicio del servidor se ejecutan `ALTER TABLE` idempotentes para agregar las columnas nuevas a las tablas existentes. Para Sprint 5 se añadieron:
+
+```python
+'ALTER TABLE custom_prices ADD COLUMN brand VARCHAR(100)',
+'ALTER TABLE custom_prices ADD COLUMN brand_id VARCHAR(36)',
+'ALTER TABLE ingredients ADD COLUMN preferred_brand_id VARCHAR(36)',
+```
+
+El patrón `try/except` garantiza que si la columna ya existe (segunda ejecución del servidor), el error `OperationalError: duplicate column name` se captura silenciosamente y la ejecución continúa. Ver Sesión 10 para la explicación completa del patrón de migración idempotente.
+
+---
+
+## Facade — métodos de Brand
+
+```python
+def get_brands(self, user_id):
+    return [b for b in self._brands.get_all() if b.user_id == user_id]
+
+def get_brand_by_name(self, user_id, name):
+    for b in self._brands.get_all():
+        if b.user_id == user_id and b.name.lower() == name.lower():
+            return b
+    return None
+
+def create_brand(self, user_id, name):
+    brand = Brand(user_id=user_id, name=name.strip())
+    return self._brands.save(brand)
+
+def delete_brand(self, brand_id, user_id):
+    brand = self._brands.get_by_id(brand_id)
+    if not brand or brand.user_id != user_id:
+        return False
+    self._brands.delete(brand_id)
+    return True
+```
+
+### Explicación
+
+```python
+def get_brands(self, user_id):
+    return [b for b in self._brands.get_all() if b.user_id == user_id]
+```
+List comprehension que filtra por `user_id`. Cada usuario ve solo sus propias marcas — aislamiento de datos. El patrón es idéntico a `get_stores`.
+
+```python
+def get_brand_by_name(self, user_id, name):
+    for b in self._brands.get_all():
+        if b.user_id == user_id and b.name.lower() == name.lower():
+            return b
+    return None
+```
+Búsqueda case-insensitive por nombre. El API la usa antes de crear una marca nueva para implementar idempotencia: si el nombre ya existe para ese usuario, se retorna la existente en lugar de crear un duplicado.
+
+```python
+def delete_brand(self, brand_id, user_id):
+    brand = self._brands.get_by_id(brand_id)
+    if not brand or brand.user_id != user_id:
+        return False
+    self._brands.delete(brand_id)
+    return True
+```
+Doble validación: la marca existe Y pertenece al usuario que pide borrarla. Retorna `bool` para que el endpoint pueda decidir si responder 204 o 404 sin acceder a la DB dos veces.
+
+---
+
+## `backend/app/api/v1/brands.py` — endpoints REST
+
+```python
+from flask_restx import Namespace, Resource, fields
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.services.facade import facade
+
+api = Namespace('brands', description='Brand management')
+
+brand_model = api.model('Brand', {
+    'name': fields.String(required=True, description='Brand name')
+})
+
+
+@api.route('')
+class BrandList(Resource):
+
+    @jwt_required()
+    @api.response(200, 'List of brands')
+    def get(self):
+        user_id = get_jwt_identity()
+        brands = facade.get_brands(user_id)
+        return [{'id': b.id, 'name': b.name} for b in brands], 200
+
+    @jwt_required()
+    @api.expect(brand_model, validate=True)
+    @api.response(200, 'Brand already exists — returned existing')
+    @api.response(201, 'Brand created')
+    def post(self):
+        user_id = get_jwt_identity()
+        name = api.payload['name'].strip()
+        existing = facade.get_brand_by_name(user_id, name)
+        if existing:
+            return {'id': existing.id, 'name': existing.name}, 200
+        brand = facade.create_brand(user_id, name)
+        return {'id': brand.id, 'name': brand.name}, 201
+
+
+@api.route('/<string:brand_id>')
+class BrandDetail(Resource):
+
+    @jwt_required()
+    @api.response(204, 'Brand deleted')
+    @api.response(404, 'Brand not found')
+    def delete(self, brand_id):
+        user_id = get_jwt_identity()
+        if not facade.delete_brand(brand_id, user_id):
+            return {'error': 'Brand not found'}, 404
+        return '', 204
+```
+
+### Explicación línea por línea
+
+```python
+api = Namespace('brands', description='Brand management')
+```
+Namespace de flask_restx. Se registra en `__init__.py` como `api.add_namespace(brands_ns, path='/api/v1/brands')`. El path base de todos los endpoints de este archivo es `/api/v1/brands`.
+
+```python
+brand_model = api.model('Brand', {
+    'name': fields.String(required=True, description='Brand name')
+})
+```
+Modelo de validación del body del POST. Con `validate=True` en `@api.expect`, flask_restx rechaza automáticamente cualquier request que no tenga el campo `name` con un 400.
+
+```python
+@api.route('')
+class BrandList(Resource):
+```
+La ruta vacía `''` se combina con el path del namespace: el resultado es `/api/v1/brands`. Contrasta con `@api.route('/')` (con barra) que generaría `/api/v1/brands/` — sin barra es más común en APIs REST para colecciones.
+
+```python
+name = api.payload['name'].strip()
+existing = facade.get_brand_by_name(user_id, name)
+if existing:
+    return {'id': existing.id, 'name': existing.name}, 200
+brand = facade.create_brand(user_id, name)
+return {'id': brand.id, 'name': brand.name}, 201
+```
+**Idempotencia controlada**: si el usuario intenta crear "Hacendado" dos veces, la segunda llamada devuelve la marca existente con 200 en lugar de 201. El frontend puede llamar a POST sin verificar si la marca ya existe — el backend lo resuelve. El código 200 vs 201 comunica al cliente si se creó algo nuevo o no, sin lanzar un error.
+
+```python
+@api.route('/<string:brand_id>')
+class BrandDetail(Resource):
+
+    def delete(self, brand_id):
+        user_id = get_jwt_identity()
+        if not facade.delete_brand(brand_id, user_id):
+            return {'error': 'Brand not found'}, 404
+        return '', 204
+```
+No hay endpoint PUT (renombrar marca) — se considera fuera del alcance del MVP. Solo se implementa DELETE. El `facade.delete_brand` ya valida ownership — si el `brand_id` no pertenece al usuario, retorna `False` y el endpoint responde 404 (no 403, para no revelar si el ID existe en el sistema).
+
+---
+
+# Sesión 14 · Sprint 5 — Fuzzy matching y resolución de precio en 4 casos
+
+## Contexto
+
+Cuando el usuario tiene guardado un precio para "harina de trigo" y la receta escaneada dice "Harina", el sistema necesita entender que son el mismo ingrediente. Esto se llama **búsqueda difusa** (fuzzy matching) — la idea es encontrar coincidencias aunque los nombres no sean idénticos.
+
+Además, cuando hay varios precios registrados para un mismo ingrediente (en distintas tiendas y/o marcas), el sistema necesita decidir cuál usar. Esta decisión sigue una **cascada de prioridad en 4 casos**.
+
+---
+
+## Fuzzy matching — `_strip_plural` y `get_custom_prices_for_ingredient`
+
+### `_strip_plural`
+
+```python
+@staticmethod
+def _strip_plural(name):
+    """Strip common Spanish/English plural endings for fuzzy matching."""
+    if name.endswith('es') and len(name) > 4:
+        return name[:-2]
+    if name.endswith('s') and len(name) > 3:
+        return name[:-1]
+    return name
+```
+
+Este método convierte una palabra al singular aproximado eliminando terminaciones de plural comunes en español e inglés.
+
+```python
+@staticmethod
+```
+`@staticmethod` indica que el método no necesita acceso a `self` (la instancia del facade) ni a `cls` (la clase). Es una función pura que solo opera sobre el argumento `name`. Se pone dentro del facade por cohesión — es una utilidad privada del proceso de matching, no tiene sentido como función global.
+
+```python
+if name.endswith('es') and len(name) > 4:
+    return name[:-2]
+```
+Elimina la terminación `'es'`. Ejemplos: "tomates" → "tomat", "limones" → "limon". La condición `len(name) > 4` evita mutilar palabras cortas — por ejemplo "mes" (3 letras) no debería convertirse en "m".
+
+```python
+if name.endswith('s') and len(name) > 3:
+    return name[:-1]
+```
+Elimina la terminación `'s'`. Ejemplos: "huevos" → "huevo", "eggs" → "egg". La condición `len(name) > 3` protege palabras como "as" o "es".
+
+```python
+return name
+```
+Si la palabra no termina en `'es'` ni `'s'`, se retorna sin cambios. "harina" → "harina", "sal" → "sal".
+
+**Limitación conocida**: este método es una heurística aproximada, no un lematizador real. Puede cometer errores ("es" → elimina "es" de "meses" correctamente, pero "mes" queda igual). Para una app personal, esta precisión es suficiente.
+
+---
+
+### `get_custom_prices_for_ingredient`
+
+```python
+def get_custom_prices_for_ingredient(self, user_id, ingredient_name):
+    name_lower = ingredient_name.lower().strip()
+    all_user = [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+
+    # 1. Exact match
+    exact = [cp for cp in all_user if cp.ingredient_name == name_lower]
+    if exact:
+        return exact
+
+    # 2. Word-prefix match: "harina" matches "harina 0000" and vice-versa
+    #    Uses ' ' padding so "sal" does NOT match "salsa"
+    prefix = [cp for cp in all_user
+              if (name_lower + ' ').startswith(cp.ingredient_name + ' ')
+              or (cp.ingredient_name + ' ').startswith(name_lower + ' ')]
+    if prefix:
+        return prefix
+
+    # 3. Singular/plural: "huevo" matches "huevos"
+    norm = self._strip_plural(name_lower)
+    plural = [cp for cp in all_user if self._strip_plural(cp.ingredient_name) == norm]
+    if plural:
+        return plural
+
+    return []
+```
+
+Este método implementa una búsqueda en 3 niveles de precisión decreciente. Si el nivel más preciso encuentra algo, retorna inmediatamente sin intentar los niveles inferiores.
+
+```python
+name_lower = ingredient_name.lower().strip()
+all_user = [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+```
+Normaliza el nombre a minúsculas sin espacios iniciales/finales, y filtra solo los precios del usuario actual. Comparar en minúscula asegura que "Harina" y "harina" son iguales.
+
+**Nivel 1 — coincidencia exacta:**
+```python
+exact = [cp for cp in all_user if cp.ingredient_name == name_lower]
+if exact:
+    return exact
+```
+Si hay una coincidencia exacta de texto, se retorna directamente. Este es el caso más común y más rápido.
+
+**Nivel 2 — prefijo de palabra:**
+```python
+prefix = [cp for cp in all_user
+          if (name_lower + ' ').startswith(cp.ingredient_name + ' ')
+          or (cp.ingredient_name + ' ').startswith(name_lower + ' ')]
+if prefix:
+    return prefix
+```
+La clave del truco es el padding con espacio `' '`. Sin él:
+- "sal".startswith("salsa"[:3]) → "sal".startswith("sal") → True (incorrecto)
+
+Con el padding:
+- `("sal" + ' ').startswith("salsa" + ' ')` → `"sal ".startswith("salsa ")` → False (correcto)
+- `("harina" + ' ').startswith("harina de trigo" + ' ')` → `"harina ".startswith("harina de trigo ")` → False (correcto)
+- `("harina de trigo" + ' ').startswith("harina" + ' ')` → `"harina de trigo ".startswith("harina ")` → **True** (correcto)
+
+El `or` bidireccional permite que la búsqueda funcione en ambos sentidos: si la receta tiene "harina" y el usuario tiene guardado "harina 000", también coincide.
+
+**Nivel 3 — singular/plural:**
+```python
+norm = self._strip_plural(name_lower)
+plural = [cp for cp in all_user if self._strip_plural(cp.ingredient_name) == norm]
+if plural:
+    return plural
+```
+Compara la raíz aproximada de ambos nombres. "huevo" y "huevos" ambos reducen a "huev" (el método elimina la 's'), por lo que coinciden.
+
+```python
+return []
+```
+Si ninguno de los 3 niveles encontró algo, retorna lista vacía. El caller (`_resolve_price`) interpreta lista vacía como "no hay precios custom para este ingrediente".
+
+---
+
+## Resolución de precio en 4 casos — `_resolve_price`
+
+```python
+def _resolve_price(self, ing, user_id=None):
+    """Returns (price_per_kg, source, store_id)."""
+    # 1. Manual override
+    if ing.manual_price is not None:
+        return ing.manual_price, 'manual', None
+
+    name_lower = ing.name.lower().strip()
+
+    # 2. Custom DB — 4-case priority: store+brand > store only > brand only > cheapest
+    if user_id:
+        customs = self.get_custom_prices_for_ingredient(user_id, name_lower)
+        if customs:
+            has_store = bool(ing.preferred_store_id)
+            has_brand = bool(getattr(ing, 'preferred_brand_id', None))
+
+            if has_store and has_brand:
+                match = [c for c in customs
+                         if c.store_id == ing.preferred_store_id
+                         and c.brand_id == ing.preferred_brand_id]
+                if match:
+                    best = min(match, key=lambda c: c.price_per_kg)
+                    return best.price_per_kg, 'custom', best.store_id
+
+            if has_store:
+                at_store = [c for c in customs if c.store_id == ing.preferred_store_id]
+                if at_store:
+                    best = min(at_store, key=lambda c: c.price_per_kg)
+                    return best.price_per_kg, 'custom', best.store_id
+
+            if has_brand:
+                at_brand = [c for c in customs if c.brand_id == ing.preferred_brand_id]
+                if at_brand:
+                    best = min(at_brand, key=lambda c: c.price_per_kg)
+                    return best.price_per_kg, 'custom', best.store_id
+
+            best = min(customs, key=lambda c: c.price_per_kg)
+            return best.price_per_kg, 'custom', best.store_id
+
+    # 3. Cached OFF price
+    if ing.price_source == 'off' and ing.estimated_cost and ing.estimated_cost > 0:
+        return ing.estimated_cost, 'off', None
+
+    # 4. Local fallback dict
+    for key, price in FALLBACK_PRICES.items():
+        if key in name_lower:
+            return price, 'fallback', None
+
+    return 5.00, 'fallback', None
+```
+
+### Cascada general de precios
+
+El método implementa una cascada de cuatro fuentes en orden de preferencia:
+
+```
+1. manual_price         → override puntual del usuario (mayor prioridad)
+2. Custom DB            → precios guardados por el usuario, con sub-prioridad de 4 casos
+3. OFF cache            → precio traído de Open Food Facts y guardado en el ingrediente
+4. FALLBACK_PRICES dict → tabla de precios aproximados para ingredientes comunes
+   (si nada coincide → 5.00 €/kg como último recurso)
+```
+
+### Explicación del nivel 2 — los 4 casos
+
+```python
+has_store = bool(ing.preferred_store_id)
+has_brand = bool(getattr(ing, 'preferred_brand_id', None))
+```
+`bool(None)` → `False`, `bool("uuid-string")` → `True`. Se usa `getattr` con valor por defecto `None` por defensividad — en teoría el campo siempre existe en el modelo, pero `getattr` evita un `AttributeError` si por alguna razón el objeto es más viejo que el campo.
+
+**Caso 1 — tienda + marca (más específico):**
+```python
+if has_store and has_brand:
+    match = [c for c in customs
+             if c.store_id == ing.preferred_store_id
+             and c.brand_id == ing.preferred_brand_id]
+```
+Busca precios que coincidan exactamente con la tienda Y la marca preferida del ingrediente. Si hay varios (el usuario registró el mismo ingrediente dos veces con la misma tienda+marca), se toma el más barato con `min(match, key=lambda c: c.price_per_kg)`.
+
+**Caso 2 — solo tienda:**
+```python
+if has_store:
+    at_store = [c for c in customs if c.store_id == ing.preferred_store_id]
+```
+Si el caso 1 no encontró nada (no hay precio registrado con esa combinación tienda+marca exacta), se busca cualquier precio en esa tienda sin importar la marca.
+
+**Caso 3 — solo marca:**
+```python
+if has_brand:
+    at_brand = [c for c in customs if c.brand_id == ing.preferred_brand_id]
+```
+Si tampoco hay precio para esa tienda, se busca por la marca preferida en cualquier tienda.
+
+**Caso 4 — más barato global:**
+```python
+best = min(customs, key=lambda c: c.price_per_kg)
+return best.price_per_kg, 'custom', best.store_id
+```
+Último recurso dentro de los custom prices: el precio más barato disponible para ese ingrediente, sin restricción de tienda ni marca.
+
+### El valor de retorno `(price_per_kg, source, store_id)`
+
+El método devuelve una tupla de 3 elementos:
+- `price_per_kg` — precio en €/kg usado para calcular el costo estimado
+- `source` — origen del precio: `'manual'`, `'custom'`, `'off'`, `'fallback'`
+- `store_id` — ID de la tienda asociada al precio (o `None`)
+
+El caller `get_recipe_cost` usa `source` para formatear la respuesta del API (el frontend muestra distintos íconos según el origen) y `store_id` para mostrar en qué tienda está activo el precio.
+
+---
+
+# Sesión 15 · Sprint 5 — Fix de seguridad + Suite de tests
+
+## Fix de seguridad: ownership check en `GET /recipes/<id>`
+
+### El problema
+
+Antes de este fix, el endpoint `GET /recipes/<recipe_id>` devolvía la receta a cualquier usuario autenticado que conociera el UUID. El decorador `@jwt_required()` solo verificaba que el token era válido — no que la receta pertenecía al usuario del token.
+
+Esto significa que si un usuario malintencionado adivinaba o interceptaba el UUID de la receta de otro usuario, podía ver toda la información de esa receta. Violación del principio de aislamiento de datos por usuario.
+
+El test que detectó el bug:
+```python
+def test_get_other_user_recipe_returns_403(self, client):
+    token1 = register_and_login(client, 'owner@test.com')
+    token2 = register_and_login(client, 'other@test.com')
+    create_res = post_json(client, '/api/v1/recipes/', {'title': 'Private'}, token=token1)
+    recipe_id = json.loads(create_res.data)['id']
+    res = get_json(client, f'/api/v1/recipes/{recipe_id}', token=token2)
+    assert res.status_code == 403
+```
+Este test falló con status 200 al correrlo por primera vez, lo que confirmó la vulnerabilidad.
+
+### El fix — `backend/app/api/v1/recipes.py`
+
+```python
+@jwt_required()
+@api.response(200, 'Recipe found')
+@api.response(403, 'Forbidden')
+@api.response(404, 'Recipe not found')
+def get(self, recipe_id):
+    user_id = get_jwt_identity()
+    recipe = facade.get_recipe(recipe_id)
+    if not recipe:
+        return {'error': 'Recipe not found'}, 404
+    if recipe.user_id != user_id:
+        return {'error': 'Forbidden'}, 403
+    return {'id': recipe.id, 'title': recipe.title,
+            'description': recipe.description, 'servings': recipe.servings,
+            'prep_time_min': recipe.prep_time_min, 'category': recipe.category,
+            'user_id': recipe.user_id, 'image_url': recipe.image_url}, 200
+```
+
+```python
+user_id = get_jwt_identity()
+```
+Extrae el ID del usuario autenticado del token JWT. Este valor fue codificado en el token durante el login — es confiable porque el token fue firmado con la clave secreta del servidor.
+
+```python
+if recipe.user_id != user_id:
+    return {'error': 'Forbidden'}, 403
+```
+Compara el propietario de la receta con el usuario del token. Si no coinciden, se retorna 403 Forbidden. Nótese que se comprueba primero si la receta existe (404) y luego si pertenece al usuario (403) — este orden evita revelar si un ID existe en el sistema a alguien que no debería saber.
+
+Los endpoints `PUT` y `DELETE` de recetas ya tenían este check. El `GET` era el único que faltaba — se encontró mediante tests automatizados.
+
+---
+
+## `tests/conftest.py` — configuración de fixtures
+
+```python
+import sys
+import os
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+
+from app import create_app
+from app.extensions import db as _db
+
+
+@pytest.fixture(scope='session')
+def app():
+    application = create_app('testing')
+    with application.app_context():
+        _db.create_all()
+        yield application
+        _db.drop_all()
+
+
+@pytest.fixture
+def client(app):
+    return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def clean_db(app):
+    """Wipe all rows after each test so tests are isolated."""
+    yield
+    with app.app_context():
+        for table in reversed(_db.metadata.sorted_tables):
+            _db.session.execute(table.delete())
+        _db.session.commit()
+```
+
+### Explicación línea por línea
+
+```python
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+```
+Agrega el directorio `backend/` al `sys.path` de Python. Esto permite que los tests importen `from app import create_app` aunque el archivo `conftest.py` esté en `tests/` (un nivel arriba de `backend/`). `__file__` es la ruta del propio `conftest.py`; `os.path.dirname(__file__)` es el directorio `tests/`; `'..', 'backend'` sube un nivel y entra a `backend/`.
+
+```python
+from app import create_app
+from app.extensions import db as _db
+```
+Importa la factory `create_app` y la instancia de SQLAlchemy. El alias `_db` es una convención para distinguir la instancia de la variable local que usarían los tests (evita shadowing).
+
+```python
+@pytest.fixture(scope='session')
+def app():
+```
+`scope='session'` significa que este fixture se crea **una sola vez** para toda la sesión de tests. Crear y destruir la app Flask con su contexto tiene costo — no tiene sentido hacerlo para cada test. Los datos se limpian entre tests por el fixture `clean_db`, no re-creando la app.
+
+```python
+application = create_app('testing')
+```
+Crea la app con la configuración `'testing'` que activa `TESTING=True` y usa SQLite en memoria (`sqlite:///:memory:`). La DB en memoria es descartada al terminar el proceso — los tests no dejan archivos residuales.
+
+```python
+with application.app_context():
+    _db.create_all()
+    yield application
+    _db.drop_all()
+```
+El bloque `with application.app_context()` empuja el contexto de la app Flask para toda la sesión de tests. Dentro de él:
+- `_db.create_all()` crea todas las tablas en SQLite (en memoria) antes de que empiecen los tests
+- `yield application` — el fixture entrega la app a los tests; la ejecución se suspende aquí
+- `_db.drop_all()` borra todas las tablas al terminar la sesión (limpieza final)
+
+```python
+@pytest.fixture
+def client(app):
+    return app.test_client()
+```
+`scope` por defecto es `'function'` — se crea un cliente nuevo para cada test. El cliente de prueba de Flask permite hacer requests HTTP directamente en memoria sin levantar un servidor real.
+
+```python
+@pytest.fixture(autouse=True)
+def clean_db(app):
+    """Wipe all rows after each test so tests are isolated."""
+    yield
+    with app.app_context():
+        for table in reversed(_db.metadata.sorted_tables):
+            _db.session.execute(table.delete())
+        _db.session.commit()
+```
+`autouse=True` hace que este fixture se aplique automáticamente a **todos** los tests sin necesidad de declararlo como parámetro. Su cuerpo tiene una estructura `yield` que divide la ejecución:
+1. **Antes del `yield`** — no hace nada (el test se ejecuta con la DB limpia)
+2. **El test corre**
+3. **Después del `yield`** — borra todas las filas de todas las tablas
+
+`reversed(_db.metadata.sorted_tables)` recorre las tablas en **orden inverso de dependencias** — primero las tablas con FK (hijos) y luego las tablas referenciadas (padres). Esto evita errores de integridad referencial al borrar. Por ejemplo: `ingredients` antes que `recipes`, `recipes` antes que `users`.
+
+`table.delete()` genera `DELETE FROM <tabla>` sin `WHERE` — borra todas las filas pero mantiene la estructura de la tabla (a diferencia de `DROP TABLE`).
+
+---
+
+## `tests/test_models.py` — tests de modelos SQLAlchemy
+
+El archivo fue reescrito completamente para usar modelos SQLAlchemy reales en lugar de las dataclasses originales de Sprint 1.
+
+### Helpers
+
+```python
+def make_user(email='ana@test.com', **kwargs):
+    defaults = dict(first_name='Ana', last_name='García',
+                    email=email, password_hash='hashed')
+    defaults.update(kwargs)
+    u = User(**defaults)
+    db.session.add(u)
+    db.session.commit()
+    return u
+
+
+def make_recipe(user_id, title='Tarta de manzana', **kwargs):
+    r = Recipe(title=title, user_id=user_id, **kwargs)
+    db.session.add(r)
+    db.session.commit()
+    return r
+```
+
+Funciones de utilidad que crean y persisten objetos en la DB de tests. Reciben `**kwargs` para sobreescribir cualquier campo — por ejemplo `make_user(email='otro@test.com')` o `make_recipe(user_id=uid, description='Clásica')`. Sin estos helpers, cada test repetiría 4-5 líneas de setup boilerplate.
+
+### Patrón de cada test
+
+```python
+def test_fields_persisted(self, app):
+    with app.app_context():
+        u = make_user()
+        found = db.session.get(User, u.id)
+        assert found.first_name == 'Ana'
+        assert found.email == 'ana@test.com'
+```
+
+`with app.app_context()` empuja el contexto de Flask necesario para que SQLAlchemy pueda acceder a la DB. `db.session.get(User, u.id)` es la forma moderna de SQLAlchemy 2.x para buscar por clave primaria (equivalente al deprecated `User.query.get(u.id)`).
+
+### Clases de tests
+
+| Clase | Qué verifica |
+|---|---|
+| `TestUser` | Persistencia de campos, UUID generado, avatar_url nullable |
+| `TestRecipe` | Campos, valores por defecto (servings=0, category=''), UUID |
+| `TestIngredient` | Campos obligatorios, preferred_store_id y preferred_brand_id nullable |
+| `TestStep` | Campos, duration_min con valor por defecto 0 |
+| `TestStore` | Creación con user_id, UUID como id |
+| `TestBrand` | Creación con user_id, UUID como id |
+| `TestCustomPrice` | Creación con store_id, brand_id nullable |
+
+---
+
+## `tests/test_repository.py` — tests de la capa de persistencia
+
+Este archivo tiene dos grupos: `TestInMemoryStorage` (no necesita DB) y `TestDbStorage` (usa SQLAlchemy con el fixture `app`).
+
+### `_Obj` — objeto mínimo para InMemoryStorage
+
+```python
+class _Obj:
+    """Minimal object with an id field — used only in InMemoryStorage tests."""
+    def __init__(self, obj_id, value):
+        self.id = obj_id
+        self.value = value
+```
+
+`InMemoryStorage` es genérico — funciona con cualquier objeto que tenga un atributo `.id`. No necesita ser un modelo SQLAlchemy. Se usa `_Obj` (nombre con `_` para indicar que es privado al módulo) como objeto mínimo para probar el almacenamiento sin dependencias de DB.
+
+### `TestInMemoryStorage` — 10 tests
+
+Cubre todas las operaciones del contrato `BaseRepository`:
+- `save` retorna el objeto guardado
+- `get_by_id` encuentra el objeto por id
+- `get_by_id` retorna `None` para ids desconocidos
+- `get_all` retorna lista vacía al inicio
+- `get_all` retorna todos los objetos guardados
+- `update` sobrescribe el objeto
+- `delete` elimina el objeto
+- `delete` de id inexistente no lanza excepción
+- `get_by_attribute` encuentra por valor de atributo
+- `get_by_attribute` retorna `None` si no encuentra
+
+### `TestDbStorage` — 7 tests
+
+```python
+def test_save_and_get_by_id(self, app):
+    with app.app_context():
+        storage = DbStorage(User)
+        u = self._make_user()
+        storage.save(u)
+        found = storage.get_by_id(u.id)
+        assert found.email == 'db@test.com'
+```
+
+`DbStorage(User)` crea una instancia del repositorio SQLAlchemy especializada en el modelo `User`. Cada test abre su propio `app.app_context()` para asegurarse de tener acceso a la sesión de SQLAlchemy. Los datos se limpian automáticamente por el fixture `autouse=True` `clean_db`.
+
+---
+
+## `tests/test_api.py` — tests de integración del API REST
+
+26 tests que verifican los endpoints HTTP end-to-end usando el cliente de prueba de Flask. No mockean la DB — usan SQLite en memoria, lo que hace los tests más realistas.
+
+### Helpers HTTP
+
+```python
+def post_json(client, url, data, token=None):
+    headers = {'Content-Type': 'application/json'}
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+    return client.post(url, data=json.dumps(data), headers=headers,
+                       follow_redirects=True)
+```
+
+`follow_redirects=True` es necesario porque el namespace de recipes está registrado en `/api/v1/recipes/` (con barra final). Una request `POST /api/v1/recipes` (sin barra) recibe un redirect 308 al URL con barra — sin `follow_redirects=True`, el cliente retornaría el 308 y el test fallaría al intentar parsear el JSON del redirect.
+
+```python
+def register_and_login(client, email='test@test.com', password='Password1!'):
+    post_json(client, '/api/v1/auth/register', {
+        'first_name': 'Test', 'last_name': 'User',
+        'email': email, 'password': password
+    })
+    res = post_json(client, '/api/v1/auth/login', {'email': email, 'password': password})
+    return json.loads(res.data)['access_token']
+```
+
+Helper de autenticación reutilizado en casi todos los tests. Registra un usuario y hace login, retornando solo el `access_token`. La clave del JSON es `access_token` (no `token`) — la colección de Postman original tenía este campo incorrecto y fue uno de los bugs detectados durante la corrección de Newman.
+
+### Clases de tests
+
+```
+TestAuth (7 tests)
+├── test_register_success              → 201, tiene user_id, no tiene password
+├── test_register_duplicate_email_returns_400
+├── test_login_success_returns_token   → 200, tiene access_token
+├── test_login_wrong_password_returns_401
+├── test_login_unknown_email_returns_401
+├── test_get_me_requires_auth          → 401 sin token
+└── test_get_me_returns_user_info      → 200, email correcto
+
+TestRecipes (7 tests)
+├── test_get_recipes_requires_auth     → 401 sin token
+├── test_create_recipe                 → 201, title y id en respuesta
+├── test_get_recipes_returns_only_own  → receta de user1 no visible por user2
+├── test_get_recipe_by_id              → 200, title correcto
+├── test_get_other_user_recipe_returns_403  ← detectó el bug de seguridad
+├── test_update_recipe                 → 200, título actualizado
+└── test_delete_recipe                 → 204, luego 404
+
+TestIngredients (4 tests)
+├── test_add_ingredient                → 201, name en respuesta
+├── test_list_ingredients              → 200, nombre en lista
+├── test_update_preferred_store        → 200, campo actualizado
+└── test_delete_ingredient             → 204
+
+TestStoresAndBrands (5 tests)
+├── test_create_store                  → 201, name correcto
+├── test_create_store_idempotent       → mismo id en ambas respuestas
+├── test_list_stores_only_own          → tienda de user1 no visible por user2
+├── test_create_brand                  → 201, name correcto
+└── test_create_brand_idempotent       → mismo id en ambas respuestas
+
+TestCustomPrices (3 tests)
+├── test_create_custom_price           → 201, ingredient_name y price_per_kg
+├── test_list_custom_prices_only_own   → precio de cp1 no visible por cp2
+└── test_delete_custom_price           → 204
+```
+
+### Resultado de la suite
+
+```
+pytest tests/ -v
+```
+```
+60 passed in X.XXs
+```
+
+60 tests — 0 fallos. La suite cubre modelos, repositorios e integración de API. El test `test_get_other_user_recipe_returns_403` fue el que detectó el bug de seguridad real documentado al inicio de esta sesión.
+

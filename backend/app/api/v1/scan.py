@@ -29,14 +29,16 @@ class ScanPdf(Resource):
 
         file_bytes = file.read()
 
-        result = facade.scan_pdf(
+        result, error_code = facade.scan_pdf(
             user_id=user_id,
             file_bytes=file_bytes,
             filename=file.filename
         )
 
         if result is None:
-            return {'error': 'Could not extract recipe from PDF'}, 500
+            if error_code == 'no_text':
+                return {'error_code': 'scan_no_text'}, 422
+            return {'error_code': 'scan_ai_failed'}, 500
 
         recipe, ingredients, steps = result
 
@@ -44,19 +46,29 @@ class ScanPdf(Resource):
             'recipe': {
                 'id': recipe.id,
                 'title': recipe.title,
+                'title_en': recipe.title_en,
+                'title_es': recipe.title_es,
+                'title_fr': recipe.title_fr,
                 'description': recipe.description,
+                'description_en': recipe.description_en,
+                'description_es': recipe.description_es,
+                'description_fr': recipe.description_fr,
                 'servings': recipe.servings,
                 'prep_time_min': recipe.prep_time_min,
                 'category': recipe.category
             },
             'ingredients': [
                 {'id': i.id, 'name': i.name,
+                 'name_en': i.name_en, 'name_es': i.name_es, 'name_fr': i.name_fr,
                  'quantity': i.quantity, 'unit': i.unit}
                 for i in ingredients
             ],
             'steps': [
                 {'id': s.id, 'order_num': s.order_num,
-                 'description': s.description}
+                 'description': s.description,
+                 'description_en': s.description_en,
+                 'description_es': s.description_es,
+                 'description_fr': s.description_fr}
                 for s in steps
             ]
         }, 201

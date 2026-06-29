@@ -10,3 +10,7 @@ class Step(db.Model):
     description = db.Column(db.Text, nullable=False)
     recipe_id = db.Column(db.String(36), db.ForeignKey('recipes.id'), nullable=False)
     duration_min = db.Column(db.Integer, default=0)
+
+    description_en = db.Column(db.Text, default='')
+    description_es = db.Column(db.Text, default='')
+    description_fr = db.Column(db.Text, default='')

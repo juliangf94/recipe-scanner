@@ -11,6 +11,7 @@ let currentCostData = null;
 let currentPriceIngId = null;
 let allStores = [];
 let allBrands = [];
+let allPrices = [];
 let priceModalMode = 'qty';
 
 // Unit sets for €/kg calculation (mirrors backend)
@@ -69,12 +70,13 @@ async function uploadRecipeImage(event) {
 
 // ── Load page ─────────────────────────────────────────────────────────────────
 async function loadPage() {
-  const [recipeRes, ingRes, stepsRes, storesRes, brandsRes] = await Promise.all([
+  const [recipeRes, ingRes, stepsRes, storesRes, brandsRes, pricesRes] = await Promise.all([
     apiFetch(`/recipes/${recipeId}`),
     apiFetch(`/recipes/${recipeId}/ingredients`),
     apiFetch(`/recipes/${recipeId}/steps`),
     apiFetch('/stores'),
-    apiFetch('/brands')
+    apiFetch('/brands'),
+    apiFetch('/prices')
   ]);
 
   if (!recipeRes || !recipeRes.ok) {
@@ -87,8 +89,9 @@ async function loadPage() {
   currentSteps = stepsRes && stepsRes.ok ? stepsRes.data : [];
   allStores = storesRes && storesRes.ok ? storesRes.data : [];
   allBrands = brandsRes && brandsRes.ok ? brandsRes.data : [];
+  allPrices = pricesRes && pricesRes.ok ? pricesRes.data : [];
 
-  document.title = `RecipeScanner — ${currentRecipe.title}`;
+  document.title = `RecipeScanner — ${localizedField(currentRecipe, 'title')}`;
   renderPage(currentRecipe, currentIngredients, currentSteps);
   loadCost();
 }
@@ -107,9 +110,23 @@ function buildStoreOptions(selectedId) {
   return autoOpt + storeOpts;
 }
 
-function buildBrandOptions(selectedId) {
+function buildBrandOptions(selectedId, ingName) {
   const autoOpt = `<option value="">${t('no_brand')}</option>`;
-  const brandOpts = allBrands.map(b =>
+  let brands = allBrands;
+
+  if (ingName && allPrices.length > 0) {
+    const needle = ingName.toLowerCase().trim();
+    const relatedIds = new Set(
+      allPrices
+        .filter(p => p.ingredient_name.toLowerCase().trim() === needle && p.brand_id)
+        .map(p => p.brand_id)
+    );
+    if (relatedIds.size > 0) {
+      brands = allBrands.filter(b => relatedIds.has(b.id));
+    }
+  }
+
+  const brandOpts = brands.map(b =>
     `<option value="${b.id}"${b.id === selectedId ? ' selected' : ''}>${b.name}</option>`
   ).join('');
   return autoOpt + brandOpts;
@@ -129,7 +146,7 @@ function buildRecipeHeaderHtml(recipe) {
 
   const photoHtml = recipe.image_url
     ? `<div class="recipe-header-photo" onclick="document.getElementById('recipe-img-input').click()">
-        <img src="http://localhost:5000${recipe.image_url}" alt="${recipe.title}">
+        <img src="http://localhost:5000${recipe.image_url}" alt="${localizedField(recipe, 'title')}">
         <div class="recipe-header-photo-overlay">${t('change_photo')}</div>
       </div>`
     : `<div class="recipe-header-photo recipe-header-photo-empty" onclick="document.getElementById('recipe-img-input').click()">
@@ -139,10 +156,11 @@ function buildRecipeHeaderHtml(recipe) {
 
   return `<div class="recipe-header-grid">
       <div>
-        <h1>${recipe.title}</h1>
+        <a href="dashboard.html" class="back-link">← ${t('nav_recipes')}</a>
+        <h1>${localizedField(recipe, 'title')}</h1>
         ${badges ? `<div class="badge-row">${badges}</div>` : ''}
         ${meta.length ? `<div class="detail-meta">${meta.map(m => `<span>${m}</span>`).join('')}</div>` : ''}
-        ${recipe.description ? `<p class="text-muted text-sm" style="margin-top:0.5rem;">${recipe.description}</p>` : ''}
+        ${recipe.description ? `<p class="text-muted text-sm" style="margin-top:0.5rem;">${localizedField(recipe, 'description')}</p>` : ''}
         <div class="detail-actions" style="margin-top:1.2rem;">
           <button class="btn btn-edit btn-sm" onclick="openEditModal()">${t('btn_edit')}</button>
           <button class="btn btn-danger btn-sm" onclick="deleteRecipe()">${t('btn_delete')}</button>
@@ -184,6 +202,7 @@ function renderPage(recipe, ingredients, steps) {
       <div class="section-card">
         <div class="section-card-header">
           <h3>${t('section_steps')}</h3>
+          <button class="btn btn-outline btn-sm" onclick="openAddStepModal()">${t('btn_add_step')}</button>
         </div>
         <div id="steps-section">
           ${renderSteps(steps)}
@@ -191,7 +210,7 @@ function renderPage(recipe, ingredients, steps) {
       </div>
     </div>`;
 
-  ['edit-modal', 'ing-modal', 'price-modal'].forEach(id => {
+  ['edit-modal', 'ing-modal', 'price-modal', 'step-add-modal', 'step-edit-modal'].forEach(id => {
     document.getElementById(id).addEventListener('click', e => {
       if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
     });
@@ -230,7 +249,7 @@ function renderIngredientsTable(ingredients) {
       ${allBrands.length > 0 ? `<th>${t('th_brand')}</th>` : ''}
       <th>${t('th_price_per_kg')}</th>
       <th>${t('th_total')}</th>
-      <th></th>
+      <th class="col-del"></th>
     </tr></thead>`;
 
   const blocks = sections.map(sec => {
@@ -257,10 +276,19 @@ function renderIngredientsTable(ingredients) {
     </tr>`;
 
   return `
-    <table class="ing-table ing-table-wide">
-      ${thead}
-      <tbody>${blocks}${addSectionRow}</tbody>
-    </table>`;
+    <div class="ing-table-wrap">
+      <table class="ing-table ing-table-wide">
+        ${thead}
+        <tbody>${blocks}${addSectionRow}</tbody>
+      </table>
+    </div>`;
+}
+
+function ingDisplayName(ing) {
+  const lang = getLang();
+  const entry = ING_MAP[(ing.name || '').toLowerCase().trim()];
+  if (entry && entry[lang]) return entry[lang];
+  return localizedField(ing, 'name');
 }
 
 function renderIngRow(i, sections) {
@@ -277,7 +305,7 @@ function renderIngRow(i, sections) {
   const brandSelectCell = allBrands.length > 0
     ? `<td class="col-brand"><select class="store-select-inline" data-ing-id="${i.id}" data-sel="brand"
            onchange="changeIngredientBrand('${i.id}', this.value)">
-         ${buildBrandOptions(i.preferred_brand_id || null)}
+         ${buildBrandOptions(i.preferred_brand_id || null, i.name)}
        </select></td>`
     : '';
 
@@ -299,15 +327,18 @@ function renderIngRow(i, sections) {
           </div>
         </div>
       </td>
-      <td class="ing-name">${i.name}</td>
-      <td class="col-qty">${i.quantity} ${i.unit}</td>
+      <td class="ing-name">${ingDisplayName(i)}</td>
+      <td class="col-qty">${i.quantity} ${tUnit(i.unit)}</td>
       <td class="col-store">${storeSelect}</td>
       ${brandSelectCell}
       <td class="col-price-kg price-clickable" data-ing-id="${i.id}" data-col="pkg"
           onclick="openPriceModal('${i.id}', '${safeName}')">—</td>
       <td class="col-total" data-ing-id="${i.id}" data-col="total">—</td>
-      <td>
-        <button class="btn btn-danger btn-sm" onclick="deleteIngredient('${i.id}')" style="padding:2px 8px;">✕</button>
+      <td class="col-del">
+        <div class="col-del-inner">
+          <button class="edit-btn" onclick="openEditIngModal('${i.id}')">✎</button>
+          <button class="del-btn" onclick="deleteIngredient('${i.id}')">✕</button>
+        </div>
       </td>
     </tr>`;
 }
@@ -388,15 +419,142 @@ function renderSteps(steps) {
   }
 
   const items = steps.map((s, i) => `
-    <li class="step-item">
+    <li class="step-item" draggable="true"
+        ondragstart="stepDragStart(event,'${s.id}')"
+        ondragover="stepDragOver(event)"
+        ondragleave="stepDragLeave(event)"
+        ondrop="stepDrop(event,'${s.id}')"
+        ondragend="stepDragEnd(event)">
+      <div class="step-drag-handle" title="${t('section_move')}">⠿</div>
       <div class="step-num">${i + 1}</div>
       <div class="step-content">
-        <p class="step-desc">${s.description || s}</p>
+        <p class="step-desc">${localizedField(s, 'description') || s}</p>
         ${s.duration_min ? `<span class="step-duration">⏱ ${s.duration_min} min</span>` : ''}
+      </div>
+      <div class="step-actions">
+        <button class="edit-btn" onclick="openEditStepModal('${s.id}')">✎</button>
+        <button class="del-btn" onclick="deleteStep('${s.id}')">✕</button>
       </div>
     </li>`).join('');
 
   return `<ul class="steps-list">${items}</ul>`;
+}
+
+// ── Step drag-and-drop ─────────────────────────────────────────────────────────
+let _dragSrcStepId = null;
+
+function stepDragStart(e, stepId) {
+  _dragSrcStepId = stepId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+
+function stepDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function stepDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function stepDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.step-item').forEach(el => el.classList.remove('drag-over'));
+}
+
+async function stepDrop(e, targetStepId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!_dragSrcStepId || _dragSrcStepId === targetStepId) return;
+
+  const srcIdx = currentSteps.findIndex(s => s.id === _dragSrcStepId);
+  const tgtIdx = currentSteps.findIndex(s => s.id === targetStepId);
+  if (srcIdx === -1 || tgtIdx === -1) return;
+
+  const [moved] = currentSteps.splice(srcIdx, 1);
+  currentSteps.splice(tgtIdx, 0, moved);
+  currentSteps.forEach((s, i) => { s.order_num = i + 1; });
+
+  document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+
+  await Promise.all(currentSteps.map(s =>
+    apiFetch(`/recipes/${recipeId}/steps/${s.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ order_num: s.order_num })
+    })
+  ));
+  _dragSrcStepId = null;
+}
+
+// ── Step CRUD ──────────────────────────────────────────────────────────────────
+
+function openAddStepModal() {
+  document.getElementById('step-add-num').value = currentSteps.length + 1;
+  document.getElementById('step-add-desc').value = '';
+  document.getElementById('step-add-error').style.display = 'none';
+  document.getElementById('step-add-modal').classList.add('open');
+  setTimeout(() => document.getElementById('step-add-desc').focus(), 50);
+}
+function closeAddStepModal() {
+  document.getElementById('step-add-modal').classList.remove('open');
+}
+async function saveNewStep() {
+  const desc = document.getElementById('step-add-desc').value.trim();
+  const numVal = parseInt(document.getElementById('step-add-num').value, 10);
+  const err = document.getElementById('step-add-error');
+  if (!desc) { err.textContent = t('err_step_empty'); err.style.display = ''; return; }
+  err.style.display = 'none';
+  const orderNum = isNaN(numVal) || numVal < 1 ? currentSteps.length + 1 : numVal;
+  const res = await apiFetch(`/recipes/${recipeId}/steps`, {
+    method: 'POST', body: JSON.stringify({ description: desc, order_num: orderNum })
+  });
+  if (!res || !res.ok) { err.textContent = t('err_save'); err.style.display = ''; return; }
+  currentSteps = [...currentSteps, res.data];
+  currentSteps.sort((a, b) => a.order_num - b.order_num);
+  closeAddStepModal();
+  document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+}
+
+function openEditStepModal(stepId) {
+  const step = currentSteps.find(s => s.id === stepId);
+  if (!step) return;
+  document.getElementById('step-edit-id').value = stepId;
+  document.getElementById('step-edit-num').value = step.order_num;
+  document.getElementById('step-edit-desc').value = step.description;
+  document.getElementById('step-edit-error').style.display = 'none';
+  document.getElementById('step-edit-modal').classList.add('open');
+  setTimeout(() => document.getElementById('step-edit-desc').focus(), 50);
+}
+function closeEditStepModal() {
+  document.getElementById('step-edit-modal').classList.remove('open');
+}
+async function saveEditStep() {
+  const stepId = document.getElementById('step-edit-id').value;
+  const desc = document.getElementById('step-edit-desc').value.trim();
+  const numVal = parseInt(document.getElementById('step-edit-num').value, 10);
+  const err = document.getElementById('step-edit-error');
+  if (!desc) { err.textContent = t('err_step_empty'); err.style.display = ''; return; }
+  err.style.display = 'none';
+  const body = { description: desc };
+  if (!isNaN(numVal) && numVal >= 1) body.order_num = numVal;
+  const res = await apiFetch(`/recipes/${recipeId}/steps/${stepId}`, {
+    method: 'PUT', body: JSON.stringify(body)
+  });
+  if (!res || !res.ok) { err.textContent = t('err_save'); err.style.display = ''; return; }
+  currentSteps = currentSteps.map(s => s.id === stepId ? res.data : s);
+  currentSteps.sort((a, b) => a.order_num - b.order_num);
+  closeEditStepModal();
+  document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+}
+
+async function deleteStep(stepId) {
+  if (!confirm(t('confirm_del_step'))) return;
+  const res = await apiFetch(`/recipes/${recipeId}/steps/${stepId}`, { method: 'DELETE' });
+  if (!res || !res.ok) return;
+  currentSteps = currentSteps.filter(s => s.id !== stepId);
+  document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
 }
 
 // ── Cost ──────────────────────────────────────────────────────────────────────
@@ -594,11 +752,28 @@ async function fetchOffPrice() {
 
 // ── Edit recipe ───────────────────────────────────────────────────────────────
 function openEditModal() {
-  document.getElementById('e-title').value = currentRecipe.title;
-  document.getElementById('e-desc').value = currentRecipe.description || '';
+  const lang = getLang();
+  const localTitle = localizedField(currentRecipe, 'title');
+  const localDesc  = localizedField(currentRecipe, 'description');
+
+  document.getElementById('e-title').value    = localTitle;
+  document.getElementById('e-desc').value     = localDesc;
   document.getElementById('e-servings').value = currentRecipe.servings || 0;
-  document.getElementById('e-prep').value = currentRecipe.prep_time_min || 0;
+  document.getElementById('e-prep').value     = currentRecipe.prep_time_min || 0;
   document.getElementById('e-category').value = currentRecipe.category || '';
+
+  // Show which language is being edited
+  document.getElementById('e-lang-badge').textContent = lang.toUpperCase();
+
+  // Show original title if a different language is active
+  const origEl = document.getElementById('e-title-original');
+  if (localTitle !== currentRecipe.title) {
+    origEl.textContent = `Original: ${currentRecipe.title}`;
+    origEl.style.display = '';
+  } else {
+    origEl.style.display = 'none';
+  }
+
   document.getElementById('edit-modal').classList.add('open');
 }
 
@@ -617,11 +792,13 @@ async function saveRecipe() {
     return;
   }
 
+  const lang = getLang();
+  const description = document.getElementById('e-desc').value.trim();
   const res = await apiFetch(`/recipes/${recipeId}`, {
     method: 'PUT',
     body: JSON.stringify({
-      title,
-      description: document.getElementById('e-desc').value.trim(),
+      [`title_${lang}`]: title,
+      [`description_${lang}`]: description,
       servings: parseInt(document.getElementById('e-servings').value) || 0,
       prep_time_min: parseInt(document.getElementById('e-prep').value) || 0,
       category: titleCase(document.getElementById('e-category').value.trim())
@@ -698,6 +875,58 @@ async function addIngredient() {
   }
 }
 
+function openEditIngModal(ingId) {
+  const ing = currentIngredients.find(i => i.id === ingId);
+  if (!ing) return;
+  document.getElementById('ing-edit-id').value = ing.id;
+  document.getElementById('ing-edit-name').value = ing.name;
+  document.getElementById('ing-edit-qty').value = ing.quantity;
+  document.getElementById('ing-edit-unit').value = ing.unit;
+  document.getElementById('ing-edit-error').style.display = 'none';
+  document.getElementById('ing-edit-modal').classList.add('open');
+  document.getElementById('ing-edit-name').focus();
+}
+
+function closeEditIngModal() {
+  document.getElementById('ing-edit-modal').classList.remove('open');
+  document.getElementById('ing-edit-error').style.display = 'none';
+}
+
+async function saveEditIng() {
+  const ingId = document.getElementById('ing-edit-id').value;
+  const name  = document.getElementById('ing-edit-name').value.trim();
+  const quantity = document.getElementById('ing-edit-qty').value.trim();
+  const unit  = document.getElementById('ing-edit-unit').value.trim();
+  document.getElementById('ing-edit-error').style.display = 'none';
+
+  if (!name || !quantity || !unit) {
+    const el = document.getElementById('ing-edit-error');
+    el.textContent = t('err_fill_fields');
+    el.style.display = '';
+    return;
+  }
+
+  const res = await apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name, quantity, unit })
+  });
+
+  if (!res || !res.ok) {
+    const el = document.getElementById('ing-edit-error');
+    el.textContent = res?.data?.error || t('err_save');
+    el.style.display = '';
+    return;
+  }
+
+  closeEditIngModal();
+  const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
+  if (ingRes && ingRes.ok) {
+    currentIngredients = ingRes.data;
+    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(ingRes.data);
+    loadCost();
+  }
+}
+
 async function deleteIngredient(ingId) {
   if (!confirm(t('confirm_del_ing'))) return;
   await apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, { method: 'DELETE' });
@@ -729,3 +958,8 @@ document.addEventListener('langchange', () => {
 });
 
 loadPage();
+
+document.getElementById('ing-edit-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeEditIngModal();
+});
+

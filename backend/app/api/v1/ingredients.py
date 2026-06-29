@@ -31,8 +31,12 @@ class IngredientList(Resource):
         if not facade.get_recipe(recipe_id):
             return {'error': 'Recipe not found'}, 404
         ingredients = facade.get_ingredients_by_recipe(recipe_id)
-        return [{'id': i.id, 'name': i.name, 'quantity': i.quantity,
-                 'unit': i.unit, 'recipe_id': i.recipe_id,
+        for ing in ingredients:
+            if not ing.name_en or not ing.name_es or not ing.name_fr:
+                facade._translate_ingredient(ing)
+        return [{'id': i.id, 'name': i.name,
+                 'name_en': i.name_en or '', 'name_es': i.name_es or '', 'name_fr': i.name_fr or '',
+                 'quantity': i.quantity, 'unit': i.unit, 'recipe_id': i.recipe_id,
                  'preferred_store_id': i.preferred_store_id,
                  'preferred_brand_id': i.preferred_brand_id,
                  'section': i.section or ''} for i in ingredients], 200
@@ -96,6 +100,7 @@ class IngredientDetail(Resource):
             return {'error': 'Forbidden'}, 403
         updated = facade.update_ingredient(ingredient_id, **api.payload)
         return {'id': updated.id, 'name': updated.name,
+                'name_en': updated.name_en or '', 'name_es': updated.name_es or '', 'name_fr': updated.name_fr or '',
                 'quantity': updated.quantity, 'unit': updated.unit,
                 'preferred_store_id': updated.preferred_store_id,
                 'preferred_brand_id': updated.preferred_brand_id,

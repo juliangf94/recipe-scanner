@@ -3,7 +3,7 @@ requireAuth();
 const user = getUser();
 let allRecipes = [];
 let activeCategory = 'all';
-
+let activeSort = 'az';
 // ── Sidebar user info ─────────────────────────────────────────────────────────
 if (user) {
   const initials = `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase();
@@ -37,9 +37,10 @@ async function uploadAvatar(event) {
 
 // ── Category banner colors ────────────────────────────────────────────────────
 function bannerClass(category) {
-  if (!category) return 'banner-0';
-  const hash = [...category.toLowerCase()].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0);
-  return `banner-${Math.abs(hash) % 6}`;
+  if (!category) return 'banner-default';
+  const canonical = (CANONICAL_CAT[category.toLowerCase().trim()] || category).toLowerCase();
+  const slug = canonical.replace(/\s+/g, '-');
+  return `banner-${slug}`;
 }
 
 const CAT_EMOJIS = {
@@ -64,8 +65,10 @@ function recipeCard(r) {
   if (r.servings) meta.push(`🍽 ${r.servings}`);
 
   const catLabel = tCat(r.category);
+  const localTitle = localizedField(r, 'title');
+  const localDesc  = localizedField(r, 'description');
   const bannerContent = r.image_url
-    ? `<img src="http://localhost:5000${r.image_url}" alt="${r.title}" style="width:100%;height:100%;object-fit:cover;">
+    ? `<img src="http://localhost:5000${r.image_url}" alt="${localTitle}" style="width:100%;height:100%;object-fit:cover;">
        ${r.category ? `<span class="cat-badge" style="position:absolute;top:0.5rem;left:0.5rem;">${catLabel}</span>` : ''}`
     : `${r.category ? `<span class="cat-badge">${catLabel}</span>` : ''}
        <span style="font-size:3rem;">${emoji}</span>`;
@@ -76,11 +79,10 @@ function recipeCard(r) {
         ${bannerContent}
       </div>
       <div class="card-body">
-        <div class="card-title">${r.title}</div>
-        ${r.description ? `<p class="text-sm text-muted mt-1">${r.description.slice(0, 60)}${r.description.length > 60 ? '…' : ''}</p>` : ''}
+        <div class="card-title">${localTitle}</div>
+        ${localDesc ? `<p class="text-sm text-muted mt-1">${localDesc.slice(0, 60)}${localDesc.length > 60 ? '…' : ''}</p>` : ''}
         <div class="card-meta">${meta.map(m => `<span>${m}</span>`).join('')}</div>
         <div class="card-footer">
-          <span></span>
           <span class="view-btn">${t('card_view')}</span>
         </div>
       </div>
@@ -92,15 +94,16 @@ function recipeCard(r) {
 // This lets "Postres" and "Desserts" collapse into a single pill in any language.
 
 function buildCategories(recipes) {
-  // Deduplicate by translated label (case-insensitive)
-  // labelMap: translatedLabel → Set of raw category values that map to it
+  // labelMap: translatedLabel → { rawSet, count }
   const labelMap = new Map();
   recipes.forEach(r => {
     if (!r.category) return;
     const raw = r.category.trim();
     const label = tCat(raw).toLowerCase();
-    if (!labelMap.has(label)) labelMap.set(label, new Set());
-    labelMap.get(label).add(raw.toLowerCase());
+    if (!labelMap.has(label)) labelMap.set(label, { rawSet: new Set(), count: 0 });
+    const entry = labelMap.get(label);
+    entry.rawSet.add(raw.toLowerCase());
+    entry.count++;
   });
 
   const bar = document.getElementById('filter-bar');
@@ -109,17 +112,19 @@ function buildCategories(recipes) {
   const allBtn = document.createElement('button');
   allBtn.className = `filter-pill${activeCategory === 'all' ? ' active' : ''}`;
   allBtn.dataset.cat = 'all';
-  allBtn.textContent = t('filter_all');
+  allBtn.innerHTML = `${t('filter_all')} <span class="pill-count">${recipes.length}</span>`;
   allBtn.onclick = () => setCategory('all', allBtn);
   bar.appendChild(allBtn);
 
-  labelMap.forEach((rawSet, label) => {
+  labelMap.forEach(({ rawSet, count }, label) => {
     const btn = document.createElement('button');
     btn.className = `filter-pill${activeCategory === label ? ' active' : ''}`;
     btn.dataset.cat = label;
-    // Display with proper casing from tCat (capitalize first letter)
-    const display = tCat([...rawSet][0]) || label;
-    btn.textContent = display.charAt(0).toUpperCase() + display.slice(1);
+    const rawCat = [...rawSet][0];
+    const dotClass = bannerClass(rawCat);
+    const display = tCat(rawCat) || label;
+    const name = display.charAt(0).toUpperCase() + display.slice(1);
+    btn.innerHTML = `<span class="cat-dot ${dotClass}"></span>${name} <span class="pill-count">${count}</span>`;
     btn.onclick = () => setCategory(label, btn);
     bar.appendChild(btn);
   });
@@ -136,21 +141,43 @@ function filterRecipes() {
   renderRecipes();
 }
 
+function setSort(value) {
+  activeSort = value;
+  renderRecipes();
+}
+
+function sortedRecipes(list) {
+  return [...list].sort((a, b) => {
+    const titleA = localizedField(a, 'title').toLowerCase();
+    const titleB = localizedField(b, 'title').toLowerCase();
+    switch (activeSort) {
+      case 'az': return titleA.localeCompare(titleB);
+      case 'za': return titleB.localeCompare(titleA);
+      case 'prep_asc':  return (a.prep_time_min || 0) - (b.prep_time_min || 0);
+      case 'prep_desc': return (b.prep_time_min || 0) - (a.prep_time_min || 0);
+      case 'srv_asc':   return (a.servings || 0) - (b.servings || 0);
+      case 'srv_desc':  return (b.servings || 0) - (a.servings || 0);
+      default: return 0;
+    }
+  });
+}
+
 function renderRecipes() {
   const search = (document.getElementById('search-input').value || '').toLowerCase();
   const filtered = allRecipes.filter(r => {
-    // Compare by translated label so "Postres" matches the "Desserts" pill in EN
     const translatedCat = tCat(r.category || '').toLowerCase();
     const matchCat = activeCategory === 'all' || translatedCat === activeCategory;
     const matchSearch = !search ||
-      r.title.toLowerCase().includes(search) ||
-      (r.description || '').toLowerCase().includes(search) ||
+      localizedField(r, 'title').toLowerCase().includes(search) ||
+      localizedField(r, 'description').toLowerCase().includes(search) ||
       tCat(r.category || '').toLowerCase().includes(search);
     return matchCat && matchSearch;
   });
 
+  const sorted = sortedRecipes(filtered);
+
   const container = document.getElementById('recipes-container');
-  if (filtered.length === 0) {
+  if (sorted.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">🔍</div>
@@ -159,7 +186,7 @@ function renderRecipes() {
     return;
   }
 
-  container.innerHTML = `<div class="recipe-grid">${filtered.map(recipeCard).join('')}</div>`;
+  container.innerHTML = `<div class="recipe-grid">${sorted.map(recipeCard).join('')}</div>`;
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────

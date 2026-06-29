@@ -8,10 +8,6 @@
 </head>
 <body>
 
-  <div class="lang-toggle lang-fixed">
-    <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
-    <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
-  </div>
 
   <!-- Sidebar -->
   <aside class="sidebar">
@@ -22,11 +18,11 @@
       </a>
     </div>
     <nav class="sidebar-nav">
-      <a href="dashboard.html" class="nav-item active">
+      <a href="home.html" class="nav-item">
         <span class="nav-icon">🏠</span>
         <span data-i18n="nav_home">Home</span>
       </a>
-      <a href="dashboard.html" class="nav-item">
+      <a href="dashboard.html" class="nav-item active">
         <span class="nav-icon">📖</span>
         <span data-i18n="nav_recipes">My Recipes</span>
         <span class="nav-badge" id="recipe-badge">0</span>
@@ -40,6 +36,13 @@
         <span data-i18n="nav_prices">My Prices</span>
       </a>
     </nav>
+    <div class="sidebar-lang">
+      <div class="lang-toggle">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+        <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+      </div>
+    </div>
     <div class="sidebar-user">
       <div class="avatar" id="user-avatar" onclick="document.getElementById('avatar-input').click()" title="Upload photo">
         <span id="avatar-initials">?</span>
@@ -72,14 +75,30 @@
       <input type="text" id="search-input" data-i18n-placeholder="search_ph" placeholder="Search recipes…" oninput="filterRecipes()">
     </div>
 
-    <div class="filter-bar" id="filter-bar">
-      <button class="filter-pill active" data-cat="all" onclick="setCategory('all', this)" data-i18n="filter_all">All</button>
+    <div class="filter-sort-row">
+      <span class="filter-label" data-i18n="label_filters">Filtros</span>
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-pill active" data-cat="all" onclick="setCategory('all', this)" data-i18n="filter_all">All</button>
+      </div>
+      <label for="sort-select" class="sr-only" data-i18n="label_sort">Ordenar</label>
+      <select id="sort-select" class="sort-select" onchange="setSort(this.value)">
+        <option value="az"    data-i18n="sort_az">A → Z</option>
+        <option value="za"    data-i18n="sort_za">Z → A</option>
+        <option value="prep_asc"  data-i18n="sort_prep_asc">⏱ Min ↑</option>
+        <option value="prep_desc" data-i18n="sort_prep_desc">⏱ Min ↓</option>
+        <option value="srv_asc"   data-i18n="sort_srv_asc">🍽 Porc. ↑</option>
+        <option value="srv_desc"  data-i18n="sort_srv_desc">🍽 Porc. ↓</option>
+      </select>
     </div>
 
     <div id="recipes-container">
       <div class="loading-center"><div class="spinner"></div></div>
     </div>
-  </main>
+  
+    <footer class="app-footer">
+      <p data-i18n="footer_disclaimer">RecipeScanner no está afiliado ni patrocinado por ninguna de las marcas o supermercados mencionados en esta aplicación.</p>
+    </footer>
+</main>
 
   <!-- Modal: create recipe manually -->
   <div class="modal-overlay" id="create-modal">
@@ -107,15 +126,7 @@
       <div class="form-group">
         <label data-i18n="label_category">Category</label>
         <input type="text" id="c-category" list="category-list" data-i18n-placeholder="ph_category" placeholder="Pasta, Desserts, Meat…" autocomplete="off">
-        <datalist id="category-list">
-          <option value="Desserts"><option value="Main Course"><option value="Pasta">
-          <option value="Meat"><option value="Chicken"><option value="Fish">
-          <option value="Seafood"><option value="Soup"><option value="Salad">
-          <option value="Breakfast"><option value="Rice"><option value="Bread">
-          <option value="Bakery"><option value="Cake"><option value="Vegan">
-          <option value="Vegetarian"><option value="Appetizer"><option value="Drink">
-          <option value="Sandwich"><option value="Snack">
-        </datalist>
+        <datalist id="category-list"></datalist>
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeCreateModal()">Cancel</button>
@@ -124,8 +135,8 @@
     </div>
   </div>
 
-  <script src="js/i18n.js"></script>
+  <script src="js/i18n.js?v=20"></script>
   <script src="js/api.js"></script>
-  <script src="js/dashboard.js"></script>
+  <script src="js/dashboard.js?v=13"></script>
 </body>
 </html>
