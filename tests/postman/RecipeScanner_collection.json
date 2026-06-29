@@ -1920,6 +1920,290 @@
       ]
     },
     {
+      "name": "5 — Steps",
+      "description": "CRUD de pasos de receta. Requiere JWT y recipe_id guardado en sección 2.",
+      "item": [
+        {
+          "name": "POST step — success (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"description\":\"Mezclar harina, azúcar y mantequilla hasta obtener una masa homogénea.\"}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — step created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Response has id and description — saved to {{step_id}}', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('description');",
+                  "    pm.expect(json.recipe_id).to.equal(pm.environment.get('recipe_id'));",
+                  "    pm.environment.set('step_id', json.id);",
+                  "});",
+                  "pm.test('order_num is 1 for first step', function () {",
+                  "    pm.expect(pm.response.json().order_num).to.equal(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST step — second step auto-increments order_num (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"description\":\"Hornear a 180°C durante 30 minutos.\"}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 — second step created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('order_num auto-incremented to 2', function () {",
+                  "    pm.expect(pm.response.json().order_num).to.equal(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET steps — list (200)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array with 2 steps', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.be.an('array');",
+                  "    pm.expect(json.length).to.equal(2);",
+                  "});",
+                  "pm.test('Steps are sorted by order_num', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json[0].order_num).to.be.at.most(json[1].order_num);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT step — update description (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"description\":\"Descripción actualizada del paso.\"}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps/{{step_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps","{{step_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — step updated', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Description was updated', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.description).to.equal('Descripción actualizada del paso.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT step — non-existent (404)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"description\":\"Ghost\"}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps/00000000-0000-0000-0000-000000000000",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps","00000000-0000-0000-0000-000000000000"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — step not found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST step — missing description (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing description', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST step — non-existent recipe (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"description\":\"Paso fantasma\"}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/00000000-0000-0000-0000-000000000000/steps",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","00000000-0000-0000-0000-000000000000","steps"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — recipe not found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE step (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps/{{step_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps","{{step_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 — step deleted', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET steps after delete — only 1 remains (200)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('One step remains after delete', function () {",
+                  "    pm.expect(pm.response.json().length).to.equal(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "7 — Cross-User Security",
       "description": "Verifica que un usuario no pueda modificar datos de otro.",
       "item": [
@@ -2392,6 +2676,37 @@
                 "exec": [
                   "pm.test('Status 403 — user2 cannot get cost of user1 recipe', function () {",
                   "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User2 adds step to user1 recipe — Forbidden (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token2}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"description\":\"Intruso\"}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recipes/{{recipe_id}}/steps",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","recipes","{{recipe_id}}","steps"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 — user2 cannot add steps to user1 recipe', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('Error says Forbidden', function () {",
+                  "    pm.expect(pm.response.json().error).to.equal('Forbidden');",
                   "});"
                 ]
               }
