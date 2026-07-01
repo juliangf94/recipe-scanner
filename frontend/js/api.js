@@ -1,4 +1,7 @@
-const BASE_URL = 'http://localhost:5000/api/v1';
+const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_URL = IS_LOCAL
+  ? 'http://localhost:5000/api/v1'
+  : 'https://RENDER_BACKEND_URL/api/v1';
 
 // ── Token storage ─────────────────────────────────────────────────────────────
 function getAccessToken()  { return localStorage.getItem('access_token'); }

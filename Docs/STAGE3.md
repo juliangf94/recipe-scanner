@@ -1,7 +1,7 @@
 # RecipeScanner — Stage 3: Technical Documentation
 
 Proyecto portfolio — Holberton School RNCP 5 DWWM  
-Fecha de entrega: finales de junio 2025
+Fecha de entrega: finales de junio 2026
 
 ---
 
@@ -119,8 +119,8 @@ Fecha de entrega: finales de junio 2025
 flowchart TD
     Browser["🌐 Client (Browser)"]
 
-    subgraph Frontend["Frontend — Flask / Jinja2"]
-        FE["Templates + Static (CSS/JS)"]
+    subgraph Frontend["Frontend — HTML/JS estático"]
+        FE["HTML + CSS + JS (sin servidor de plantillas)"]
     end
 
     subgraph Backend["Backend — Flask API"]
@@ -138,7 +138,7 @@ flowchart TD
     end
 
     subgraph External["External Services"]
-        Groq["Groq API\nLLaMA 3.3-70b"]
+        Groq["Groq API\nQwen 3.6-27b"]
         OFF["Open Food Facts API"]
     end
 
@@ -188,7 +188,7 @@ flowchart TD
 | DbStorage | `persistence/db_storage.py` | Implementación SQLAlchemy (Sesión 8) |
 | Security | `utils/security.py` | Hash y verificación de contraseñas (bcrypt) |
 
-### Domain Models (Dataclasses)
+### Domain Models (SQLAlchemy db.Model)
 
 ```python
 User
@@ -196,40 +196,72 @@ User
 ├── first_name: str
 ├── last_name: str
 ├── email: str            # identificador único de login
-└── password_hash: str
+├── password_hash: str
+└── avatar_url: str
 
 Recipe
 ├── id: str               # UUID
-├── user_id: str          # FK → User (UUID)
+├── user_id: str          # FK → User
 ├── title: str
+├── title_en / title_es / title_fr: str  # traducciones IA
 ├── description: str
 ├── servings: int
 ├── prep_time_min: int
-└── category: str
+├── category: str
+└── image_url: str
 
 Ingredient
 ├── id: str               # UUID
-├── recipe_id: str        # FK → Recipe (UUID)
+├── recipe_id: str        # FK → Recipe
 ├── name: str
-├── quantity: str         # str porque Groq puede retornar "al gusto", "una pizca"
+├── name_en / name_es / name_fr: str  # traducciones IA
+├── quantity: str         # str: Groq puede retornar "al gusto"
 ├── unit: str
-├── off_product_id: str   # ID en Open Food Facts
+├── off_product_id: str
 ├── estimated_cost: float
-└── cost_is_manual: bool
+├── cost_is_manual: bool
+├── manual_price: float   # precio manual del usuario (sobrescribe OFF)
+├── price_source: str     # 'custom' | 'off' | 'fallback' | 'manual'
+├── section: str          # agrupación (carnes, lácteos, etc.)
+├── preferred_store_id: str  # FK → Store
+└── preferred_brand_id: str  # FK → Brand
 
 Step
 ├── id: str               # UUID
-├── recipe_id: str        # FK → Recipe (UUID)
+├── recipe_id: str        # FK → Recipe
 ├── order_num: int        # 'order' es keyword reservado en SQL
 ├── description: str
+├── description_en / description_es / description_fr: str
 └── duration_min: int
 
 PdfScan
 ├── id: str               # UUID
-├── recipe_id: str        # FK → Recipe (UUID)
+├── recipe_id: str        # FK → Recipe
 ├── filename: str
 ├── status: str           # 'pending' | 'done' | 'error'
 └── scanned_at: str
+
+CustomPrice
+├── id: str               # UUID
+├── user_id: str          # FK → User
+├── ingredient_name: str  # normalizado sin acentos (_norm)
+├── store_id: str         # FK → Store (opcional)
+├── brand_id: str         # FK → Brand (opcional)
+├── bought_qty: float
+├── bought_unit: str
+├── bought_price: float
+└── notes: str
+
+Store / Brand
+├── id: str               # UUID
+├── user_id: str          # FK → User
+└── name: str
+
+CookLog
+├── id: str               # UUID
+├── recipe_id: str        # FK → Recipe
+├── user_id: str          # FK → User
+└── cooked_at: str
 ```
 
 ### Class Diagram
@@ -419,21 +451,22 @@ sequenceDiagram
 
 ### External APIs
 
-#### Groq API (LLaMA 3.3-70b)
+#### Groq API (Qwen 3.6-27b)
 
 - **URL base:** `https://api.groq.com/openai/v1/chat/completions`
 - **Auth:** `Authorization: Bearer <GROQ_API_KEY>`
-- **Por qué:** inferencia ultrarrápida con hardware LPU especializado. LLaMA 3.3-70b
-  es open-source de Meta — sin dependencia de proveedor propietario. Costo mínimo
-  frente a GPT-4 para el mismo caso de uso.
+- **Por qué:** inferencia ultrarrápida con hardware LPU especializado. Groq ofrece
+  acceso gratuito (free tier). Qwen 3.6-27b es open-source de Alibaba — sin
+  dependencia de proveedor propietario. Migrado de LLaMA 3.3-70b en junio 2026
+  cuando Groq deprecó ese modelo (email de deprecación recibido 2026-06-28).
 - **Uso en el proyecto:** se le envía el texto extraído del PDF y se le pide que
   devuelva un JSON estructurado con título, ingredientes (nombre, cantidad, unidad)
-  y pasos ordenados.
+  y pasos ordenados. También devuelve traducciones EN/ES/FR de los campos de texto.
 
 **Ejemplo de request:**
 ```json
 {
-  "model": "llama-3.3-70b-versatile",
+  "model": "qwen/qwen3.6-27b",
   "messages": [
     {
       "role": "user",
@@ -507,7 +540,11 @@ Formato: JSON
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | POST | `/auth/register` | Registrar nuevo usuario | No |
-| POST | `/auth/login` | Login, retorna JWT | No |
+| POST | `/auth/login` | Login, retorna JWT + refresh token | No |
+| POST | `/auth/refresh` | Renovar access token con refresh token | Yes (refresh) |
+| GET | `/auth/me` | Ver perfil del usuario autenticado | Yes |
+| PUT | `/auth/me` | Actualizar nombre, email o contraseña | Yes |
+| DELETE | `/auth/me` | Eliminar cuenta y todos sus datos | Yes |
 
 **POST /auth/register**
 ```
@@ -626,22 +663,33 @@ Output 422:
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| GET | `/recipes/<id>/ingredients` | Listar ingredientes con precios OFF | Yes |
+| GET | `/recipes/<id>/ingredients` | Listar ingredientes de la receta | Yes |
+| POST | `/recipes/<id>/ingredients` | Añadir ingrediente a la receta | Yes |
+| PUT | `/recipes/<id>/ingredients/<ing_id>` | Editar ingrediente | Yes |
+| DELETE | `/recipes/<id>/ingredients/<ing_id>` | Eliminar ingrediente | Yes |
 
-**GET /recipes/<id>/ingredients**
-```
-Output 200:
-[
-  {
-    "id": 1,
-    "name": "harina",
-    "quantity": 300.0,
-    "unit": "g",
-    "off_product_id": "3017620422003",
-    "estimated_price": 0.45
-  }
-]
-```
+#### Costs & Custom Prices
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| GET | `/recipes/<id>/cost` | Calcular costo total de la receta | Yes |
+| GET | `/prices` | Listar precios personalizados del usuario | Yes |
+| POST | `/prices` | Crear precio personalizado | Yes |
+| PUT | `/prices/<price_id>` | Editar precio personalizado | Yes |
+| DELETE | `/prices/<price_id>` | Eliminar precio personalizado | Yes |
+| PUT | `/recipes/<id>/ingredients/<ing_id>/price` | Sobrescribir precio manualmente | Yes |
+| DELETE | `/recipes/<id>/ingredients/<ing_id>/price` | Eliminar override de precio manual | Yes |
+
+#### Stores & Brands
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| GET | `/stores` | Listar tiendas del usuario | Yes |
+| POST | `/stores` | Crear tienda | Yes |
+| DELETE | `/stores/<store_id>` | Eliminar tienda | Yes |
+| GET | `/brands` | Listar marcas del usuario | Yes |
+| POST | `/brands` | Crear marca | Yes |
+| DELETE | `/brands/<brand_id>` | Eliminar marca | Yes |
 
 ---
 
@@ -690,7 +738,13 @@ __pycache__/
 instance/
 *.pyc
 .DS_Store
+backend/app/static/uploads/avatars/*
+backend/app/static/uploads/recipes/*
+!backend/app/static/uploads/avatars/.gitkeep
+!backend/app/static/uploads/recipes/.gitkeep
 ```
+
+Los directorios de uploads existen en el repo gracias a archivos `.gitkeep` pero los archivos subidos por los usuarios (JPEGs de avatars e imágenes de recetas) están excluidos. Esto previene que imágenes privadas de usuarios aparezcan en GitHub.
 
 ---
 
@@ -743,6 +797,6 @@ instance/
 | In-memory first | SQLAlchemy desde el inicio | Validar lógica sin complejidad de BD, desarrollo más rápido |
 | JWT | Sessions, OAuth | Stateless, escalable, estándar REST |
 | bcrypt | MD5, SHA-256 | Lento por diseño, incluye salt, resistente a fuerza bruta |
-| Groq + LLaMA 3.3-70b | OpenAI GPT-4 | Más rápido (LPU), open-source, menor costo |
+| Groq + Qwen 3.6-27b | OpenAI GPT-4 | Más rápido (LPU), open-source, tier gratuito, sin costo |
 | Open Food Facts | APIs de supermercados | Abierta, gratuita, sin acuerdo comercial, 3M+ productos |
-| Jinja2 | React, Vue | Un solo servidor, tiempo de desarrollo menor, sin API desacoplada |
+| Frontend HTML/JS estático | React, Vue, Jinja2 | Desacoplado del backend, mismo consumidor que app móvil futura |

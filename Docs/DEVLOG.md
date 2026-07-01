@@ -13,14 +13,14 @@ Fecha de entrega: finales de junio 2026
 | ORM | SQLAlchemy 2.x | Abstracción de SQL, soporta SQLite y PostgreSQL sin cambiar código |
 | Autenticación | flask_jwt_extended + bcrypt | JWT = stateless (sin sesiones en servidor); bcrypt = hash lento por diseño |
 | PDF parsing | PyMuPDF | Binding C de MuPDF, muy rápido para extraer texto |
-| IA | Groq API (LLaMA 3.3-70b) | Inferencia ultrarrápida, modelo open-source potente |
+| IA | Groq API (Qwen 3.6-27b) | Inferencia ultrarrápida, modelo open-source potente |
 | API externa | Open Food Facts | Base de datos de alimentos abierta y gratuita |
 | BDD desarrollo | SQLite | Sin servidor, archivo local, ideal para desarrollo |
 | BDD producción | PostgreSQL | Robusto, concurrente, estándar en producción |
 | API docs | flask_restx (Swagger UI) | Documentación automática en `/api/docs`, preparado para app móvil |
 | Frontend | HTML + JS estático | Desacoplado del backend, consume la misma API REST que consumiría una app móvil |
-| Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 60 tests, 0 failures |
-| Tests end-to-end | Newman + Postman | 186 assertions contra el servidor en vivo — 101 requests, 0 failures |
+| Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 100 tests, 0 failures |
+| Tests end-to-end | Newman + Postman | 331 assertions contra el servidor en vivo — 109 requests, 0 failures |
 | Variables de entorno | python-dotenv | Carga `.env` en desarrollo; en producción las claves van directo al servidor |
 
 ### Justificación detallada de cada tecnología
@@ -57,13 +57,14 @@ rápido que alternativas puras en Python como PyPDF2 o pdfplumber. Para un proye
 que procesa PDFs subidos por usuarios, la velocidad de extracción de texto es crítica.
 Además maneja correctamente PDFs complejos con múltiples formatos de encoding.
 
-**Groq API con LLaMA 3.3-70b — IA**
+**Groq API con Qwen 3.6-27b — IA**
 Elegimos Groq sobre OpenAI por dos razones principales. Primero, Groq ofrece
 inferencia ultrarrápida gracias a su hardware especializado LPU — los tiempos de
-respuesta son notablemente menores que OpenAI para el mismo modelo. Segundo, LLaMA
-3.3-70b es un modelo open-source de Meta, lo que significa que no hay dependencia
-de un proveedor propietario. Para nuestro caso de uso — extraer ingredientes,
-cantidades y pasos de un texto de receta — un modelo de 70 mil millones de parámetros
+respuesta son notablemente menores que OpenAI para el mismo modelo. Segundo,
+el proyecto comenzó con LLaMA 3.3-70b (Meta, open-source) y migró a Qwen 3.6-27b
+(Alibaba, open-source) en julio 2026 cuando Groq deprecó LLaMA 3.3. Ambos modelos
+son open-source — sin dependencia de un proveedor propietario. Para nuestro caso
+de uso — extraer ingredientes, cantidades y pasos de un texto de receta — Qwen 3.6-27b
 es más que suficiente y el costo es mínimo comparado con GPT-4.
 
 **Open Food Facts — API externa**
@@ -88,60 +89,76 @@ SQLAlchemy, el cambio entre ambos es transparente para el código.
 
 ```
 recipe_Scanner/
-├── DEVLOG.md
-├── CODE_NOTES_BACK.md          # Explicaciones de código línea a línea — backend (Sesiones 1–10)
-├── CODE_NOTES_FRONT.md         # Explicaciones de código línea a línea — frontend (Sesión 11+)
-├── WORKFLOW.md                 # Flujo de trabajo y plan de sesiones
-├── STAGE3.md                   # Documentación técnica para Holberton
-├── class_Diagram.png
+├── Docs/
+│   ├── DEVLOG.md
+│   ├── CODE_NOTES_BACK.md      # Explicaciones de código línea a línea — backend
+│   ├── CODE_NOTES_FRONT.md     # Explicaciones de código línea a línea — frontend
+│   ├── WORKFLOW.md             # Flujo de trabajo y plan de sesiones
+│   ├── SPRINT_PLAN.md          # Plan de sprints MoSCoW
+│   └── STAGE3.md               # Documentación técnica para Holberton
 ├── backend/
 │   ├── run.py                      # Punto de entrada — llama a create_app()
-│   ├── config.py                   # Configuración por entornos (Dev/Prod)
+│   ├── config.py                   # Configuración por entornos (Dev/Prod/Test)
 │   ├── requirements.txt
 │   ├── .env                        # Variables de entorno (nunca va a GitHub)
-│   ├── .gitignore
-│   ├── scripts/                    # Scripts auxiliares (migraciones, seeds, etc.)
-│   └── app/                        # Paquete principal de la aplicación
+│   ├── scripts/                    # Scripts auxiliares (migraciones, seeds)
+│   └── app/
 │       ├── __init__.py             # Application factory (create_app)
-│       ├── api/
-│       │   └── v1/                 # API REST (JSON) — Swagger en /api/docs
-│       │       ├── auth.py
-│       │       ├── recipes.py
-│       │       ├── ingredients.py
-│       │       ├── scan.py
-│       │       └── costs.py
-│       ├── views/                  # Blueprints HTML (Jinja2) — Sesión 11
-│       │   ├── auth.py
-│       │   └── recipes.py
-│       ├── templates/              # Plantillas Jinja2
-│       │   ├── base.html
-│       │   ├── auth/
-│       │   │   ├── login.html
-│       │   │   └── register.html
-│       │   ├── recipes/
-│       │   │   ├── list.html
-│       │   │   ├── detail.html
-│       │   │   └── form.html
-│       │   └── scan/
-│       │       └── upload.html
-│       ├── static/
-│       │   └── css/
-│       │       └── style.css
-│       ├── models/
-│       │   ├── user.py             # db.Model — SQLAlchemy
-│       │   ├── recipe.py
-│       │   ├── ingredient.py
-│       │   ├── step.py
-│       │   ├── pdf_scan.py
-│       │   └── custom_price.py
 │       ├── extensions.py           # db = SQLAlchemy() — evita imports circulares
+│       ├── api/
+│       │   └── v1/
+│       │       ├── auth.py         # Register, Login, Refresh, GET/PUT/DELETE /me
+│       │       ├── recipes.py      # CRUD recetas + cook log
+│       │       ├── ingredients.py  # CRUD ingredientes por receta
+│       │       ├── scan.py         # Upload PDF → Groq → receta
+│       │       ├── costs.py        # /cost, /prices CRUD, manual price, OFF price
+│       │       ├── stores.py       # CRUD tiendas del usuario
+│       │       └── brands.py       # CRUD marcas del usuario
+│       ├── models/
+│       │   ├── user.py
+│       │   ├── recipe.py           # +title_en/es/fr, image_url, category
+│       │   ├── ingredient.py       # +name_en/es/fr, preferred_store_id, preferred_brand_id, manual_price, section
+│       │   ├── step.py             # +description_en/es/fr
+│       │   ├── pdf_scan.py
+│       │   ├── custom_price.py     # +store_id, brand_id, bought_qty/unit/price
+│       │   ├── store.py
+│       │   ├── brand.py
+│       │   └── cook_log.py         # Registro de cocinadas por receta
 │       ├── services/
-│       │   └── facade.py
+│       │   └── facade.py           # Lógica de negocio completa
 │       ├── utils/
-│       │   └── security.py         # hash_password + check_password (bcrypt)
-│       └── persistence/
-│           ├── repository.py       # BaseRepository (ABC) + InMemoryStorage
-│           └── db_storage.py       # DbStorage — SQLAlchemy session
+│       │   └── security.py
+│       ├── persistence/
+│       │   ├── repository.py
+│       │   └── db_storage.py
+│       └── static/
+│           └── uploads/
+│               ├── avatars/        # Fotos de perfil (excluidas del repo)
+│               └── recipes/        # Imágenes de recetas (excluidas del repo)
+├── frontend/
+│   ├── index.html              # Login
+│   ├── register.html
+│   ├── home.html               # Resumen de costos y recetas top
+│   ├── dashboard.html          # Lista de recetas con filtros y búsqueda
+│   ├── recipe.html             # Detalle: ingredientes, costos, pasos
+│   ├── scan.html               # Upload PDF con IA
+│   ├── prices.html             # Mis precios (CRUD custom prices)
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+│       ├── i18n.js             # Traducciones EN/ES/FR
+│       ├── api.js              # JWT + fetch wrapper con auto-refresh
+│       ├── auth.js
+│       ├── home.js
+│       ├── dashboard.js
+│       ├── recipe.js
+│       ├── scan.js
+│       └── prices.js
+└── tests/
+    ├── conftest.py
+    ├── test_api.py             # 66 tests pytest
+    └── postman/
+        └── RecipeScanner_collection.json  # 109 requests, 331 assertions
 ```
 
 ---
@@ -149,29 +166,51 @@ recipe_Scanner/
 ## Modelo de datos
 
 ```
-User (UUID)       Recipe (UUID)       Ingredient (UUID)     Step (UUID)     PdfScan (UUID)
-──────────────    ───────────────     ─────────────────     ───────────     ──────────────
-id: str PK        id: str PK          id: str PK            id: str PK      id: str PK
-first_name: str   user_id: str FK     recipe_id: str FK     recipe_id FK    recipe_id FK
-last_name: str    title: str          name: str             order_num: int  filename: str
-email: str        description: str    quantity: str         description:str status: str
-password_hash:str servings: int       unit: str             duration_min:int scanned_at:str
-                  prep_time_min: int  off_product_id: str
-                  category: str       estimated_cost: float
-                                      cost_is_manual: bool
+User (UUID)         Recipe (UUID)          Ingredient (UUID)          Step (UUID)
+──────────────      ───────────────        ─────────────────          ───────────
+id: str PK          id: str PK             id: str PK                 id: str PK
+first_name: str     user_id: str FK        recipe_id: str FK          recipe_id FK
+last_name: str      title: str             name: str                  order_num: int
+email: str          title_en: str          name_en: str               description: str
+password_hash: str  title_es: str          name_es: str               description_en: str
+avatar_url: str     title_fr: str          name_fr: str               description_es: str
+                    description: str       quantity: str              description_fr: str
+                    servings: int          unit: str                  duration_min: int
+                    prep_time_min: int     off_product_id: str
+                    category: str          estimated_cost: float
+                    image_url: str         cost_is_manual: bool
+                                           manual_price: float
+                                           price_source: str
+                                           section: str
+                                           preferred_store_id: FK
+                                           preferred_brand_id: FK
+
+PdfScan (UUID)      CustomPrice (UUID)     Store (UUID)               Brand (UUID)
+──────────────      ──────────────────     ────────────               ────────────
+id: str PK          id: str PK             id: str PK                 id: str PK
+recipe_id FK        user_id: str FK        user_id: str FK            user_id: str FK
+filename: str       ingredient_name: str   name: str                  name: str
+status: str         store_id: FK
+scanned_at: str     brand_id: FK           CookLog (UUID)
+                    bought_qty: float      ──────────────
+                    bought_unit: str       id: str PK
+                    bought_price: float    recipe_id: FK
+                    notes: str             user_id: str FK
+                                           cooked_at: str
 ```
 
 **Nota sobre los tipos:**
 - `id` es `str` (UUID) en todos los modelos — más seguro que `int` (previene enumeración de IDs)
 - `quantity` es `str` — Groq puede retornar "al gusto", "una pizca", valores no numéricos
 - No hay `username` — el email es el identificador único de login
-- No hay `created_at` en los modelos Phase 1 — se agrega con SQLAlchemy en Sesión 8
+- `name_en/es/fr`, `title_en/es/fr`, `description_en/es/fr` — campos de traducción para i18n EN/ES/FR
 
 Relaciones:
 - `User` 1 → 0..* `Recipe`  (owns)
-- `Recipe` 1 → 0..* `Ingredient`  (contains)
-- `Recipe` 1 → 0..* `Step`  (includes)
-- `Recipe` 1 → 0..* `PdfScan`  (generated from)
+- `User` 1 → 0..* `Store`, `Brand`, `CustomPrice`  (owns)
+- `Recipe` 1 → 0..* `Ingredient`, `Step`, `PdfScan`, `CookLog`
+- `CustomPrice` → FK a `Store`, `Brand` (opcionales)
+- `Ingredient` → FK a `Store`, `Brand` (preferred_store_id, preferred_brand_id)
 
 ---
 
@@ -230,12 +269,16 @@ Relaciones:
 - [x] Fix seguridad ingredientes: ownership check en POST/PUT/DELETE
 - [x] 144 assertions Postman pasando (82 requests)
 
-### Fase 9 — Frontend 🔄
+### Fase 9 — Frontend ✅
 
-- [ ] `app/views/auth.py` + templates login/register
-- [ ] `app/views/recipes.py` + templates list/detail/form
-- [ ] `app/templates/base.html`
-- [ ] `app/static/css/style.css`
+- [x] Frontend estático HTML + JS (Jinja2 descartado — ver CODE_NOTES_FRONT.md)
+- [x] `frontend/index.html` + `frontend/register.html` + `frontend/js/auth.js`
+- [x] `frontend/dashboard.html` + `frontend/js/dashboard.js`
+- [x] `frontend/recipe.html` + `frontend/js/recipe.js`
+- [x] `frontend/scan.html` + `frontend/js/scan.js`
+- [x] `frontend/prices.html` + `frontend/js/prices.js`
+- [x] `frontend/home.html` + `frontend/js/home.js` (resumen de costos)
+- [x] `frontend/css/style.css` + accesibilidad WCAG (contraste AA)
 
 ---
 
@@ -615,7 +658,7 @@ frontend/
   js/
     api.js            ← fetch wrapper + JWT
     auth.js           ← login/logout/localStorage
-    i18n.js           ← traducciones ES/EN
+    i18n.js           ← traducciones EN/ES/FR
     dashboard.js
     recipe.js
     scan.js
@@ -663,17 +706,47 @@ Si el usuario no tiene ningún precio custom → se usa Open Food Facts + tabla 
 
 ---
 
-### Decisión 12 — Fuzzy matching de nombres de ingredientes
+### Decisión 12 — Fuzzy matching de nombres de ingredientes (multilingüe)
 
 La receta extraída por IA puede escribir "huevo" y el usuario tiene guardado "huevos".
-La búsqueda exact-match fallaría. Solución en 3 pasos:
+Además, la IA puede usar un idioma distinto al que el usuario guardó el precio (ej: IA
+devuelve "sucre en poudre" en francés, usuario guardó "azucar" en español sin acento).
 
+**Solución en 4 capas:**
+
+**Capa A — Normalización Unicode (`_norm`):**
+Antes de cualquier comparación, se eliminan acentos con `unicodedata.normalize('NFD')`:
+```python
+@staticmethod
+def _norm(s):
+    s = s.lower().strip()
+    return ''.join(c for c in unicodedata.normalize('NFD', s)
+                   if unicodedata.category(c) != 'Mn')
+# _norm("Azúcar en polvo") == "azucar en polvo"  ✓
+# _norm("sucre")           == "sucre"             ✓
+```
+Todos los nombres se almacenan ya normalizados (`create_custom_price` aplica `_norm`).
+
+**Capa B — Búsqueda por candidatos multilingüe (Option A):**
+`_resolve_price()` intenta matching en todos los idiomas disponibles del ingrediente:
+```python
+candidates = {name_lower}
+for attr in ('name_en', 'name_es', 'name_fr'):
+    val = (getattr(ing, attr, None) or '').lower().strip()
+    if val:
+        candidates.add(val)
+# Si ing.name="sucre en poudre", ing.name_es="Azúcar en polvo"
+# candidates = {"sucre en poudre", "azucar en polvo"}
+# "azucar en polvo" → word-prefix → encuentra "azucar" guardado ✓
+```
+
+**Capa C — Matching en 3 pasos (por cada candidato):**
 ```python
 # 1. Exact match
 exact = [cp for cp in all_user if cp.ingredient_name == name_lower]
 if exact: return exact
 
-# 2. Word-prefix (con padding de espacio para evitar "sal" → "salsa")
+# 2. Word-prefix (padding para evitar "sal" → "salsa")
 prefix = [cp for cp in all_user
           if (name_lower + ' ').startswith(cp.ingredient_name + ' ')
           or (cp.ingredient_name + ' ').startswith(name_lower + ' ')]
@@ -686,8 +759,10 @@ if plural: return plural
 ```
 
 Casos resueltos:
-- `huevo` ↔ `huevos` → paso 3
-- `harina` ↔ `harina 0000` → paso 2
+- `huevo` ↔ `huevos` → paso C3
+- `harina` ↔ `harina 0000` → paso C2
+- `sucre en poudre` ↔ `azucar` → name_es="Azúcar en polvo" → _norm → C2
+- `azucar` ↔ `azúcar` → _norm elimina tilde → C1
 
 ---
 

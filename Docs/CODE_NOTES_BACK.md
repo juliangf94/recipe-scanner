@@ -6,9 +6,10 @@
 > |---|---|---|
 > | Sesión 1–2 | Sprint 1 — Foundation | ✅ Completo |
 > | Sesión 3–4 | Sprint 2 — Data Layer + Auth | ✅ Completo |
-> | Sesión 5–6 | Sprint 3 — Business Logic + PDF Scan | 🔄 En progreso |
-> | Sesión 7–8 | Sprint 4 — Precios + SQLAlchemy | ⏳ Pendiente |
-> | Sesión 9 | Sprint 5 — Frontend Jinja2 | ⏳ Pendiente |
+> | Sesión 5–6 | Sprint 3 — Business Logic + PDF Scan | ✅ Completo |
+> | Sesión 7–8 | Sprint 4 — Precios + SQLAlchemy | ✅ Completo |
+> | Sesión 9–15 | Sprint 5 — Frontend HTML/JS estático | ✅ Completo |
+> | Sesión 16+ | Sprint 6 — Hardening + Migración Qwen + 100 tests total | ✅ Completo |
 >
 > Cada sesión = una unidad de trabajo de 2–3 horas. Cada sprint = 1–2 sesiones con un objetivo entregable.
 
@@ -2515,13 +2516,16 @@ PDF binario (bytes)  →  PyMuPDF  →  string de texto plano
 Groq es una empresa que ofrece una API para ejecutar modelos de lenguaje (**LLMs**) con hardware especializado (**LPU — Language Processing Unit**). 
 Su API es compatible con el formato de OpenAI, pero es significativamente más rápida y tiene un generoso tier gratuito.
 
-#### **El modelo que usamos: LLaMA 3.3-70b-versatile**
-**LLaMA** es una familia de modelos de lenguaje open-source creados por Meta (Facebook). 
-`3.3` es la versión, `70b` significa 70 mil millones de parámetros (el tamaño del modelo), `versatile` indica que está optimizado para seguir instrucciones.
+#### **El modelo que usamos: Qwen 3.6-27b (qwen/qwen3.6-27b)**
+**Qwen** es una familia de modelos de lenguaje open-source creados por Alibaba.
+`3.6` es la versión, `27b` significa 27 mil millones de parámetros.
+
+El proyecto empezó con **LLaMA 3.3-70b-versatile** de Meta, pero Groq lo deprecó en junio 2026.
+Migramos a `qwen/qwen3.6-27b` — un modelo más reciente con mejor eficiencia y disponible en el tier gratuito.
 
 ```
 Nosotros enviamos:  "Aquí está el texto de una receta. Devuélveme un JSON con..."
-LLaMA 3.3-70b:      Entiende el texto, extrae la estructura, devuelve JSON
+Qwen 3.6-27b:       Entiende el texto, extrae la estructura, devuelve JSON
 ```
 
 #### **¿Por qué Groq y no OpenAI?**
@@ -2530,8 +2534,8 @@ LLaMA 3.3-70b:      Entiende el texto, extrae la estructura, devuelve JSON
 |---|---|---|
 | Velocidad | Muy rápida (LPU) | Estándar (GPU) |
 | Tier gratuito | Generoso (suficiente para este proyecto) | Muy limitado |
-| Calidad | Excelente con LLaMA 3.3-70b | Excelente con GPT-4o |
-| Precio | Bajo | Alto |
+| Calidad | Excelente con Qwen 3.6-27b | Excelente con GPT-4o |
+| Precio | Bajo / gratis en free tier | Alto |
 
 ---
 
@@ -2771,7 +2775,7 @@ def _call_groq(self, text):
 ```python
     try:
         response = client.chat.completions.create(
-            model='llama-3.3-70b-versatile',
+            model='qwen/qwen3.6-27b',
             messages=[{'role': 'user', 'content': GROQ_PROMPT + text}],
             temperature=0.1
         )
@@ -3280,7 +3284,7 @@ Click **Send**. La respuesta esperada es `201` con:
 }
 ```
 
-Groq (LLaMA 3.3-70b) extrae la receta del texto del PDF y devuelve JSON estructurado. El endpoint guarda automáticamente la receta, los ingredientes y los pasos en el storage del usuario logueado.
+Groq (Qwen 3.6-27b) extrae la receta del texto del PDF y devuelve JSON estructurado. El endpoint guarda automáticamente la receta, los ingredientes y los pasos en el storage del usuario logueado.
 
 ---
 
@@ -5746,6 +5750,71 @@ Si ninguno de los 3 niveles encontró algo, retorna lista vacía. El caller (`_r
 
 ---
 
+## Normalización Unicode — `_norm` (acento-insensible)
+
+El fuzzy matching de los 3 pasos falla cuando el nombre almacenado y el nombre buscado difieren solo en acentos: "azucar" ≠ "azúcar". Para resolverlo se añadió `_norm`.
+
+```python
+@staticmethod
+def _norm(s):
+    s = s.lower().strip()
+    return ''.join(c for c in unicodedata.normalize('NFD', s)
+                   if unicodedata.category(c) != 'Mn')
+```
+
+`unicodedata.normalize('NFD', s)` descompone cada carácter acentuado en su letra base más el diacrítico como caracteres separados:
+- `'á'` → `'a'` + `'́'` (combining acute accent)
+- `'ü'` → `'u'` + `'̈'` (combining diaeresis)
+
+`unicodedata.category(c) != 'Mn'` filtra los diacríticos (categoría Unicode `Mn` = "Mark, Nonspacing") y los descarta. Resultado:
+
+```
+_norm("Azúcar en polvo") → "azucar en polvo"
+_norm("azucar")          → "azucar"
+_norm("Hühnerfleisch")   → "huhnerfleisch"
+```
+
+`_norm` se aplica:
+- Al **almacenar** un precio custom (`create_custom_price` llama `self._norm(ingredient_name)`)
+- Al **comparar** en `get_custom_prices_for_ingredient` (ambos lados de la comparación)
+- Al **buscar** por tienda o marca en `get_custom_price_by_store` y similares
+
+---
+
+## Búsqueda multilingüe — Option A en `_resolve_price`
+
+La IA extrae ingredientes en el idioma del PDF (puede ser francés, inglés, español). El usuario guarda sus precios en su idioma. La combinación de ambos problemas (idioma distinto + acento) requería una solución adicional.
+
+**Ejemplo real**: la IA extrae `name="sucre en poudre"` (francés). El usuario tiene guardado `"azucar"` (español, sin acento). El matching de 3 pasos fallaba porque "sucre en poudre" ≠ "azucar" en ningún paso.
+
+**Solución — Option A**: `_resolve_price` construye un conjunto `candidates` con el nombre del ingrediente en todos los idiomas disponibles, y busca en cada uno:
+
+```python
+candidates = {name_lower}
+for attr in ('name_en', 'name_es', 'name_fr'):
+    val = (getattr(ing, attr, None) or '').lower().strip()
+    if val:
+        candidates.add(val)
+
+seen_ids = set()
+customs = []
+for candidate in candidates:
+    for cp in self.get_custom_prices_for_ingredient(user_id, candidate):
+        if cp.id not in seen_ids:
+            seen_ids.add(cp.id)
+            customs.append(cp)
+```
+
+Con `ing.name="sucre en poudre"` y `ing.name_es="Azúcar en polvo"`:
+```
+candidates = {"sucre en poudre", "azucar en polvo"}
+# "azucar en polvo" → _norm → paso C2 (word-prefix) → encuentra "azucar" ✓
+```
+
+`seen_ids` evita duplicados cuando varios candidatos apuntan al mismo `CustomPrice`.
+
+---
+
 ## Resolución de precio en 4 casos — `_resolve_price`
 
 ```python
@@ -6194,5 +6263,5 @@ pytest tests/ -v
 60 passed in X.XXs
 ```
 
-60 tests — 0 fallos. La suite cubre modelos, repositorios e integración de API. El test `test_get_other_user_recipe_returns_403` fue el que detectó el bug de seguridad real documentado al inicio de esta sesión.
+66 tests — 0 fallos. La suite cubre modelos, repositorios e integración de API, incluyendo edge cases de 403/404/400, conversión de unidades, precios duplicados, y el endpoint de costos completo. El test `test_get_other_user_recipe_returns_403` fue el que detectó el bug de seguridad real documentado al inicio de esta sesión.
 

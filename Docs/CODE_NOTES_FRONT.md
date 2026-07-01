@@ -30,20 +30,23 @@ Backend (Flask)  ──► JSON únicamente  ◄──  Cualquier cliente
 
 ```
 frontend/
-├── index.html          ← Login / Register
-├── dashboard.html      ← Lista de recetas
-├── recipe.html         ← Detalle de receta
+├── index.html          ← Login
+├── register.html       ← Registro
+├── home.html           ← Resumen de costos y recetas top
+├── dashboard.html      ← Lista de recetas con filtros y búsqueda
+├── recipe.html         ← Detalle de receta, ingredientes, precios, pasos
 ├── scan.html           ← Escanear PDF con IA
-├── prices.html         ← Mis precios
+├── prices.html         ← Mis precios custom, tiendas, marcas
 ├── css/
-│   └── style.css       ← Estilos globales
+│   └── style.css       ← Estilos globales (dark/light, WCAG AA)
 └── js/
-    ├── i18n.js         ← Sistema de traducción (EN/ES) — se carga primero
-    ├── api.js          ← Tokens JWT + fetch wrapper — se carga segundo
-    ├── auth.js         ← Login y registro
+    ├── i18n.js         ← Sistema de traducción (EN/ES/FR) — se carga primero
+    ├── api.js          ← Tokens JWT + fetch wrapper con auto-refresh — se carga segundo
+    ├── auth.js         ← Login, registro, localStorage
+    ├── home.js         ← Resumen de costos y recetas top
     ├── dashboard.js    ← Dashboard de recetas
-    ← recipe.js         ← Detalle de receta, ingredientes, precios, secciones
-    ├── prices.js       ← Gestión de precios custom y tiendas
+    ├── recipe.js       ← Detalle de receta, ingredientes, precios, secciones
+    ├── prices.js       ← Gestión de precios custom, tiendas y marcas
     └── scan.js         ← Carga de PDF y escaneo con IA
 ```
 

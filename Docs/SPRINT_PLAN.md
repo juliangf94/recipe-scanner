@@ -200,7 +200,7 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 | PDF scan page | `frontend/scan.html` + `js/scan.js` | Must Have | ✅ Done |
 | My Prices — custom prices CRUD | `frontend/prices.html` + `js/prices.js` | Should Have | ✅ Done |
 | Stores y Brands como entidades gestionadas | `api/v1/stores.py`, `api/v1/brands.py` | Should Have | ✅ Done |
-| i18n EN/ES | `frontend/js/i18n.js` | Could Have | ✅ Done |
+| i18n EN/ES/FR | `frontend/js/i18n.js` | Could Have | ✅ Done |
 | Centralización HTTP + JWT | `frontend/js/api.js` | Must Have | ✅ Done |
 | Store + Brand por ingrediente en receta | `js/recipe.js` | Should Have | ✅ Done |
 | Resolución de precio 4 casos | `services/facade.py` | Should Have | ✅ Done |
@@ -208,7 +208,7 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 | Avatar + imagen de receta | `api/v1/auth.py`, `api/v1/recipes.py` | Could Have | ✅ Done |
 | CSS responsive — dark/light mode | `frontend/css/style.css` | Must Have | ✅ Done |
 | Fix seguridad: ownership check en GET recipe | `api/v1/recipes.py` | Must Have | ✅ Done |
-| Tests — models, repository, API (60 tests) | `tests/` | Must Have | ✅ Done |
+| Tests — models, repository, API (66 tests) | `tests/` | Must Have | ✅ Done |
 | End-to-end manual test | Full user flow en navegador | Must Have | ✅ Done |
 | Deploy to production | Render / Railway | Should Have | Pending |
 
@@ -226,18 +226,43 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 **Definition of Done:**
 - ✅ Full user flow funciona en el navegador: register → login → scan PDF → ver receta con precios
 - ✅ Precios custom con stores y brands funcionan end-to-end
-- ✅ 60 tests pasan: `pytest tests/` — 0 failures
+- ✅ 100 tests pasan: `pytest tests/` — 0 failures (66 API + 34 models/repository)
 - ✅ Todo commiteado en `develop`
 - ⏳ Deploy a producción (Render/Railway) — pendiente para Sprint 6
 - ⏳ Merge `develop` → `main` — pendiente tras deploy
 
 ---
 
-## Sprint 6 — Deploy ⏳ PENDING
+## Sprint 6 — Hardening + Model Migration ✅ COMPLETE
+
+**Goal:** Strengthen the codebase: expand test suite, migrate AI model, add multilingual price matching, and secure GitHub uploads.
+
+**Duration:** Week 9
+
+| Task | Priority | Status |
+|---|---|---|
+| Migrate Groq model: `llama-3.3-70b-versatile` → `qwen/qwen3.6-27b` | Must Have | ✅ Done |
+| Multilingual price matching (`_norm` + Option A translation candidates) | Should Have | ✅ Done |
+| Expand pytest suite: 38 → 66 tests (edge cases, 403/404/400, costs) | Must Have | ✅ Done |
+| Expand Postman: 101 → 109 requests, 186 → 331 assertions | Should Have | ✅ Done |
+| Fix user-uploaded images leaking to GitHub (.gitignore + .gitkeep) | Must Have | ✅ Done |
+| Push corrected commits to `develop` on GitHub | Must Have | ✅ Done |
+| Update all Docs to reflect current project state | Should Have | ✅ Done |
+
+**Sprint 6 notes:**
+- Groq deprecated `llama-3.3-70b-versatile`; migrated to `qwen/qwen3.6-27b` (Qwen 3.6 27B by Alibaba, free tier).
+- `_norm()` strips Unicode diacritics so "azúcar" == "azucar" in all CustomPrice comparisons.
+- Option A: `_resolve_price()` tries `name_en`, `name_es`, `name_fr` as additional search candidates,
+  so a French AI response ("sucre en poudre") can match a Spanish stored price ("azucar").
+- `TestCosts` class added: 5 tests covering auth, 403, manual price override, and cost endpoint structure.
+
+---
+
+## Sprint 7 — Deploy ⏳ PENDING
 
 **Goal:** Deploy to production and final merge to main.
 
-**Duration:** Week 8
+**Duration:** Week 10
 
 | Task | Priority | Status |
 |---|---|---|
@@ -252,7 +277,7 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 
 | Metric | Target | Actual |
 |---|---|---|
-| Test coverage | 70%+ on models, persistence, services | 60 tests — models, repository, API ✅ |
+| Test coverage | 70%+ on models, persistence, services | 100 tests pytest (66 API + 34 unit) + 331 Postman assertions (109 requests) ✅ |
 | Bugs at sprint end | 0 critical, under 3 minor | 0 critical ✅ |
 | Commits per sprint | Minimum 5 meaningful commits | ✅ |
 | Branches | All work on `develop`, swap isolated to `feature/sqlalchemy` | ✅ |

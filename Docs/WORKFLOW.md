@@ -135,12 +135,13 @@ gitGraph
 | 6 | `develop` | `api/v1/scan.py` + Groq en facade | PDF → receta extraída |
 | 7 | `develop` | Open Food Facts en facade | Precios de ingredientes |
 | 8 | `feature/sqlalchemy` | `persistence/db_storage.py`, `config.py` actualizado | Swap a SQLAlchemy — backend completo |
-| 9 | `develop` | `templates/`, `static/` | Jinja2 — UI server-side integrada en Flask |
+| 9 | `develop` | `frontend/` (HTML + JS estático) | Frontend desacoplado — HTML/CSS/JS puro consumiendo la API REST |
 
 > **Nota — Sesión 9 (Frontend):**
-> Decisión confirmada: **Jinja2 + HTML/CSS/JS** (React descartado).
-> Un solo servidor, sin build process separado, sin CORS, sin deploy adicional.
-> Proyecto individual con deadline fin de junio 2025 — Jinja2 permite terminar en tiempo sin comprometer la funcionalidad core.
+> Decisión final: **HTML estático + JS puro** (Jinja2 descartado).
+> El frontend está completamente desacoplado del backend Flask — consume la API REST
+> igual que lo haría una app móvil React Native en el futuro.
+> Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Sesión 11).
 
 ---
 
@@ -148,7 +149,7 @@ gitGraph
 
 - **Código:** comentarios en inglés.
 - **Documentación:** DEVLOG en español.
-- **Archivos sensibles** (`.env`, `*.db`, `venv/`) nunca van a GitHub.
+- **Archivos sensibles** (`.env`, `*.db`, `venv/`, imágenes subidas por usuarios) nunca van a GitHub.
 - **Cada archivo nuevo** se documenta en DEVLOG con su explicación línea a línea.
 - **Cada decisión técnica** se justifica antes de implementarla.
 - **Un solo archivo por vez** — terminar y documentar antes de pasar al siguiente.
