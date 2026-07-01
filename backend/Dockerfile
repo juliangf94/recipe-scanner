@@ -20,8 +20,8 @@ RUN addgroup --gid 1001 appgroup \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=appuser:appgroup . .
-RUN mkdir -p app/static/uploads/avatars app/static/uploads/recipes \
- && chown -R appuser:appgroup app/static/uploads
+RUN mkdir -p app/static/uploads/avatars app/static/uploads/recipes instance \
+ && chown -R appuser:appgroup app/static/uploads instance
 USER appuser
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \

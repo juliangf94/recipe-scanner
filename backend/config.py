@@ -31,7 +31,8 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     """Production environment — all secrets loaded from environment variables."""
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'sqlite:////app/instance/production.db'
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 
 
