@@ -4,15 +4,23 @@ A full-stack web application that extracts recipes from PDF files using AI, save
 
 Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 
+**Live demo:**
+- Frontend: https://recipes-scanner.netlify.app
+- API (Swagger): https://recipe-scanner-kfnm.onrender.com/api/docs
+
 ---
 
 ## Features
 
-- Upload a PDF recipe and extract ingredients and steps automatically using Groq API (LLaMA 3.3-70b)
-- User authentication with JWT tokens and bcrypt password hashing
-- Save, view, edit, and delete recipes
-- Estimate ingredient prices via Open Food Facts API
-- Secure per-user data isolation — users can only access their own recipes
+- Upload a PDF recipe and extract ingredients and steps automatically using Groq API (Qwen 3.6-27b)
+- User authentication with JWT access + refresh tokens, bcrypt password hashing
+- Save, view, edit, and delete recipes with multilingual fields (EN/ES/FR)
+- Estimate ingredient prices via Open Food Facts API + custom price database
+- Custom prices linked to stores and brands with 4-case priority resolution
+- Accent-insensitive multilingual ingredient matching (`_norm` + translation fields)
+- Secure per-user data isolation — users can only access their own data
+- Static HTML + JS frontend, fully decoupled from the backend API
+- Containerized with Docker (multi-stage build: dev + production with gunicorn)
 
 ---
 
@@ -20,253 +28,69 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 
 | Layer | Technology |
 |---|---|
-| Backend | Python 3, Flask 3.x |
-| Authentication | PyJWT + bcrypt |
-| PDF Extraction | PyMuPDF |
-| AI / NLP | Groq API — LLaMA 3.3-70b |
-| Ingredient Prices | Open Food Facts API |
-| Database | SQLite (dev) → PostgreSQL (prod) |
-| ORM | SQLAlchemy 2.x |
-| Frontend | Jinja2 + HTML/CSS/JS |
+| Backend | Python 3.12, Flask 3.x, flask-restx (Swagger) |
+| Authentication | Flask-JWT-Extended (access + refresh tokens) + bcrypt |
+| PDF Extraction | PyMuPDF (fitz) |
+| AI / NLP | Groq API — Qwen 3.6-27b (qwen/qwen3.6-27b) |
+| Ingredient Prices | Open Food Facts API + FALLBACK_PRICES table |
+| Database | SQLite (dev) / PostgreSQL (prod) |
+| ORM | SQLAlchemy 2.x (Repository Pattern) |
+| Frontend | HTML + CSS + JS vanilla (static, no framework) |
+| Containerization | Docker (multi-stage) + Docker Compose |
+| Deploy | Render (backend) + Netlify (frontend) |
+| Tests | pytest (100 tests) + Postman Newman (331 assertions, 109 requests) |
 
 ---
 
-## Application Architecture
-
-```mermaid
-flowchart TD
-    Browser["Client (Browser)"]
-
-    subgraph Frontend["Frontend — Flask / Jinja2"]
-        FE["Templates + Static (CSS/JS)"]
-    end
-
-    subgraph Backend["Backend — Flask API"]
-        API["Blueprints /api/v1/\nauth · recipes · ingredients · scan"]
-    end
-
-    subgraph Services["Services"]
-        Facade["Facade\n(business logic)"]
-    end
-
-    subgraph Persistence["Persistence — Repository Pattern"]
-        Repo["BaseRepository\n(ABC interface)"]
-        Mem["InMemoryStorage\n(Phase 1 — dicts)"]
-        DB["DbStorage\n(Phase 2 — SQLAlchemy)"]
-    end
-
-    subgraph External["External Services"]
-        Groq["Groq API\nLLaMA 3.3-70b"]
-        OFF["Open Food Facts API"]
-    end
-
-    subgraph Database["Database"]
-        SQLite["SQLite (dev)"]
-        PG["PostgreSQL (prod)"]
-    end
-
-    Browser -->|HTTP| FE
-    FE -->|HTTP /api/v1/| API
-    API --> Facade
-    Facade --> Repo
-    Facade -->|PDF text + prompt| Groq
-    Facade -->|ingredient name| OFF
-    Repo --> Mem
-    Repo --> DB
-    DB --> SQLite
-    DB --> PG
-```
-
-### Data Flow
-
-1. User performs an action in the browser (login, upload PDF, view recipe).
-2. Flask renders the template or routes the request to the API.
-3. The API Blueprint receives the request, validates the JWT, and delegates to the Facade.
-4. The Facade orchestrates the logic: calls the Repository for local data and external services (Groq, Open Food Facts) when needed.
-5. The Repository abstracts the storage layer — the Facade does not know whether it is talking to RAM or PostgreSQL.
-6. The response travels back up through the layers to the browser.
-
----
-
-## Database Diagram
-
-```mermaid
-classDiagram
-    class User {
-        +String id
-        +String first_name
-        +String last_name
-        +String email
-        +String password_hash
-    }
-
-    class Recipe {
-        +String id
-        +String user_id
-        +String title
-        +String description
-        +int servings
-        +int prep_time_min
-        +String category
-    }
-
-    class Ingredient {
-        +String id
-        +String recipe_id
-        +String name
-        +String quantity
-        +String unit
-        +String off_product_id
-        +float estimated_cost
-        +bool cost_is_manual
-    }
-
-    class Step {
-        +String id
-        +String recipe_id
-        +int order
-        +String description
-        +int duration_min
-    }
-
-    class PdfScan {
-        +String id
-        +String recipe_id
-        +String filename
-        +String status
-        +String scanned_at
-    }
-
-    class BaseRepository {
-        <<abstract>>
-        +get_all()*
-        +get_by_id(id)*
-        +save(obj)*
-        +update(obj)*
-        +delete(id)*
-    }
-
-    class InMemoryStorage {
-        -dict _storage
-        +get_all()
-        +get_by_id(id)
-        +save(obj)
-        +update(obj)
-        +delete(id)
-    }
-
-    class DbStorage {
-        -Session _session
-        +get_all()
-        +get_by_id(id)
-        +save(obj)
-        +update(obj)
-        +delete(id)
-    }
-
-    class Facade {
-        -BaseRepository _repository
-        +register_user(email, password)
-        +login(email, password)
-        +get_recipes(user_id)
-        +get_recipe(id, user_id)
-        +create_recipe(data, user_id)
-        +update_recipe(id, data, user_id)
-        +delete_recipe(id, user_id)
-        +scan_pdf(file, user_id)
-        +get_ingredient_prices(recipe_id)
-    }
-
-    User "1" --> "0..*" Recipe : owns
-    Recipe "1" --> "0..*" Ingredient : contains
-    Recipe "1" --> "0..*" Step : includes
-    Recipe "1" --> "0..*" PdfScan : generated from
-
-    InMemoryStorage --|> BaseRepository : implements
-    DbStorage --|> BaseRepository : implements
-    Facade --> BaseRepository : uses
-```
-
----
-
-## Project Structure
+## Architecture
 
 ```
-recipe-scanner/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py          # Application factory (create_app)
-│   │   ├── api/v1/
-│   │   │   ├── auth.py          # Register + Login endpoints
-│   │   │   ├── recipes.py       # Recipe CRUD endpoints
-│   │   │   ├── ingredients.py   # Ingredient price endpoints
-│   │   │   └── scan.py          # PDF upload + extraction endpoint
-│   │   ├── models/
-│   │   │   ├── user.py
-│   │   │   ├── recipe.py
-│   │   │   ├── ingredient.py
-│   │   │   ├── step.py
-│   │   │   └── pdf_scan.py
-│   │   ├── persistence/
-│   │   │   ├── repository.py    # BaseRepository ABC
-│   │   │   └── memory_storage.py
-│   │   ├── services/
-│   │   │   └── facade.py        # Business logic
-│   │   └── utils/
-│   │       ├── jwt_helper.py
-│   │       └── security.py
-│   ├── config.py                # Environment-based configuration
-│   ├── run.py                   # Entry point
-│   └── requirements.txt
-└── frontend/                    # Jinja2 templates (Phase 9)
+Browser
+  │
+  ├── Netlify (frontend/)
+  │     HTML + CSS + JS → fetch /api/v1/*
+  │
+  └── Render (backend/)  ← Docker (production stage)
+        Flask API (flask-restx)
+          │
+          ├── Facade (business logic)
+          │     ├── Repository Pattern → SQLAlchemy → SQLite/PostgreSQL
+          │     ├── Groq API (Qwen 3.6-27b) → PDF text → structured JSON
+          │     └── Open Food Facts API → ingredient price lookup
+          │
+          └── Swagger UI → /api/docs
 ```
-
----
-
-## API Endpoints
-
-Base URL: `/api/v1`
-Authentication: `Authorization: Bearer <JWT_TOKEN>` (except register and login)
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| POST | `/auth/register` | Register a new user | No |
-| POST | `/auth/login` | Login, returns JWT token | No |
-| GET | `/recipes` | List all recipes for the logged-in user | Yes |
-| POST | `/recipes` | Create a recipe manually | Yes |
-| GET | `/recipes/<id>` | Get full recipe detail | Yes |
-| PUT | `/recipes/<id>` | Update a recipe | Yes |
-| DELETE | `/recipes/<id>` | Delete a recipe | Yes |
-| POST | `/scan` | Upload PDF and extract recipe via Groq | Yes |
-| GET | `/recipes/<id>/ingredients` | Get ingredients with price estimates | Yes |
 
 ---
 
 ## Local Setup
 
-**Requirements:** Python 3.8+, pip
+### Option A — Python (venv)
 
 ```bash
-# Clone the repository
 git clone https://github.com/juliangf94/recipe-scanner.git
 cd recipe-scanner/backend
-
-# Create and activate virtual environment
 python3 -m venv venv
-source venv/bin/activate      # Linux/Mac
-venv\Scripts\activate         # Windows
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Create .env file and add your keys
+# Create .env with your keys (see Environment Variables below)
 cp .env.example .env
 
-# Run the development server
 python run.py
+# → http://localhost:5000/api/docs
 ```
 
-The server will start at `http://localhost:5000`.
+### Option B — Docker Compose
+
+```bash
+git clone https://github.com/juliangf94/recipe-scanner.git
+cd recipe-scanner
+
+# Add your keys to backend/.env first
+docker compose up --build
+# → http://localhost:5000/api/docs
+```
 
 ---
 
@@ -278,7 +102,40 @@ The server will start at `http://localhost:5000`.
 | `JWT_SECRET_KEY` | JWT token signing key |
 | `GROQ_API_KEY` | API key from console.groq.com |
 | `FLASK_ENV` | `development` / `production` |
-| `DATABASE_URL` | PostgreSQL URL (production only) |
+| `DATABASE_URL` | PostgreSQL URL (production) — defaults to SQLite if not set |
+
+---
+
+## API Endpoints
+
+Base URL: `/api/v1` — Full interactive docs at `/api/docs`
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| POST | `/auth/register` | Register new user | No |
+| POST | `/auth/login` | Login, returns JWT + refresh token | No |
+| POST | `/auth/refresh` | Renew access token | Yes (refresh) |
+| GET/PUT/DELETE | `/auth/me` | View / update / delete account | Yes |
+| GET/POST | `/recipes` | List / create recipes | Yes |
+| GET/PUT/DELETE | `/recipes/<id>` | Recipe detail / edit / delete | Yes |
+| GET/POST | `/recipes/<id>/ingredients` | List / add ingredients | Yes |
+| PUT/DELETE | `/recipes/<id>/ingredients/<id>` | Edit / delete ingredient | Yes |
+| POST | `/scan` | Upload PDF → extract recipe via Groq | Yes |
+| GET | `/recipes/<id>/cost` | Calculate recipe cost | Yes |
+| GET/POST/PUT/DELETE | `/prices` | Custom price CRUD | Yes |
+| GET/POST/DELETE | `/stores` | Store management | Yes |
+| GET/POST/DELETE | `/brands` | Brand management | Yes |
+
+---
+
+## Tests
+
+```bash
+cd recipe-scanner
+source backend/venv/bin/activate
+pytest tests/ -v
+# 100 tests — 0 failures
+```
 
 ---
 
@@ -286,9 +143,8 @@ The server will start at `http://localhost:5000`.
 
 | Branch | Purpose |
 |---|---|
-| `main` | Production-ready code only. Receives merges from `develop`. |
-| `develop` | Day-to-day work. One commit per completed feature or file. |
-| `feature/sqlalchemy` | Temporary branch — Session 8 only. Isolated because swapping the storage layer can break existing functionality. |
+| `main` | Production-ready code. Receives merges from `develop` at sprint end. |
+| `develop` | Day-to-day development. Auto-deploys to Render + Netlify. |
 
 ---
 
