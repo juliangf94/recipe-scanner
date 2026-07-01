@@ -22,6 +22,9 @@ Fecha de entrega: finales de junio 2026
 | Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 100 tests, 0 failures |
 | Tests end-to-end | Newman + Postman | 331 assertions contra el servidor en vivo — 109 requests, 0 failures |
 | Variables de entorno | python-dotenv | Carga `.env` en desarrollo; en producción las claves van directo al servidor |
+| Containerización | Docker (multi-stage) | Stage dev con hot reload, stage production con gunicorn + usuario no-root |
+| Deploy backend | Render (Docker) | Free tier, auto-deploy desde GitHub, soporte Docker nativo |
+| Deploy frontend | Netlify | Free tier, deploy de estáticos desde GitHub, auto-deploy |
 
 ### Justificación detallada de cada tecnología
 

@@ -258,17 +258,51 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 
 ---
 
-## Sprint 7 — Deploy ⏳ PENDING
+## Sprint 7 — Deploy ✅ COMPLETE
 
-**Goal:** Deploy to production and final merge to main.
+**Goal:** Deploy backend y frontend a producción con Docker.
 
 **Duration:** Week 10
 
 | Task | Priority | Status |
 |---|---|---|
-| Deploy backend a Render / Railway | Should Have | Pending |
-| Variables de entorno de producción | Must Have | Pending |
-| README actualizado con URL de producción | Should Have | Pending |
+| Dockerfile multi-stage (dev + production) | Must Have | ✅ Done |
+| docker-compose.yml para desarrollo local | Should Have | ✅ Done |
+| Deploy backend en Render (Docker, free tier) | Must Have | ✅ Done |
+| Variables de entorno de producción configuradas | Must Have | ✅ Done |
+| Fix `pkg_resources==0.0.0` en requirements.txt | Must Have | ✅ Done |
+| Fix `DATABASE_URL` fallback a SQLite en ProductionConfig | Must Have | ✅ Done |
+| Deploy frontend en Netlify (estático, free tier) | Must Have | ✅ Done |
+| `api.js` detección automática de entorno (localhost vs producción) | Must Have | ✅ Done |
+| README actualizado con URLs de producción | Should Have | ✅ Done |
+| Documentación de deploy en `Docs/DEPLOY.md` | Should Have | ✅ Done |
+
+**URLs de producción:**
+- Frontend: https://recipes-scanner.netlify.app
+- API: https://recipe-scanner-kfnm.onrender.com/api/docs
+
+**Definition of Done:**
+- ✅ Frontend carga en Netlify y se puede registrar/login
+- ✅ Backend responde en Render con todos los endpoints
+- ✅ Auto-deploy activo: push a `develop` → redeploy automático en ambos servicios
+
+**Próximo paso — Sprint 8:**
+- Migrar base de datos a Supabase (PostgreSQL gratuito permanente) para persistencia real
+- Merge `develop` → `main`
+
+---
+
+## Sprint 8 — Base de datos persistente ⏳ PENDING
+
+**Goal:** Reemplazar SQLite en producción por PostgreSQL con Supabase para persistencia real de datos.
+
+**Duration:** Week 11
+
+| Task | Priority | Status |
+|---|---|---|
+| Crear proyecto en Supabase (EU West) | Must Have | Pending |
+| Configurar `DATABASE_URL` en Render con URL de Supabase | Must Have | Pending |
+| Verificar que los datos persisten tras reinicio del contenedor | Must Have | Pending |
 | Merge `develop` → `main` | Must Have | Pending |
 
 ---
