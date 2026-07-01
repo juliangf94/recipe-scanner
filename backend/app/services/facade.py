@@ -390,7 +390,7 @@ class RecipeScannerFacade:
         client = Groq(api_key=os.environ.get('GROQ_API_KEY'))
         try:
             response = client.chat.completions.create(
-                model='llama-3.3-70b-versatile',
+                model='qwen/qwen3.6-27b',
                 messages=[{'role': 'user', 'content': GROQ_PROMPT + text}],
                 temperature=0.1
             )
