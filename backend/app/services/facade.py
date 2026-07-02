@@ -114,10 +114,18 @@ class RecipeScannerFacade:
     # --- Recipes --- api/v1/recipes.py ---
 
     @staticmethod
+    VALID_CATEGORIES = {
+        'Desserts', 'Cake', 'Main Course', 'Meat', 'Pasta', 'Chicken', 'Fish',
+        'Seafood', 'Soup', 'Salad', 'Breakfast', 'Rice', 'Bread', 'Bakery',
+        'Vegan', 'Vegetarian', 'Appetizer', 'Drink', 'Sandwich', 'Snack'
+    }
+
+    @staticmethod
     def _normalize_category(category):
         if not category:
             return ''
-        return category.strip().title()
+        normalized = category.strip().title()
+        return normalized if normalized in RecipeScannerFacade.VALID_CATEGORIES else ''
 
     def create_recipe(self, user_id, title, description='',
                       servings=0, prep_time_min=0, category=''):
