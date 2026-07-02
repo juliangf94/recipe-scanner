@@ -2022,7 +2022,6 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
     justify-content: space-around;
   }
   .nav-item {
-    position: relative;
     flex-direction: column;
     justify-content: center;
     gap: 2px;
@@ -2032,15 +2031,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   }
   .nav-item span[data-i18n] { display: block; font-size: 0.65rem; }
   .nav-item .nav-icon { font-size: 1.1rem; width: auto; }
-  .nav-badge {
-    position: absolute;
-    top: 3px;
-    right: 6px;
-    margin-left: 0;
-    font-size: 0.6rem;
-    padding: 1px 4px;
-    min-width: 16px;
-  }
+  .nav-badge { display: none; }
   .mobile-only-nav { display: flex; }
 
   .app-layout {

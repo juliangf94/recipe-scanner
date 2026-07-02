@@ -62,6 +62,48 @@ function switchMethod(method) {
   document.getElementById('method-type').classList.toggle('active', method === 'type');
 }
 
+// ── Manual create modal (from scan page) ──────────────────────────────────────
+function openScanCreateModal() {
+  document.getElementById('scan-create-modal').classList.add('open');
+  document.getElementById('sc-title').focus();
+}
+
+function closeScanCreateModal() {
+  document.getElementById('scan-create-modal').classList.remove('open');
+  document.getElementById('scan-create-error').style.display = 'none';
+  ['sc-title', 'sc-desc', 'sc-category'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('sc-servings').value = 0;
+  document.getElementById('sc-prep').value = 0;
+}
+
+async function submitScanCreate() {
+  const title = document.getElementById('sc-title').value.trim();
+  const errEl = document.getElementById('scan-create-error');
+  errEl.style.display = 'none';
+  if (!title) {
+    errEl.textContent = t('err_title_req');
+    errEl.style.display = '';
+    return;
+  }
+  const res = await apiFetch('/recipes/', {
+    method: 'POST',
+    body: JSON.stringify({
+      title,
+      description: document.getElementById('sc-desc').value.trim(),
+      servings: parseInt(document.getElementById('sc-servings').value) || 0,
+      prep_time_min: parseInt(document.getElementById('sc-prep').value) || 0,
+      category: (document.getElementById('sc-category').value.trim() || '')
+        .replace(/\b\w/g, c => c.toUpperCase())
+    })
+  });
+  if (!res || !res.ok) {
+    errEl.textContent = res?.data?.error || t('err_create');
+    errEl.style.display = '';
+    return;
+  }
+  window.location.href = `recipe.html?id=${res.data.id}`;
+}
+
 // ── Extraction option pills ───────────────────────────────────────────────────
 document.querySelectorAll('.opt-pill').forEach(pill => {
   pill.addEventListener('click', () => pill.classList.toggle('active'));
