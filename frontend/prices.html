@@ -72,7 +72,6 @@
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
         <button class="btn btn-outline" onclick="openStoresModal()" data-i18n="manage_stores">Manage stores</button>
         <button class="btn btn-outline" onclick="openBrandsModal()" data-i18n="manage_brands">Manage brands</button>
-        <button class="btn btn-orange" onclick="openAddModal()" data-i18n="btn_add_price">+ Add price</button>
       </div>
     </div>
 
@@ -132,151 +131,6 @@
     </div>
   </div>
 
-  <!-- ─── Modal: add price ───────────────────────────────────────────────── -->
-  <div class="modal-overlay" id="add-modal">
-    <div class="modal" style="max-width:500px;">
-      <h2 data-i18n="modal_add_price">Add custom price</h2>
-      <div id="add-error" class="alert alert-error" style="display:none"></div>
-
-      <!-- Ingredient name -->
-      <div class="form-group">
-        <label data-i18n="label_ing_name_req2">Ingredient name *</label>
-        <input type="text" id="add-name" data-i18n-placeholder="ph_price_ing" placeholder="e.g. flour, tomatoes">
-      </div>
-
-      <!-- Store + Brand row -->
-      <div style="display:flex;gap:0.75rem;">
-        <div class="form-group" style="flex:1;margin-bottom:1rem;">
-          <label data-i18n="label_store">Store</label>
-          <select id="add-store">
-            <option value="" data-i18n="no_store">Any store</option>
-          </select>
-        </div>
-        <div class="form-group" style="flex:1;margin-bottom:1rem;">
-          <label data-i18n="label_brand">Brand</label>
-          <select id="add-brand">
-            <option value="" data-i18n="no_brand">Any brand</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Entry mode toggle -->
-      <div class="price-mode-toggle" style="margin-bottom:1rem;">
-        <button class="mode-btn active" id="add-mode-qty" onclick="setAddMode('qty')" data-i18n="input_mode_qty">By amount</button>
-        <button class="mode-btn" id="add-mode-kg" onclick="setAddMode('kg')" data-i18n="input_mode_kg">Per kg</button>
-      </div>
-
-      <!-- By-amount fields -->
-      <div id="add-qty-fields">
-        <div style="display:flex;gap:0.75rem;align-items:flex-end;">
-          <div class="form-group" style="flex:1;margin:0;">
-            <label data-i18n="label_bought_qty">Quantity bought</label>
-            <input type="text" id="add-bought-qty" inputmode="decimal" placeholder="500">
-          </div>
-          <div class="form-group" style="flex:1;margin:0;">
-            <label data-i18n="label_bought_unit">Unit</label>
-            <select id="add-bought-unit">
-              <option value="g">g</option>
-              <option value="kg">kg</option>
-              <option value="ml">ml</option>
-              <option value="l">l</option>
-              <option value="unidad">unidad</option>
-              <option value="pieza">pieza</option>
-            </select>
-          </div>
-          <div class="form-group" style="flex:1;margin:0;">
-            <label data-i18n="label_bought_price">Price paid (€)</label>
-            <input type="text" id="add-bought-price" inputmode="decimal" placeholder="1.50">
-          </div>
-        </div>
-        <p id="add-price-preview" class="price-preview-text" style="display:none;"></p>
-      </div>
-
-      <!-- Per-kg field -->
-      <div id="add-kg-field" style="display:none;">
-        <div class="form-group">
-          <label data-i18n="label_price_kg_req">Price per kg (€) *</label>
-          <input type="text" id="add-price-kg" inputmode="decimal" placeholder="3.00">
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeAddModal()" data-i18n="btn_cancel">Cancel</button>
-        <button class="btn btn-orange" onclick="saveAdd()" data-i18n="btn_save">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── Modal: edit price ─────────────────────────────────────────────── -->
-  <div class="modal-overlay" id="edit-modal">
-    <div class="modal" style="max-width:500px;">
-      <h2 data-i18n="modal_edit_price">Edit price</h2>
-      <div id="edit-error" class="alert alert-error" style="display:none"></div>
-
-      <div class="form-group">
-        <label data-i18n="label_ing_name_req2">Ingredient name *</label>
-        <input type="text" id="edit-name" readonly style="background:var(--bg); color:var(--text-muted); cursor:not-allowed;">
-      </div>
-
-      <!-- Store + Brand row -->
-      <div style="display:flex;gap:0.75rem;">
-        <div class="form-group" style="flex:1;margin-bottom:1rem;">
-          <label data-i18n="label_store">Store</label>
-          <select id="edit-store"></select>
-        </div>
-        <div class="form-group" style="flex:1;margin-bottom:1rem;">
-          <label data-i18n="label_brand">Brand</label>
-          <select id="edit-brand">
-            <option value="" data-i18n="no_brand">Any brand</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Entry mode toggle -->
-      <div class="price-mode-toggle" style="margin-bottom:1rem;">
-        <button class="mode-btn active" id="edit-mode-qty" onclick="setEditMode('qty')" data-i18n="input_mode_qty">By amount</button>
-        <button class="mode-btn" id="edit-mode-kg" onclick="setEditMode('kg')" data-i18n="input_mode_kg">Per kg</button>
-      </div>
-
-      <div id="edit-qty-fields">
-        <div style="display:flex;gap:0.75rem;align-items:flex-end;">
-          <div class="form-group" style="flex:1;margin:0;">
-            <label data-i18n="label_bought_qty">Quantity bought</label>
-            <input type="text" id="edit-bought-qty" inputmode="decimal" placeholder="500">
-          </div>
-          <div class="form-group" style="flex:1;margin:0;">
-            <label data-i18n="label_bought_unit">Unit</label>
-            <select id="edit-bought-unit">
-              <option value="g">g</option>
-              <option value="kg">kg</option>
-              <option value="ml">ml</option>
-              <option value="l">l</option>
-              <option value="unidad">unidad</option>
-              <option value="pieza">pieza</option>
-            </select>
-          </div>
-          <div class="form-group" style="flex:1;margin:0;">
-            <label data-i18n="label_bought_price">Price paid (€)</label>
-            <input type="text" id="edit-bought-price" inputmode="decimal" placeholder="1.50">
-          </div>
-        </div>
-        <p id="edit-price-preview" class="price-preview-text" style="display:none;"></p>
-      </div>
-
-      <div id="edit-kg-field" style="display:none;">
-        <div class="form-group">
-          <label data-i18n="label_price_kg_req">Price per kg (€) *</label>
-          <input type="text" id="edit-price-kg" inputmode="decimal" placeholder="3.00">
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeEditModal()" data-i18n="btn_cancel">Cancel</button>
-        <button class="btn btn-orange" onclick="saveEdit()" data-i18n="btn_save">Save</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Modal: confirm (shared) -->
   <div class="modal-overlay" id="shared-confirm-modal">
     <div class="modal" style="max-width:400px;text-align:center;">
@@ -292,6 +146,6 @@
 
   <script src="js/i18n.js?v=20"></script>
   <script src="js/api.js"></script>
-  <script src="js/prices.js?v=5"></script>
+  <script src="js/prices.js?v=6"></script>
 </body>
 </html>

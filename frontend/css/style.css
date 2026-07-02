@@ -1077,6 +1077,51 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 .price-clickable { cursor: pointer; user-select: none; }
 .price-clickable:hover { background: #F9FAFB; }
 
+/* ── Inline prices table ────────────────────────────────────────────────────── */
+.prices-inline-table .cell-inp,
+.prices-inline-table .cell-sel {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.2rem 0.35rem;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  width: 100%;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.prices-inline-table .cell-inp:hover,
+.prices-inline-table .cell-sel:hover {
+  border-color: var(--border);
+  background: var(--card-bg);
+}
+.prices-inline-table .cell-inp:focus,
+.prices-inline-table .cell-sel:focus {
+  border-color: var(--orange);
+  background: var(--card-bg);
+  outline: none;
+}
+.prices-inline-table .cell-name {
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+.prices-inline-table .ppkg-cell {
+  font-weight: 600;
+  color: var(--orange);
+  white-space: nowrap;
+  text-align: right;
+}
+.prices-inline-table .new-price-row {
+  background: rgba(247, 167, 38, 0.04);
+}
+.prices-inline-table .new-price-row .cell-inp,
+.prices-inline-table .new-price-row .cell-sel {
+  color: var(--text-muted);
+}
+.prices-inline-table .qty-cell { max-width: 70px; }
+.prices-inline-table .price-cell { max-width: 80px; }
+
 /* Store / brand select inside ingredient table */
 .store-select-inline {
   font-size: 0.82rem;
