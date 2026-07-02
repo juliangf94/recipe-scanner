@@ -235,6 +235,59 @@ class TestRecipes:
         res = delete_json(client, f'/api/v1/recipes/{recipe_id}', token2)
         assert res.status_code == 403
 
+    def test_upload_recipe_image(self, client):
+        import io
+        token = register_and_login(client, 'imgup@test.com')
+        r = post_json(client, '/api/v1/recipes/', {'title': 'Con foto'}, token=token)
+        recipe_id = json.loads(r.data)['id']
+        fake_jpg = io.BytesIO(b'\xff\xd8\xff\xe0' + b'\x00' * 10)
+        res = client.post(
+            f'/api/v1/recipes/{recipe_id}/image',
+            data={'file': (fake_jpg, 'photo.jpg', 'image/jpeg')},
+            headers={'Authorization': f'Bearer {token}'},
+            content_type='multipart/form-data'
+        )
+        assert res.status_code == 200
+        data = json.loads(res.data)
+        assert 'image_url' in data
+        assert data['image_url']
+
+    def test_upload_recipe_image_wrong_user_returns_403(self, client):
+        import io
+        token1 = register_and_login(client, 'imgowner@test.com')
+        token2 = register_and_login(client, 'imgattacker@test.com')
+        r = post_json(client, '/api/v1/recipes/', {'title': 'Foto privada'}, token=token1)
+        recipe_id = json.loads(r.data)['id']
+        fake_jpg = io.BytesIO(b'\xff\xd8\xff\xe0' + b'\x00' * 10)
+        res = client.post(
+            f'/api/v1/recipes/{recipe_id}/image',
+            data={'file': (fake_jpg, 'hack.jpg', 'image/jpeg')},
+            headers={'Authorization': f'Bearer {token2}'},
+            content_type='multipart/form-data'
+        )
+        assert res.status_code == 403
+
+    def test_delete_recipe_image(self, client):
+        import io
+        token = register_and_login(client, 'imgdel@test.com')
+        r = post_json(client, '/api/v1/recipes/', {'title': 'Foto a borrar'}, token=token)
+        recipe_id = json.loads(r.data)['id']
+        fake_jpg = io.BytesIO(b'\xff\xd8\xff\xe0' + b'\x00' * 10)
+        up = client.post(
+            f'/api/v1/recipes/{recipe_id}/image',
+            data={'file': (fake_jpg, 'todelete.jpg', 'image/jpeg')},
+            headers={'Authorization': f'Bearer {token}'},
+            content_type='multipart/form-data'
+        )
+        image_url = json.loads(up.data)['image_url']
+        res = client.delete(
+            f'/api/v1/recipes/{recipe_id}/image',
+            data=json.dumps({'image_url': image_url}),
+            headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
+        )
+        assert res.status_code == 200
+        assert json.loads(res.data)['image_url'] is None
+
 
 # ── Ingredients ───────────────────────────────────────────────────────────────
 
