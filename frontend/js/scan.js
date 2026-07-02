@@ -23,17 +23,6 @@ function dismissScanSuccess() {
   document.getElementById('upload-success').style.display = 'none';
 }
 
-// ── Restore scan success after any page reload ────────────────────────────────
-(function restoreScanSuccess() {
-  const id    = sessionStorage.getItem('scan_success_id');
-  const title = sessionStorage.getItem('scan_success_title');
-  if (!id || !title) return;
-  sessionStorage.removeItem('scan_success_id');
-  sessionStorage.removeItem('scan_success_title');
-  lastScanSuccessId    = id;
-  lastScanSuccessTitle = title;
-  renderSuccessMessage(id, title);
-})();
 
 // ── Sidebar user info ─────────────────────────────────────────────────────────
 const user = getUser();
@@ -155,13 +144,9 @@ async function scanPdf() {
 
   const recipe = res.data.recipe;
 
-  // Persist success so it survives any page reload triggered by the browser
   lastScanSuccessId    = recipe.id;
   lastScanSuccessTitle = recipe.title;
-  sessionStorage.setItem('scan_success_id',    recipe.id);
-  sessionStorage.setItem('scan_success_title', recipe.title);
 
-  // Prevent a second scan from hiding this message
   selectedFile = null;
   document.getElementById('scan-btn').disabled = true;
 
@@ -256,8 +241,6 @@ async function forceCreateRecipe() {
   const recipe = res.data.recipe;
   lastScanSuccessId = recipe.id;
   lastScanSuccessTitle = recipe.title;
-  sessionStorage.setItem('scan_success_id', recipe.id);
-  sessionStorage.setItem('scan_success_title', recipe.title);
   selectedFile = null;
   document.getElementById('scan-btn').disabled = true;
   renderSuccessMessage(recipe.id, recipe.title);
