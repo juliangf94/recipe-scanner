@@ -194,7 +194,8 @@ class RecipeScannerFacade:
         return self._ingredients.get_by_id(ingredient_id)
 
     def get_ingredients_by_recipe(self, recipe_id):
-        return [i for i in self._ingredients.get_all() if i.recipe_id == recipe_id]
+        ings = [i for i in self._ingredients.get_all() if i.recipe_id == recipe_id]
+        return sorted(ings, key=lambda i: (i.order_num or 0))
 
     def update_ingredient(self, ingredient_id, **kwargs):
         ingredient = self._ingredients.get_by_id(ingredient_id)

@@ -1,3 +1,4 @@
+from flask import request
 from flask_restx import Namespace, Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services.facade import facade
@@ -117,3 +118,24 @@ class IngredientDetail(Resource):
             return {'error': 'Forbidden'}, 403
         facade.delete_ingredient(ingredient_id)
         return '', 204
+
+
+@api.route('/recipes/<string:recipe_id>/ingredients/reorder')
+class IngredientReorder(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Order updated')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Recipe not found')
+    def post(self, recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        updates = (request.get_json() or {}).get('updates', [])
+        for upd in updates:
+            facade.update_ingredient(upd['id'], section=upd.get('section', ''), order_num=upd.get('order_num', 0))
+        return {}, 200
+

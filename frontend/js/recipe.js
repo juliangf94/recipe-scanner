@@ -220,6 +220,8 @@ function renderPage(recipe, ingredients, steps) {
       if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
     });
   });
+
+  initSortable();
 }
 
 // ── Section helpers ───────────────────────────────────────────────────────────
@@ -260,7 +262,8 @@ function renderIngredientsTable(ingredients) {
       <th class="col-del"></th>
     </tr></thead>`;
 
-  const blocks = sections.map(sec => {
+  const tbodies = sections.map(sec => {
+    const secAttr = sec.replace(/"/g, '&quot;');
     const group = ingredients.filter(i => (i.section || '') === sec);
     const headerRow = `
       <tr class="section-header-row">
@@ -274,22 +277,26 @@ function renderIngredientsTable(ingredients) {
 
     const rows = group.length > 0
       ? group.map(i => renderIngRow(i, sections)).join('')
-      : `<tr><td colspan="7" style="padding:0.75rem 1.2rem;color:var(--text-muted);font-size:0.85rem;font-style:italic;">${t('section_empty_hint')}</td></tr>`;
-    return headerRow + rows;
+      : `<tr class="section-empty-row"><td colspan="7" style="padding:0.75rem 1.2rem;color:var(--text-muted);font-size:0.85rem;font-style:italic;">${t('section_empty_hint')}</td></tr>`;
+
+    return `<tbody class="section-body" data-section="${secAttr}">${headerRow}${rows}</tbody>`;
   }).join('');
 
   const addSectionRow = `
-    <tr class="section-add-row">
-      <td colspan="7">
-        <button class="btn-add-section" onclick="addSection()">+ ${t('section_new')}</button>
-      </td>
-    </tr>`;
+    <tbody>
+      <tr class="section-add-row">
+        <td colspan="7">
+          <button class="btn-add-section" onclick="addSection()">+ ${t('section_new')}</button>
+        </td>
+      </tr>
+    </tbody>`;
 
   return `
     <div class="ing-table-wrap">
-      <table class="ing-table ing-table-wide">
+      <table class="ing-table ing-table-wide" id="ing-table">
         ${thead}
-        <tbody>${blocks}${addSectionRow}</tbody>
+        ${tbodies}
+        ${addSectionRow}
       </table>
     </div>`;
 }
@@ -380,7 +387,7 @@ function moveToSection(ingId, value) {
       if (!res || !res.ok) return;
       const ing = currentIngredients.find(i => i.id === ingId);
       if (ing) ing.section = sectionName;
-      document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
+      setIngredients(currentIngredients);
       loadCost();
     });
     return;
@@ -392,8 +399,7 @@ function moveToSection(ingId, value) {
     if (!res || !res.ok) return;
     const ing = currentIngredients.find(i => i.id === ingId);
     if (ing) ing.section = value;
-    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
-    loadCost();
+    setIngredients(currentIngredients);
   });
 }
 
@@ -402,8 +408,7 @@ function addSection() {
     if (!localSections.includes(name) && !currentIngredients.some(i => (i.section || '') === name)) {
       localSections.push(name);
     }
-    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
-    loadCost();
+    setIngredients(currentIngredients);
   });
 }
 
@@ -418,8 +423,7 @@ function renameSection(oldName) {
       })
     ));
     targets.forEach(i => i.section = trimmed);
-    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
-    loadCost();
+    setIngredients(currentIngredients);
   });
 }
 
@@ -853,6 +857,47 @@ function deleteRecipe() {
   );
 }
 
+// ── Sortable drag & drop ──────────────────────────────────────────────────────
+function initSortable() {
+  document.querySelectorAll('#ing-table .section-body').forEach(tbody => {
+    new Sortable(tbody, {
+      group: 'ingredients',
+      animation: 150,
+      handle: '.move-icon',
+      filter: '.section-header-row, .section-empty-row',
+      draggable: '.ing-row',
+      ghostClass: 'ing-row-ghost',
+      chosenClass: 'ing-row-chosen',
+      onEnd: saveIngredientOrder,
+    });
+  });
+}
+
+async function saveIngredientOrder() {
+  const updates = [];
+  document.querySelectorAll('#ing-table .section-body').forEach(tbody => {
+    const section = tbody.dataset.section || '';
+    tbody.querySelectorAll('.ing-row').forEach((row, idx) => {
+      const id = row.dataset.ingId;
+      updates.push({ id, section, order_num: idx });
+      const ing = currentIngredients.find(i => i.id === id);
+      if (ing) { ing.section = section; ing.order_num = idx; }
+    });
+  });
+  await apiFetch(`/recipes/${recipeId}/ingredients/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ updates })
+  });
+  loadCost();
+}
+
+function setIngredients(ings) {
+  currentIngredients = ings;
+  document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(ings);
+  initSortable();
+  loadCost();
+}
+
 // ── Translate ────────────────────────────────────────────────────────────────
 async function translateRecipe() {
   const btn = document.getElementById('translate-btn');
@@ -885,10 +930,7 @@ async function translateRecipe() {
     apiFetch(`/recipes/${recipeId}/ingredients`),
     apiFetch(`/recipes/${recipeId}/steps`)
   ]);
-  if (ingRes?.ok) {
-    currentIngredients = ingRes.data;
-    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
-  }
+  if (ingRes?.ok) setIngredients(ingRes.data);
   if (stepRes?.ok) {
     currentSteps = stepRes.data;
     document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
@@ -935,11 +977,9 @@ async function addIngredient() {
   closeIngModal();
   const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
   if (ingRes && ingRes.ok) {
-    currentIngredients = ingRes.data;
-    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(ingRes.data);
+    setIngredients(ingRes.data);
     document.getElementById('ing-count').textContent =
       ingRes.data.length === 1 ? t('ing_1') : tf('ing_n', { n: ingRes.data.length });
-    loadCost();
   }
 }
 
@@ -988,11 +1028,7 @@ async function saveEditIng() {
 
   closeEditIngModal();
   const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
-  if (ingRes && ingRes.ok) {
-    currentIngredients = ingRes.data;
-    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(ingRes.data);
-    loadCost();
-  }
+  if (ingRes && ingRes.ok) setIngredients(ingRes.data);
 }
 
 function deleteIngredient(ingId) {
@@ -1003,11 +1039,9 @@ function deleteIngredient(ingId) {
   await apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, { method: 'DELETE' });
   const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
   if (ingRes && ingRes.ok) {
-    currentIngredients = ingRes.data;
-    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(ingRes.data);
+    setIngredients(ingRes.data);
     document.getElementById('ing-count').textContent =
       ingRes.data.length === 1 ? t('ing_1') : tf('ing_n', { n: ingRes.data.length });
-    loadCost();
   }
     }
   );
