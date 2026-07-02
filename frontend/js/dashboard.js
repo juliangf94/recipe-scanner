@@ -251,26 +251,32 @@ async function createRecipe() {
     return;
   }
 
-  const res = await apiFetch('/recipes/', {
-    method: 'POST',
-    body: JSON.stringify({
-      title,
-      description: document.getElementById('c-desc').value.trim(),
-      servings: parseInt(document.getElementById('c-servings').value) || 0,
-      prep_time_min: parseInt(document.getElementById('c-prep').value) || 0,
-      category: document.getElementById('c-category').value || null
-    })
-  });
+  const btn = document.querySelector('#create-modal .btn-orange');
+  btn.disabled = true;
+  try {
+    const res = await apiFetch('/recipes/', {
+      method: 'POST',
+      body: JSON.stringify({
+        title,
+        description: document.getElementById('c-desc').value.trim(),
+        servings: parseInt(document.getElementById('c-servings').value) || 0,
+        prep_time_min: parseInt(document.getElementById('c-prep').value) || 0,
+        category: document.getElementById('c-category').value || null
+      })
+    });
 
-  if (!res || !res.ok) {
-    const el = document.getElementById('create-error');
-    el.textContent = res?.data?.error || t('err_create');
-    el.style.display = '';
-    return;
+    if (!res || !res.ok) {
+      const el = document.getElementById('create-error');
+      el.textContent = res?.data?.error || t('err_create');
+      el.style.display = '';
+      return;
+    }
+
+    closeCreateModal();
+    window.location.href = `recipe.html?id=${res.data.id}`;
+  } finally {
+    btn.disabled = false;
   }
-
-  closeCreateModal();
-  window.location.href = `recipe.html?id=${res.data.id}`;
 }
 
 function logout() {

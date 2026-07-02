@@ -131,21 +131,27 @@ async function createStore() {
   const errEl = document.getElementById('stores-error');
   errEl.style.display = 'none';
   if (!name) return;
-  const res = await apiFetch('/stores', {
-    method: 'POST',
-    body: JSON.stringify({ name })
-  });
-  if (!res || !res.ok) {
-    errEl.textContent = t('err_store_create');
-    errEl.style.display = '';
-    return;
+  const btn = document.querySelector('#stores-modal .btn-orange');
+  btn.disabled = true;
+  try {
+    const res = await apiFetch('/stores', {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    });
+    if (!res || !res.ok) {
+      errEl.textContent = t('err_store_create');
+      errEl.style.display = '';
+      return;
+    }
+    document.getElementById('new-store-name').value = '';
+    if (!allStores.find(s => s.id === res.data.id)) {
+      allStores.push(res.data);
+    }
+    renderStoresList();
+    applySortAndRender();
+  } finally {
+    btn.disabled = false;
   }
-  document.getElementById('new-store-name').value = '';
-  if (!allStores.find(s => s.id === res.data.id)) {
-    allStores.push(res.data);
-  }
-  renderStoresList();
-  applySortAndRender();
 }
 
 function deleteStore(storeId, storeName) {
@@ -236,22 +242,28 @@ async function createBrand() {
   const errEl = document.getElementById('brands-error');
   errEl.style.display = 'none';
   if (!name) return;
-  const res = await apiFetch('/brands', {
-    method: 'POST',
-    body: JSON.stringify({ name, ingredient_name: ingName })
-  });
-  if (!res || !res.ok) {
-    errEl.textContent = t('err_brand_create');
-    errEl.style.display = '';
-    return;
+  const btn = document.querySelector('#brands-modal .btn-orange');
+  btn.disabled = true;
+  try {
+    const res = await apiFetch('/brands', {
+      method: 'POST',
+      body: JSON.stringify({ name, ingredient_name: ingName })
+    });
+    if (!res || !res.ok) {
+      errEl.textContent = t('err_brand_create');
+      errEl.style.display = '';
+      return;
+    }
+    document.getElementById('new-brand-name').value = '';
+    if (document.getElementById('new-brand-ing')) document.getElementById('new-brand-ing').value = '';
+    if (!allBrands.find(b => b.id === res.data.id)) {
+      allBrands.push(res.data);
+    }
+    renderBrandsList();
+    applySortAndRender();
+  } finally {
+    btn.disabled = false;
   }
-  document.getElementById('new-brand-name').value = '';
-  if (document.getElementById('new-brand-ing')) document.getElementById('new-brand-ing').value = '';
-  if (!allBrands.find(b => b.id === res.data.id)) {
-    allBrands.push(res.data);
-  }
-  renderBrandsList();
-  applySortAndRender();
 }
 
 function deleteBrand(brandId, brandName) {

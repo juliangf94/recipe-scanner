@@ -85,22 +85,28 @@ async function submitScanCreate() {
     errEl.style.display = '';
     return;
   }
-  const res = await apiFetch('/recipes/', {
-    method: 'POST',
-    body: JSON.stringify({
-      title,
-      description: document.getElementById('sc-desc').value.trim(),
-      servings: parseInt(document.getElementById('sc-servings').value) || 0,
-      prep_time_min: parseInt(document.getElementById('sc-prep').value) || 0,
-      category: document.getElementById('sc-category').value || null
-    })
-  });
-  if (!res || !res.ok) {
-    errEl.textContent = res?.data?.error || t('err_create');
-    errEl.style.display = '';
-    return;
+  const btn = document.querySelector('#scan-create-modal .btn-orange');
+  btn.disabled = true;
+  try {
+    const res = await apiFetch('/recipes/', {
+      method: 'POST',
+      body: JSON.stringify({
+        title,
+        description: document.getElementById('sc-desc').value.trim(),
+        servings: parseInt(document.getElementById('sc-servings').value) || 0,
+        prep_time_min: parseInt(document.getElementById('sc-prep').value) || 0,
+        category: document.getElementById('sc-category').value || null
+      })
+    });
+    if (!res || !res.ok) {
+      errEl.textContent = res?.data?.error || t('err_create');
+      errEl.style.display = '';
+      return;
+    }
+    window.location.href = `recipe.html?id=${res.data.id}`;
+  } finally {
+    btn.disabled = false;
   }
-  window.location.href = `recipe.html?id=${res.data.id}`;
 }
 
 // ── Extraction option pills ───────────────────────────────────────────────────
