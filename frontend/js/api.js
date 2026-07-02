@@ -162,6 +162,72 @@ async function apiUpload(path, formData) {
   return res.json().then(data => ({ ok: res.ok, status: res.status, data }));
 }
 
+// ── Custom prompt modal ───────────────────────────────────────────────────────
+function showPrompt(title, defaultValue, callback) {
+  const modal = document.getElementById('shared-prompt-modal');
+  const titleEl = document.getElementById('shared-prompt-title');
+  const input = document.getElementById('shared-prompt-input');
+  const confirmBtn = document.getElementById('shared-prompt-confirm');
+  if (!modal) return;
+
+  titleEl.textContent = title;
+  input.value = defaultValue || '';
+  modal.classList.add('open');
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+
+  function submit() {
+    const val = input.value.trim();
+    if (!val) return;
+    modal.classList.remove('open');
+    confirmBtn.onclick = null;
+    callback(val);
+  }
+
+  confirmBtn.onclick = submit;
+  input.onkeydown = (e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') closePrompt(); };
+  modal.onclick = (e) => { if (e.target === modal) closePrompt(); };
+}
+
+function closePrompt() {
+  document.getElementById('shared-prompt-modal')?.classList.remove('open');
+}
+
+// ── Custom alert modal ────────────────────────────────────────────────────────
+function showAlert(message) {
+  const modal = document.getElementById('shared-alert-modal');
+  const msgEl = document.getElementById('shared-alert-message');
+  if (!modal) return;
+  msgEl.textContent = message;
+  modal.classList.add('open');
+  modal.onclick = (e) => { if (e.target === modal) closeAlert(); };
+}
+
+function closeAlert() {
+  document.getElementById('shared-alert-modal')?.classList.remove('open');
+}
+
+// ── Custom confirm modal (shared) ─────────────────────────────────────────────
+function showConfirmModal(title, desc, callback) {
+  const modal = document.getElementById('shared-confirm-modal');
+  const titleEl = document.getElementById('shared-confirm-title');
+  const descEl = document.getElementById('shared-confirm-desc');
+  const confirmBtn = document.getElementById('shared-confirm-btn');
+  if (!modal) return;
+
+  titleEl.textContent = title;
+  descEl.textContent = desc || '';
+  confirmBtn.onclick = () => {
+    modal.classList.remove('open');
+    callback();
+  };
+  modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('open'); };
+  modal.classList.add('open');
+}
+
+function closeSharedConfirm() {
+  document.getElementById('shared-confirm-modal')?.classList.remove('open');
+}
+
 // ── User dropdown menu ────────────────────────────────────────────────────────
 function toggleUserMenu(e) {
   e.stopPropagation();

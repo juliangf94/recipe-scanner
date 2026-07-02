@@ -120,15 +120,16 @@ async function createBrand() {
   rebuildBrandDropdowns();
 }
 
-async function deleteBrand(brandId, brandName) {
-  if (!confirm(tf('confirm_del_brand', { name: brandName }))) return;
-  const res = await apiFetch(`/brands/${brandId}`, { method: 'DELETE' });
-  if (res !== null && res !== undefined && !res.ok) {
-    showError(t('err_brand_del'));
-    return;
-  }
-  allBrands = allBrands.filter(b => b.id !== brandId);
-  rebuildBrandDropdowns();
+function deleteBrand(brandId, brandName) {
+  showConfirmModal(tf('confirm_del_brand', { name: brandName }), '', async () => {
+    const res = await apiFetch(`/brands/${brandId}`, { method: 'DELETE' });
+    if (res !== null && res !== undefined && !res.ok) {
+      showError(t('err_brand_del'));
+      return;
+    }
+    allBrands = allBrands.filter(b => b.id !== brandId);
+    rebuildBrandDropdowns();
+  });
 }
 
 function rebuildStoreDropdowns() {
@@ -187,15 +188,16 @@ async function createStore() {
   rebuildStoreDropdowns();
 }
 
-async function deleteStore(storeId, storeName) {
-  if (!confirm(tf('confirm_del_store', { name: storeName }))) return;
-  const res = await apiFetch(`/stores/${storeId}`, { method: 'DELETE' });
-  if (res !== null && res !== undefined && !res.ok) {
-    showError(t('err_store_del'));
-    return;
-  }
-  allStores = allStores.filter(s => s.id !== storeId);
-  rebuildStoreDropdowns();
+function deleteStore(storeId, storeName) {
+  showConfirmModal(tf('confirm_del_store', { name: storeName }), '', async () => {
+    const res = await apiFetch(`/stores/${storeId}`, { method: 'DELETE' });
+    if (res !== null && res !== undefined && !res.ok) {
+      showError(t('err_store_del'));
+      return;
+    }
+    allStores = allStores.filter(s => s.id !== storeId);
+    rebuildStoreDropdowns();
+  });
 }
 
 // ── Entry mode toggle ─────────────────────────────────────────────────────────
@@ -497,15 +499,16 @@ async function saveEdit() {
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
-async function deletePrice(priceId, name) {
-  if (!confirm(tf('confirm_del_price', { name }))) return;
-  const res = await apiFetch(`/prices/${priceId}`, { method: 'DELETE' });
-  if (res !== null && res !== undefined && !res.ok) {
-    showError(t('err_price_del'));
-    return;
-  }
-  showSuccess(t('btn_del_price'));
-  await loadPrices();
+function deletePrice(priceId, name) {
+  showConfirmModal(tf('confirm_del_price', { name }), '', async () => {
+    const res = await apiFetch(`/prices/${priceId}`, { method: 'DELETE' });
+    if (res !== null && res !== undefined && !res.ok) {
+      showError(t('err_price_del'));
+      return;
+    }
+    showSuccess(t('btn_del_price'));
+    await loadPrices();
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

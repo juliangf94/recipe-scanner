@@ -364,47 +364,49 @@ document.addEventListener('click', e => {
   }
 });
 
-async function moveToSection(ingId, value) {
-  let sectionName = value;
+function moveToSection(ingId, value) {
   if (value === '__new__') {
-    sectionName = prompt(t('section_new_name_prompt'));
-    if (!sectionName || !sectionName.trim()) return;
-    sectionName = sectionName.trim();
+    showPrompt(t('section_new_name_prompt'), '', async (sectionName) => {
+      const res = await apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ section: sectionName })
+      });
+      if (!res || !res.ok) return;
+      const ing = currentIngredients.find(i => i.id === ingId);
+      if (ing) ing.section = sectionName;
+      document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
+      loadCost();
+    });
+    return;
   }
-  const res = await apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, {
+  apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, {
     method: 'PUT',
-    body: JSON.stringify({ section: sectionName })
+    body: JSON.stringify({ section: value })
+  }).then(res => {
+    if (!res || !res.ok) return;
+    const ing = currentIngredients.find(i => i.id === ingId);
+    if (ing) ing.section = value;
+    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
+    loadCost();
   });
-  if (!res || !res.ok) return;
-  const ing = currentIngredients.find(i => i.id === ingId);
-  if (ing) ing.section = sectionName;
-  document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
-  loadCost();
 }
 
-async function addSection() {
-  const name = prompt(t('section_new_name_prompt'));
-  if (!name || !name.trim()) return;
-  // Sections only exist when an ingredient belongs to them — nothing to save yet
-  // Just add a visual placeholder by assigning a dummy invisible ingredient? No.
-  // Instead: ask user to pick which ingredient to put in new section, or just show the header.
-  // Simplest: create the section by moving the first unsectioned ingredient there.
-  // Better UX: tell user to use the ⠿ icon on any ingredient.
-  alert(tf('section_created_hint', { name: name.trim() }));
+function addSection() {
+  showPrompt(t('section_new_name_prompt'), '', (name) => {
+    showAlert(tf('section_created_hint', { name }));
+  });
 }
 
-function renameSection(oldName, el) {
-  const newName = prompt(t('section_rename_prompt'), oldName);
-  if (!newName || !newName.trim() || newName.trim() === oldName) return;
-  const trimmed = newName.trim();
-  // Update all ingredients in that section
-  const targets = currentIngredients.filter(i => (i.section || '') === oldName);
-  Promise.all(targets.map(i =>
-    apiFetch(`/recipes/${recipeId}/ingredients/${i.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ section: trimmed })
-    })
-  )).then(() => {
+function renameSection(oldName) {
+  showPrompt(t('section_rename_prompt'), oldName, async (trimmed) => {
+    if (trimmed === oldName) return;
+    const targets = currentIngredients.filter(i => (i.section || '') === oldName);
+    await Promise.all(targets.map(i =>
+      apiFetch(`/recipes/${recipeId}/ingredients/${i.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ section: trimmed })
+      })
+    ));
     targets.forEach(i => i.section = trimmed);
     document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
     loadCost();
@@ -412,7 +414,7 @@ function renameSection(oldName, el) {
 }
 
 function promptAddSection() {
-  alert(t('section_move_hint'));
+  showAlert(t('section_move_hint'));
 }
 
 function renderSteps(steps) {
