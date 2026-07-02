@@ -1392,6 +1392,12 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 .lang-btn.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 
 .lang-fixed { display: none; } /* moved inside sidebar */
+.lang-fixed-auth {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+}
 
 .sidebar-lang {
   padding: 0.6rem 1rem;
