@@ -84,6 +84,7 @@ function recipeCard(r) {
         <div class="card-meta">${meta.map(m => `<span>${m}</span>`).join('')}</div>
         <div class="card-footer">
           <span class="view-btn">${t('card_view')}</span>
+          <button class="card-delete-btn" onclick="event.preventDefault();event.stopPropagation();confirmDeleteRecipe('${r.id}','${localTitle.replace(/'/g,"\\'")}')">🗑</button>
         </div>
       </div>
     </a>`;
@@ -274,6 +275,23 @@ async function createRecipe() {
 function logout() {
   removeToken();
   window.location.href = 'index.html';
+}
+
+function confirmDeleteRecipe(id, title) {
+  document.getElementById('dash-confirm-title').textContent = tf('confirm_del_recipe', { title });
+  document.getElementById('dash-confirm-desc').textContent = t('confirm_del_recipe_desc');
+  document.getElementById('dash-confirm-btn').textContent = t('btn_delete');
+  document.getElementById('dash-confirm-btn').onclick = async () => {
+    document.getElementById('dash-confirm-modal').classList.remove('open');
+    await apiFetch(`/recipes/${id}`, { method: 'DELETE' });
+    allRecipes = allRecipes.filter(r => r.id !== id);
+    renderRecipes(allRecipes);
+  };
+  document.getElementById('dash-confirm-modal').classList.add('open');
+}
+
+function closeDashConfirm() {
+  document.getElementById('dash-confirm-modal').classList.remove('open');
 }
 
 document.getElementById('create-modal').addEventListener('click', e => {

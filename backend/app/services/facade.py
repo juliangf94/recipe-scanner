@@ -158,6 +158,10 @@ class RecipeScannerFacade:
         return self._recipes.update(recipe)
 
     def delete_recipe(self, recipe_id):
+        for ing in self.get_ingredients_by_recipe(recipe_id):
+            self._ingredients.delete(ing.id)
+        for step in self.get_steps_by_recipe(recipe_id):
+            self._steps.delete(step.id)
         self._recipes.delete(recipe_id)
 
     # --- Ingredients --- api/v1/ingredients.py ---
