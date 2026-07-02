@@ -449,37 +449,34 @@ class RecipeScannerFacade:
             logging.info('PDF text sent to Groq (first 300 chars): %s', text[:300])
             response = client.chat.completions.create(
                 model='llama-3.3-70b-versatile',
-                messages=[{'role': 'user', 'content': GROQ_PROMPT + text}],
+                messages=[{'role': 'user', 'content': GROQ_PROMPT + text[:8000]}],
                 temperature=0.1,
             )
             content = response.choices[0].message.content.strip()
-            # Strip <think>…</think> blocks produced by Qwen3 reasoning mode
+            # Strip <think>…</think> blocks produced by reasoning models
             content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
-            logging.info('Groq raw response (first 200 chars): %s', content[:200])
+            logging.info('Groq raw response (first 400 chars): %s', content[:400])
 
-            # Strip markdown code fences (```json ... ```)
-            content = re.sub(r'```(?:json)?\s*', '', content).strip()
+            # Strip markdown code fences
+            content = re.sub(r'```(?:json)?\s*|\s*```', '', content).strip()
 
-            # Find the first { that looks like a real JSON object start (followed by whitespace then ")
-            match = re.search(r'\{\s*"', content)
+            # First try: whole response is plain JSON
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                pass
+
+            # Second try: find the opening { and use raw_decode — correctly handles
+            # braces inside string values (the manual depth-tracker does not)
+            match = re.search(r'\{', content)
             if match is None:
                 logging.error('No JSON object found in Groq response: %s', content[:500])
                 return None
-            start = match.start()
-            depth = 0
-            end = start
-            for i, ch in enumerate(content[start:], start):
-                if ch == '{':
-                    depth += 1
-                elif ch == '}':
-                    depth -= 1
-                    if depth == 0:
-                        end = i
-                        break
             try:
-                return json.loads(content[start:end + 1])
+                obj, _ = json.JSONDecoder().raw_decode(content, match.start())
+                return obj
             except json.JSONDecodeError as e:
-                logging.error('Groq response was not valid JSON after extraction: %s', e)
+                logging.error('Groq JSON decode failed: %s | content: %s', e, content[:500])
                 return None
         except Exception as e:
             logging.error('Groq API call failed: %s', e)
