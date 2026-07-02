@@ -410,7 +410,6 @@ class RecipeScannerFacade:
                 model='qwen/qwen3.6-27b',
                 messages=[{'role': 'user', 'content': GROQ_PROMPT + text}],
                 temperature=0.1,
-                response_format={'type': 'json_object'}
             )
             content = response.choices[0].message.content.strip()
             logging.info('Groq raw response (first 200 chars): %s', content[:200])
