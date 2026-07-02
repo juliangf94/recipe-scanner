@@ -391,6 +391,30 @@ class TestStoresAndBrands:
         res = delete_json(client, '/api/v1/brands/00000000-0000-0000-0000-000000000000', token)
         assert res.status_code == 404
 
+    def test_patch_brand_ingredient_name(self, client):
+        token = register_and_login(client, 'bpatch@test.com')
+        create_res = post_json(client, '/api/v1/brands', {'name': 'Natura'}, token=token)
+        brand_id = json.loads(create_res.data)['id']
+        res = client.patch(
+            f'/api/v1/brands/{brand_id}',
+            data=json.dumps({'ingredient_name': 'mantequilla'}),
+            headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
+        )
+        assert res.status_code == 200
+        assert json.loads(res.data)['ingredient_name'] == 'mantequilla'
+
+    def test_patch_brand_other_user_returns_404(self, client):
+        token1 = register_and_login(client, 'bpowner@test.com')
+        token2 = register_and_login(client, 'bpattacker@test.com')
+        create_res = post_json(client, '/api/v1/brands', {'name': 'AjenaMarca'}, token=token1)
+        brand_id = json.loads(create_res.data)['id']
+        res = client.patch(
+            f'/api/v1/brands/{brand_id}',
+            data=json.dumps({'ingredient_name': 'leche'}),
+            headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token2}'}
+        )
+        assert res.status_code == 404
+
 
 # ── Steps ─────────────────────────────────────────────────────────────────────
 
@@ -651,3 +675,17 @@ class TestCosts:
         data = json.loads(res.data)
         ing = data['ingredients'][0]
         assert ing['source'] != 'manual'
+
+
+# ── Health ─────────────────────────────────────────────────────────────────────
+
+class TestHealth:
+
+    def test_health_returns_200(self, client):
+        res = client.get('/api/v1/health')
+        assert res.status_code == 200
+
+    def test_health_no_auth_required(self, client):
+        res = client.get('/api/v1/health')
+        data = json.loads(res.data)
+        assert data.get('status') == 'ok'
