@@ -24,13 +24,7 @@
     <h1 data-i18n="signup_title">Create your account</h1>
     <p class="subtitle" data-i18n="signup_sub">Start scanning recipes and tracking costs</p>
 
-    <div class="trust-row">
-      <span class="trust-item" data-i18n="trust_free">✅ Free</span>
-      <span class="trust-item" data-i18n="trust_nocard">💳 No credit card</span>
-      <span class="trust-item" data-i18n="trust_secure">🔒 Secure</span>
-    </div>
-
-    <div id="register-error" class="alert alert-error" style="display:none"></div>
+<div id="register-error" class="alert alert-error" style="display:none"></div>
 
     <form onsubmit="handleRegister(event)" novalidate>
       <div class="form-row">
@@ -38,14 +32,14 @@
           <label for="reg-first" data-i18n="label_firstname">First name</label>
           <div class="input-wrap">
             <span class="input-icon">👤</span>
-            <input type="text" id="reg-first" placeholder="Marie" autocomplete="given-name">
+            <input type="text" id="reg-first" placeholder="" autocomplete="given-name">
           </div>
         </div>
         <div class="form-group">
           <label for="reg-last" data-i18n="label_lastname">Last name</label>
           <div class="input-wrap">
             <span class="input-icon">👤</span>
-            <input type="text" id="reg-last" placeholder="Dupont" autocomplete="family-name">
+            <input type="text" id="reg-last" placeholder="" autocomplete="family-name">
           </div>
         </div>
       </div>
