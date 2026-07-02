@@ -113,7 +113,6 @@ class RecipeScannerFacade:
 
     # --- Recipes --- api/v1/recipes.py ---
 
-    @staticmethod
     VALID_CATEGORIES = {
         'Desserts', 'Cake', 'Main Course', 'Meat', 'Pasta', 'Chicken', 'Fish',
         'Seafood', 'Soup', 'Salad', 'Breakfast', 'Rice', 'Bread', 'Bakery',
