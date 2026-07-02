@@ -414,11 +414,15 @@ class RecipeScannerFacade:
             content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
             logging.info('Groq raw response (first 200 chars): %s', content[:200])
 
-            # Extract the first balanced {...} block — handles extra text/markdown after the JSON
-            start = content.find('{')
-            if start == -1:
+            # Strip markdown code fences (```json ... ```)
+            content = re.sub(r'```(?:json)?\s*', '', content).strip()
+
+            # Find the first { that looks like a real JSON object start (followed by whitespace then ")
+            match = re.search(r'\{\s*"', content)
+            if match is None:
                 logging.error('No JSON object found in Groq response: %s', content[:500])
                 return None
+            start = match.start()
             depth = 0
             end = start
             for i, ch in enumerate(content[start:], start):
