@@ -10,6 +10,11 @@ function resolveImgUrl(url) {
   return `${SERVER_URL}${url}`;
 }
 
+function supabaseThumb(url, width = 200, quality = 80) {
+  if (!url || !url.includes('supabase.co/storage/v1/object/public/')) return url;
+  return url.replace('/object/public/', '/render/image/public/') + `?width=${width}&quality=${quality}`;
+}
+
 // ── Token storage ─────────────────────────────────────────────────────────────
 function getAccessToken()  { return localStorage.getItem('access_token'); }
 function getRefreshToken() { return localStorage.getItem('refresh_token'); }

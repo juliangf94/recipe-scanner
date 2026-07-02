@@ -1583,7 +1583,9 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   background: none;
   border: none;
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 8px 12px;
+  min-height: 44px;
+  min-width: 44px;
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -1612,7 +1614,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 @media (max-width: 960px) {
   .sidebar-lang { padding: 0.5rem 0.25rem; }
   .sidebar-lang .lang-toggle { flex-direction: column; gap: 1px; }
-  .sidebar-lang .lang-btn { padding: 3px 6px; font-size: 0.7rem; letter-spacing: 0; text-align: center; }
+  .sidebar-lang .lang-btn { padding: 6px 4px; min-height: 36px; min-width: 36px; font-size: 0.7rem; letter-spacing: 0; text-align: center; }
 }
 
 .mobile-only-nav { display: none; }
@@ -1851,7 +1853,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 .home-recipe-cost {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--orange);
+  color: #b45309;
 }
 
 /* Top ingredients list */

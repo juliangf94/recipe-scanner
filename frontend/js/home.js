@@ -88,7 +88,7 @@ function renderHome(data) {
         const emoji = cardEmoji(r.category);
         const bannerCls = bannerClass(r.category);
         const imgHtml = r.image_url
-          ? `<img src="${resolveImgUrl(r.image_url)}" alt="${title}" style="width:100%;height:100%;object-fit:cover;">`
+          ? `<img src="${supabaseThumb(resolveImgUrl(r.image_url), 120)}" alt="${title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
           : `<div class="home-recipe-banner ${bannerCls}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2.2rem;">${emoji}</div>`;
 
         return `
