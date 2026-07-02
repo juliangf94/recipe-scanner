@@ -13,7 +13,7 @@ function setAvatarDisplay(avatarUrl, initials) {
   }
   if (large) {
     large.innerHTML = avatarUrl
-      ? `<img src="${supabaseThumb(baseUrl, 300, 85)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+      ? `<img src="${supabaseThumb(baseUrl, 300, 85)}" alt="avatar" style="width:100%;height:100%;object-fit:contain;border-radius:50%;background:#f3f4f6;">`
       : `<span>${initials}</span>`;
   }
   document.getElementById('account-initials')?.remove();
