@@ -58,6 +58,10 @@ def create_app(config_name=None):
     api.add_namespace(stores_ns, path='/api/v1/stores')
     api.add_namespace(brands_ns, path='/api/v1/brands')
 
+    @app.route('/api/v1/health')
+    def health():
+        return {'status': 'ok'}, 200
+
     with app.app_context():
         from app.models.brand import Brand  # ensure table is registered before create_all
         db.create_all()

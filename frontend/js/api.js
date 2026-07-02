@@ -4,6 +4,9 @@ const BASE_URL = IS_LOCAL
   : 'https://recipe-scanner-kfnm.onrender.com/api/v1';
 const SERVER_URL = BASE_URL.replace('/api/v1', '');
 
+// Wake up Render free-tier backend on page load (fire-and-forget, no error shown)
+if (!IS_LOCAL) fetch(`${BASE_URL}/health`).catch(() => {});
+
 function resolveImgUrl(url) {
   if (!url) return '';
   if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('//')) return url;
