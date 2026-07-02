@@ -397,15 +397,26 @@ class RecipeScannerFacade:
             content = response.choices[0].message.content.strip()
             logging.info('Groq raw response (first 200 chars): %s', content[:200])
 
-            # Extract the first {...} block — handles markdown fences, leading text, etc.
-            match = re.search(r'\{.*\}', content, re.DOTALL)
-            if not match:
+            # Extract the first balanced {...} block — handles extra text/markdown after the JSON
+            start = content.find('{')
+            if start == -1:
                 logging.error('No JSON object found in Groq response: %s', content[:500])
                 return None
-            return json.loads(match.group())
-        except json.JSONDecodeError as e:
-            logging.error('Groq response was not valid JSON: %s', e)
-            return None
+            depth = 0
+            end = start
+            for i, ch in enumerate(content[start:], start):
+                if ch == '{':
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end = i
+                        break
+            try:
+                return json.loads(content[start:end + 1])
+            except json.JSONDecodeError as e:
+                logging.error('Groq response was not valid JSON after extraction: %s', e)
+                return None
         except Exception as e:
             logging.error('Groq API call failed: %s', e)
             return None
