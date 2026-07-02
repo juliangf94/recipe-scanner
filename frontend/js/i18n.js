@@ -134,7 +134,10 @@ const TRANSLATIONS = {
     btn_save: 'Save',
     err_save: 'Error saving.',
     confirm_del_recipe: 'Delete "{title}"?',
+    confirm_del_recipe_desc: 'This will permanently delete the recipe, all its ingredients and steps.',
     confirm_del_ing: 'Delete this ingredient?',
+    confirm_del_ing_desc: 'This ingredient will be permanently removed from the recipe.',
+    confirm_del_step_desc: 'This step will be permanently removed from the recipe.',
     err_add_ing: 'Error adding ingredient.',
 
     // Manual price override
@@ -437,7 +440,10 @@ const TRANSLATIONS = {
     btn_save: 'Guardar',
     err_save: 'Error al guardar.',
     confirm_del_recipe: '¿Eliminar "{title}"?',
+    confirm_del_recipe_desc: 'Esto eliminará permanentemente la receta, todos sus ingredientes y pasos.',
     confirm_del_ing: '¿Eliminar este ingrediente?',
+    confirm_del_ing_desc: 'Este ingrediente será eliminado permanentemente de la receta.',
+    confirm_del_step_desc: 'Este paso será eliminado permanentemente de la receta.',
     err_add_ing: 'Error al agregar ingrediente.',
 
     // Manual price override
@@ -740,7 +746,10 @@ const TRANSLATIONS = {
     btn_save: 'Enregistrer',
     err_save: 'Erreur lors de l\'enregistrement.',
     confirm_del_recipe: 'Supprimer « {title} » ?',
+    confirm_del_recipe_desc: 'Cela supprimera définitivement la recette, tous ses ingrédients et ses étapes.',
     confirm_del_ing: 'Supprimer cet ingrédient ?',
+    confirm_del_ing_desc: 'Cet ingrédient sera définitivement supprimé de la recette.',
+    confirm_del_step_desc: 'Cette étape sera définitivement supprimée de la recette.',
     err_add_ing: 'Erreur lors de l\'ajout de l\'ingrédient.',
 
     // Manual price override

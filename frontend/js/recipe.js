@@ -549,12 +549,17 @@ async function saveEditStep() {
   document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
 }
 
-async function deleteStep(stepId) {
-  if (!confirm(t('confirm_del_step'))) return;
-  const res = await apiFetch(`/recipes/${recipeId}/steps/${stepId}`, { method: 'DELETE' });
-  if (!res || !res.ok) return;
-  currentSteps = currentSteps.filter(s => s.id !== stepId);
-  document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+function deleteStep(stepId) {
+  showConfirmDelete(
+    t('confirm_del_step'),
+    t('confirm_del_step_desc'),
+    async () => {
+      const res = await apiFetch(`/recipes/${recipeId}/steps/${stepId}`, { method: 'DELETE' });
+      if (!res || !res.ok) return;
+      currentSteps = currentSteps.filter(s => s.id !== stepId);
+      document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+    }
+  );
 }
 
 // ── Cost ──────────────────────────────────────────────────────────────────────
@@ -821,10 +826,15 @@ async function saveRecipe() {
   renderRecipeHeader(currentRecipe);
 }
 
-async function deleteRecipe() {
-  if (!confirm(tf('confirm_del_recipe', { title: currentRecipe.title }))) return;
-  await apiFetch(`/recipes/${recipeId}`, { method: 'DELETE' });
-  window.location.href = 'dashboard.html';
+function deleteRecipe() {
+  showConfirmDelete(
+    tf('confirm_del_recipe', { title: currentRecipe.title }),
+    t('confirm_del_recipe_desc'),
+    async () => {
+      await apiFetch(`/recipes/${recipeId}`, { method: 'DELETE' });
+      window.location.href = 'dashboard.html';
+    }
+  );
 }
 
 // ── Ingredients ───────────────────────────────────────────────────────────────
@@ -927,8 +937,11 @@ async function saveEditIng() {
   }
 }
 
-async function deleteIngredient(ingId) {
-  if (!confirm(t('confirm_del_ing'))) return;
+function deleteIngredient(ingId) {
+  showConfirmDelete(
+    t('confirm_del_ing'),
+    t('confirm_del_ing_desc'),
+    async () => {
   await apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, { method: 'DELETE' });
   const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
   if (ingRes && ingRes.ok) {
@@ -938,9 +951,29 @@ async function deleteIngredient(ingId) {
       ingRes.data.length === 1 ? t('ing_1') : tf('ing_n', { n: ingRes.data.length });
     loadCost();
   }
+    }
+  );
 }
 
 function logout() { removeToken(); window.location.href = 'index.html'; }
+
+// ── Confirm delete modal ──────────────────────────────────────────────────────
+let _confirmDeleteCallback = null;
+
+function showConfirmDelete(title, desc, callback) {
+  document.getElementById('confirm-delete-title').textContent = title;
+  document.getElementById('confirm-delete-desc').textContent = desc;
+  document.getElementById('confirm-delete-btn').textContent = t('btn_delete');
+  document.getElementById('confirm-delete-btn').onclick = () => {
+    closeConfirmDelete();
+    callback();
+  };
+  document.getElementById('confirm-delete-modal').classList.add('open');
+}
+
+function closeConfirmDelete() {
+  document.getElementById('confirm-delete-modal').classList.remove('open');
+}
 
 // Live preview listeners for price modal
 document.addEventListener('DOMContentLoaded', () => {
