@@ -258,7 +258,7 @@ async function createRecipe() {
       description: document.getElementById('c-desc').value.trim(),
       servings: parseInt(document.getElementById('c-servings').value) || 0,
       prep_time_min: parseInt(document.getElementById('c-prep').value) || 0,
-      category: titleCase(document.getElementById('c-category').value.trim())
+      category: document.getElementById('c-category').value || null
     })
   });
 

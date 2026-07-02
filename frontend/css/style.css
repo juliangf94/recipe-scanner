@@ -277,6 +277,7 @@ a:hover { text-decoration: underline; }
 .form-group { margin-bottom: 1rem; }
 .form-row { display: flex; gap: 0.75rem; }
 .form-row .form-group { flex: 1; }
+.form-select { cursor: pointer; appearance: auto; }
 
 label {
   display: block;

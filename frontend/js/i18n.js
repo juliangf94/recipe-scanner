@@ -995,85 +995,126 @@ function tf(key, vars) {
 // ── Category translation — canonical approach ─────────────────────────────────
 // Step 1: any variant (ES/FR/EN) → English canonical key
 const CANONICAL_CAT = {
+  // ── English ──────────────────────────────────────────────────────────────────
   'desserts': 'Desserts', 'dessert': 'Desserts',
-  'cake': 'Cake', 'cakes': 'Cake',
-  'main course': 'Main Course',
-  'meat': 'Meat',
-  'pasta': 'Pasta', 'pastas': 'Pasta',
-  'chicken': 'Chicken',
-  'fish': 'Fish', 'seafood': 'Seafood',
-  'soup': 'Soup', 'soups': 'Soup',
+  'cake': 'Desserts', 'cakes': 'Desserts',
+  'pastry': 'Desserts', 'pastries': 'Desserts',
+  'sweet': 'Desserts', 'sweets': 'Desserts',
+  'candy': 'Desserts', 'confectionery': 'Desserts',
+  'cookie': 'Desserts', 'cookies': 'Desserts',
+  'biscuit': 'Desserts', 'biscuits': 'Desserts',
+  'brownie': 'Desserts', 'brownies': 'Desserts',
+  'cupcake': 'Desserts', 'cupcakes': 'Desserts',
+  'muffin': 'Desserts', 'muffins': 'Desserts',
+  'pudding': 'Desserts', 'puddings': 'Desserts',
+  'pie': 'Desserts', 'pies': 'Desserts',
+  'tart': 'Desserts', 'tarts': 'Desserts',
+  'ice cream': 'Desserts', 'gelato': 'Desserts',
+  'main course': 'Main Course', 'main dish': 'Main Course', 'entree': 'Main Course',
+  'meat': 'Meat', 'beef': 'Meat', 'pork': 'Meat', 'lamb': 'Meat',
+  'steak': 'Meat', 'burger': 'Meat', 'hamburger': 'Meat',
+  'pasta': 'Pasta', 'pastas': 'Pasta', 'noodles': 'Pasta',
+  'chicken': 'Chicken', 'poultry': 'Chicken', 'turkey': 'Chicken',
+  'fish': 'Fish', 'tuna': 'Fish', 'salmon': 'Fish', 'cod': 'Fish',
+  'seafood': 'Seafood', 'shrimp': 'Seafood', 'prawn': 'Seafood',
+  'soup': 'Soup', 'soups': 'Soup', 'stew': 'Soup', 'broth': 'Soup',
   'salad': 'Salad', 'salads': 'Salad',
-  'breakfast': 'Breakfast',
-  'rice': 'Rice',
-  'bread': 'Bread', 'bakery': 'Bakery',
-  'vegan': 'Vegan', 'vegetarian': 'Vegetarian',
-  'appetizer': 'Appetizer', 'appetizers': 'Appetizer',
-  'drink': 'Drink', 'drinks': 'Drink',
-  'sandwich': 'Sandwich',
-  'snack': 'Snack',
-  // Spanish variants
+  'breakfast': 'Breakfast', 'brunch': 'Breakfast',
+  'rice': 'Rice', 'risotto': 'Rice',
+  'bread': 'Bakery', 'bakery': 'Bakery', 'baked goods': 'Bakery',
+  'vegan': 'Vegan', 'plant-based': 'Vegan',
+  'vegetarian': 'Vegetarian',
+  'appetizer': 'Appetizer', 'appetizers': 'Appetizer', 'starter': 'Appetizer', 'starters': 'Appetizer',
+  'drink': 'Drink', 'drinks': 'Drink', 'beverage': 'Drink', 'beverages': 'Drink',
+  'smoothie': 'Drink', 'juice': 'Drink', 'cocktail': 'Drink',
+  'sandwich': 'Sandwich', 'sandwiches': 'Sandwich', 'wrap': 'Sandwich',
+  'snack': 'Snack', 'snacks': 'Snack',
+  // ── Spanish ──────────────────────────────────────────────────────────────────
   'postres': 'Desserts', 'postre': 'Desserts',
-  'carne': 'Meat', 'carnes': 'Meat',
-  'pollo': 'Chicken',
-  'pescado': 'Fish', 'mariscos': 'Seafood',
-  'sopa': 'Soup', 'sopas': 'Soup',
+  'repostería': 'Desserts', 'reposteria': 'Desserts',
+  'pastelería': 'Desserts', 'pasteleria': 'Desserts',
+  'dulces': 'Desserts', 'dulce': 'Desserts',
+  'confitería': 'Desserts', 'confiteria': 'Desserts',
+  'golosinas': 'Desserts', 'golosina': 'Desserts',
+  'galletas': 'Desserts', 'galleta': 'Desserts',
+  'torta': 'Desserts', 'tortas': 'Desserts',
+  'tarta': 'Desserts', 'tartas': 'Desserts',
+  'bizcocho': 'Desserts', 'bizcochos': 'Desserts',
+  'helado': 'Desserts', 'helados': 'Desserts',
+  'flan': 'Desserts', 'mousse': 'Desserts',
+  'alfajor': 'Desserts', 'alfajores': 'Desserts',
+  'facturas': 'Desserts',
+  'plato principal': 'Main Course',
+  'carne': 'Meat', 'carnes': 'Meat', 'res': 'Meat', 'cerdo': 'Meat', 'cordero': 'Meat',
+  'hamburguesa': 'Meat', 'hamburguesas': 'Meat', 'milanesa': 'Meat', 'milanesas': 'Meat',
+  'pollo': 'Chicken', 'pavo': 'Chicken',
+  'pescado': 'Fish', 'atún': 'Fish', 'atun': 'Fish', 'salmon': 'Fish', 'salmón': 'Fish',
+  'mariscos': 'Seafood', 'camarones': 'Seafood', 'langostinos': 'Seafood',
+  'sopa': 'Soup', 'sopas': 'Soup', 'guiso': 'Soup', 'guisos': 'Soup', 'caldo': 'Soup',
   'ensalada': 'Salad', 'ensaladas': 'Salad',
-  'desayuno': 'Breakfast',
-  'arroz': 'Rice',
-  'pan': 'Bread', 'panaderia': 'Bakery',
-  'tarta': 'Cake', 'torta': 'Cake', 'tortas': 'Cake',
-  'vegano': 'Vegan', 'vegetariano': 'Vegetarian',
-  'aperitivo': 'Appetizer', 'aperitivos': 'Appetizer',
-  'bebida': 'Drink', 'bebidas': 'Drink',
-  // French variants
-  'gâteau': 'Cake', 'gâteaux': 'Cake', 'tarte': 'Cake',
-  'pâtes': 'Pasta',
-  'viande': 'Meat',
-  'poulet': 'Chicken',
-  'poisson': 'Fish', 'fruits de mer': 'Seafood',
-  'soupe': 'Soup', 'soupes': 'Soup',
+  'desayuno': 'Breakfast', 'brunch': 'Breakfast',
+  'arroz': 'Rice', 'risotto': 'Rice',
+  'pan': 'Bakery', 'panes': 'Bakery', 'panadería': 'Bakery', 'panaderia': 'Bakery', 'bollería': 'Bakery', 'bolleria': 'Bakery',
+  'vegano': 'Vegan', 'vegana': 'Vegan',
+  'vegetariano': 'Vegetarian', 'vegetariana': 'Vegetarian',
+  'aperitivo': 'Appetizer', 'aperitivos': 'Appetizer', 'entrada': 'Appetizer', 'entradas': 'Appetizer',
+  'bebida': 'Drink', 'bebidas': 'Drink', 'jugo': 'Drink', 'juegos': 'Drink', 'licuado': 'Drink',
+  'sándwich': 'Sandwich', 'sandwich': 'Sandwich',
+  'snack': 'Snack', 'picada': 'Snack',
+  // ── French ───────────────────────────────────────────────────────────────────
+  'desserts': 'Desserts', 'dessert': 'Desserts',
+  'pâtisserie': 'Desserts', 'patisserie': 'Desserts',
+  'gâteau': 'Desserts', 'gâteaux': 'Desserts',
+  'tarte': 'Desserts', 'tartes': 'Desserts',
+  'sucrerie': 'Desserts', 'sucreries': 'Desserts',
+  'confiserie': 'Desserts', 'biscuit': 'Desserts', 'biscuits': 'Desserts',
+  'macaron': 'Desserts', 'macarons': 'Desserts',
+  'madeleine': 'Desserts', 'madeleines': 'Desserts',
+  'éclair': 'Desserts', 'éclairs': 'Desserts',
+  'viennoiserie': 'Desserts',
+  'plat principal': 'Main Course',
+  'viande': 'Meat', 'bœuf': 'Meat', 'boeuf': 'Meat', 'porc': 'Meat', 'agneau': 'Meat',
+  'pâtes': 'Pasta', 'pates': 'Pasta',
+  'poulet': 'Chicken', 'volaille': 'Chicken', 'dinde': 'Chicken',
+  'poisson': 'Fish', 'thon': 'Fish', 'saumon': 'Fish',
+  'fruits de mer': 'Seafood', 'crevette': 'Seafood', 'crevettes': 'Seafood',
+  'soupe': 'Soup', 'soupes': 'Soup', 'bouillon': 'Soup', 'ragoût': 'Soup',
   'salade': 'Salad', 'salades': 'Salad',
+  'petit-déjeuner': 'Breakfast', 'petit dejeuner': 'Breakfast',
   'riz': 'Rice',
-  'pain': 'Bread', 'boulangerie': 'Bakery',
-  'végane': 'Vegan', 'végétarien': 'Vegetarian',
-  'apéritif': 'Appetizer', 'apéritifs': 'Appetizer',
-  'boisson': 'Drink', 'boissons': 'Drink',
-  // Pastry / bakery sub-types → Bakery
-  'patisserie': 'Bakery', 'pâtisserie': 'Bakery',
-  'patisserie bretonne': 'Bakery', 'pâtisserie bretonne': 'Bakery',
-  'viennoiserie': 'Bakery', 'viennoiserie belge': 'Bakery',
-  'panaderia': 'Bakery',
+  'pain': 'Bakery', 'pains': 'Bakery', 'boulangerie': 'Bakery',
+  'végane': 'Vegan', 'végétalien': 'Vegan',
+  'végétarien': 'Vegetarian', 'végétarienne': 'Vegetarian',
+  'apéritif': 'Appetizer', 'apéritifs': 'Appetizer', 'entrée': 'Appetizer',
+  'boisson': 'Drink', 'boissons': 'Drink', 'jus': 'Drink',
+  'sandwich': 'Sandwich',
 };
 
 // Step 2: English canonical key → display label per language
 const CAT_DISPLAY = {
   en: {
-    'Desserts': 'Desserts', 'Cake': 'Cake', 'Main Course': 'Main Course',
-    'Meat': 'Meat', 'Pasta': 'Pasta', 'Chicken': 'Chicken',
-    'Fish': 'Fish', 'Seafood': 'Seafood', 'Soup': 'Soup',
-    'Salad': 'Salad', 'Breakfast': 'Breakfast', 'Rice': 'Rice',
-    'Bread': 'Bread', 'Bakery': 'Bakery', 'Vegan': 'Vegan',
-    'Vegetarian': 'Vegetarian', 'Appetizer': 'Appetizer',
-    'Drink': 'Drink', 'Sandwich': 'Sandwich', 'Snack': 'Snack',
+    'Appetizer': 'Appetizer', 'Bakery': 'Bakery', 'Breakfast': 'Breakfast',
+    'Chicken': 'Chicken', 'Desserts': 'Desserts', 'Drink': 'Drink',
+    'Fish': 'Fish', 'Main Course': 'Main Course', 'Meat': 'Meat',
+    'Pasta': 'Pasta', 'Rice': 'Rice', 'Salad': 'Salad',
+    'Sandwich': 'Sandwich', 'Seafood': 'Seafood', 'Snack': 'Snack',
+    'Soup': 'Soup', 'Vegan': 'Vegan', 'Vegetarian': 'Vegetarian',
   },
   es: {
-    'Desserts': 'Postres', 'Cake': 'Torta', 'Main Course': 'Plato Principal',
-    'Meat': 'Carne', 'Pasta': 'Pasta', 'Chicken': 'Pollo',
-    'Fish': 'Pescado', 'Seafood': 'Mariscos', 'Soup': 'Sopa',
-    'Salad': 'Ensalada', 'Breakfast': 'Desayuno', 'Rice': 'Arroz',
-    'Bread': 'Pan', 'Bakery': 'Panadería', 'Vegan': 'Vegano',
-    'Vegetarian': 'Vegetariano', 'Appetizer': 'Aperitivo',
-    'Drink': 'Bebida', 'Sandwich': 'Sandwich', 'Snack': 'Snack',
+    'Appetizer': 'Aperitivo', 'Bakery': 'Panadería', 'Breakfast': 'Desayuno',
+    'Chicken': 'Pollo', 'Desserts': 'Postres', 'Drink': 'Bebida',
+    'Fish': 'Pescado', 'Main Course': 'Plato Principal', 'Meat': 'Carne',
+    'Pasta': 'Pasta', 'Rice': 'Arroz', 'Salad': 'Ensalada',
+    'Sandwich': 'Sandwich', 'Seafood': 'Mariscos', 'Snack': 'Snack',
+    'Soup': 'Sopa', 'Vegan': 'Vegano', 'Vegetarian': 'Vegetariano',
   },
   fr: {
-    'Desserts': 'Desserts', 'Cake': 'Gâteau', 'Main Course': 'Plat Principal',
-    'Meat': 'Viande', 'Pasta': 'Pâtes', 'Chicken': 'Poulet',
-    'Fish': 'Poisson', 'Seafood': 'Fruits de mer', 'Soup': 'Soupe',
-    'Salad': 'Salade', 'Breakfast': 'Petit-déjeuner', 'Rice': 'Riz',
-    'Bread': 'Pain', 'Bakery': 'Boulangerie', 'Vegan': 'Végane',
-    'Vegetarian': 'Végétarien', 'Appetizer': 'Apéritif',
-    'Drink': 'Boisson', 'Sandwich': 'Sandwich', 'Snack': 'Snack',
+    'Appetizer': 'Apéritif', 'Bakery': 'Boulangerie', 'Breakfast': 'Petit-déjeuner',
+    'Chicken': 'Poulet', 'Desserts': 'Desserts', 'Drink': 'Boisson',
+    'Fish': 'Poisson', 'Main Course': 'Plat Principal', 'Meat': 'Viande',
+    'Pasta': 'Pâtes', 'Rice': 'Riz', 'Salad': 'Salade',
+    'Sandwich': 'Sandwich', 'Seafood': 'Fruits de mer', 'Snack': 'Snack',
+    'Soup': 'Soupe', 'Vegan': 'Végane', 'Vegetarian': 'Végétarien',
   },
 };
 
@@ -1118,22 +1159,35 @@ function applyTranslations() {
     btn.classList.toggle('active', btn.dataset.lang === lang);
   });
 
-  fillCategoryDatalist('category-list');
+  document.querySelectorAll('select[data-cat-select]').forEach(sel => {
+    fillCategorySelect(sel.id);
+  });
 }
 
 document.addEventListener('DOMContentLoaded', applyTranslations);
 
 const CATEGORY_LIST = [
-  'Appetizer','Bakery','Bread','Breakfast','Cake','Chicken','Desserts',
-  'Drink','Fish','Main Course','Meat','Pasta','Rice','Salad','Sandwich',
-  'Seafood','Snack','Soup','Vegan','Vegetarian'
+  'Appetizer', 'Bakery', 'Breakfast', 'Chicken', 'Desserts',
+  'Drink', 'Fish', 'Main Course', 'Meat', 'Pasta', 'Rice', 'Salad',
+  'Sandwich', 'Seafood', 'Snack', 'Soup', 'Vegan', 'Vegetarian',
 ];
 
-function fillCategoryDatalist(id) {
-  const dl = document.getElementById(id);
-  if (!dl) return;
-  const sorted = CATEGORY_LIST.map(c => tCat(c)).sort((a, b) => a.localeCompare(b));
-  dl.innerHTML = sorted.map(c => `<option value="${c}">`).join('');
+function fillCategorySelect(id) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const current = sel.value;
+  const lang = getLang();
+  const placeholder = lang === 'es' ? '— Sin categoría —' : lang === 'fr' ? '— Sans catégorie —' : '— No category —';
+  const sorted = CATEGORY_LIST
+    .map(c => ({ value: c, label: tCat(c) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  sel.innerHTML = `<option value="">${placeholder}</option>` +
+    sorted.map(o => `<option value="${o.value}"${o.value === current ? ' selected' : ''}>${o.label}</option>`).join('');
+}
+
+function normalizeCatToCanonical(raw) {
+  if (!raw) return '';
+  return CANONICAL_CAT[(raw || '').toLowerCase().trim()] || raw;
 }
 
 // Returns the translated field for the active language, falling back to the original.

@@ -842,7 +842,7 @@ function openEditModal() {
   document.getElementById('e-desc').value     = localDesc;
   document.getElementById('e-servings').value = currentRecipe.servings || 0;
   document.getElementById('e-prep').value     = currentRecipe.prep_time_min || 0;
-  document.getElementById('e-category').value = currentRecipe.category || '';
+  document.getElementById('e-category').value = normalizeCatToCanonical(currentRecipe.category);
 
   // Show which language is being edited
   document.getElementById('e-lang-badge').textContent = lang.toUpperCase();
@@ -883,7 +883,7 @@ async function saveRecipe() {
       [`description_${lang}`]: description,
       servings: parseInt(document.getElementById('e-servings').value) || 0,
       prep_time_min: parseInt(document.getElementById('e-prep').value) || 0,
-      category: titleCase(document.getElementById('e-category').value.trim())
+      category: document.getElementById('e-category').value || null
     })
   });
 
@@ -898,7 +898,7 @@ async function saveRecipe() {
   currentRecipe.description = document.getElementById('e-desc').value.trim();
   currentRecipe.servings = parseInt(document.getElementById('e-servings').value) || 0;
   currentRecipe.prep_time_min = parseInt(document.getElementById('e-prep').value) || 0;
-  currentRecipe.category = titleCase(document.getElementById('e-category').value.trim());
+  currentRecipe.category = document.getElementById('e-category').value || null;
   closeEditModal();
   renderRecipeHeader(currentRecipe);
 }

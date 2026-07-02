@@ -92,8 +92,7 @@ async function submitScanCreate() {
       description: document.getElementById('sc-desc').value.trim(),
       servings: parseInt(document.getElementById('sc-servings').value) || 0,
       prep_time_min: parseInt(document.getElementById('sc-prep').value) || 0,
-      category: (document.getElementById('sc-category').value.trim() || '')
-        .replace(/\b\w/g, c => c.toUpperCase())
+      category: document.getElementById('sc-category').value || null
     })
   });
   if (!res || !res.ok) {
