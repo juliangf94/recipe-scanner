@@ -775,6 +775,19 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 .badge-cat { background: var(--orange-light); color: var(--orange); }
 .badge-scanned { background: #DCFCE7; color: #16A34A; }
 
+.translate-done-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #DBEAFE;
+  color: #1D4ED8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+
 .detail-meta {
   display: flex;
   gap: 1.2rem;

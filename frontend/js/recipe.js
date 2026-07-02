@@ -168,7 +168,7 @@ function buildRecipeHeaderHtml(recipe) {
             ? `<button class="btn btn-outline btn-sm" id="translate-btn" onclick="translateRecipe()">${t('btn_translate')}</button>`
             : ''}
         </div>
-        <div id="translate-status" style="display:none;font-size:0.85rem;margin-top:0.5rem;"></div>
+        <div id="translate-status" style="margin-top:0.75rem;">${recipe.translation_status === 'done' ? `<span class="translate-done-badge">🌐 ${t('translate_done_short')}</span>` : ''}</div>
       </div>
       ${photoHtml}
     </div>`;
@@ -869,8 +869,7 @@ async function translateRecipe() {
 
   currentRecipe.translation_status = 'done';
   btn.remove();
-  status.textContent = t('translate_done');
-  status.style.display = '';
+  status.innerHTML = `<span class="translate-done-badge">🌐 ${t('translate_done_short')}</span>`;
 
   const [ingRes, stepRes] = await Promise.all([
     apiFetch(`/recipes/${recipeId}/ingredients`),
