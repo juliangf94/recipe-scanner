@@ -78,6 +78,7 @@ def create_app(config_name=None):
             'ALTER TABLE custom_prices ADD COLUMN brand_id VARCHAR(36)',
             'ALTER TABLE ingredients ADD COLUMN preferred_brand_id VARCHAR(36)',
             'ALTER TABLE ingredients ADD COLUMN order_num INTEGER DEFAULT 0',
+            "ALTER TABLE recipes ADD COLUMN images_json TEXT DEFAULT '[]'",
         ]:
             try:
                 db.session.execute(text(stmt))

@@ -39,7 +39,7 @@ if (user) {
 function setAvatarDisplay(avatarUrl, initials) {
   const el = document.getElementById('user-avatar');
   if (avatarUrl) {
-    el.innerHTML = `<img src="http://localhost:5000${avatarUrl}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
+    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
   } else {
     el.innerHTML = `<span id="avatar-initials">${initials}</span><div class="avatar-overlay">📷</div>`;
   }
@@ -59,14 +59,33 @@ async function uploadAvatar(event) {
 }
 
 async function uploadRecipeImage(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await apiUpload(`/recipes/${recipeId}/image`, fd);
-  if (!res || !res.ok) return;
-  currentRecipe.image_url = res.data.image_url;
+  const files = Array.from(event.target.files);
+  event.target.value = '';
+  if (!files.length) return;
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await apiUpload(`/recipes/${recipeId}/image`, fd);
+    if (res && res.ok) {
+      currentRecipe.image_url = res.data.image_url;
+      currentRecipe.images = res.data.images || [res.data.image_url];
+    }
+  }
   renderRecipeHeader(currentRecipe);
+}
+
+async function deleteRecipePhoto(imageUrl) {
+  showConfirmModal(t('btn_delete'), t('confirm_delete_photo'), async () => {
+    const res = await apiFetch(`/recipes/${recipeId}/image`, {
+      method: 'DELETE',
+      body: JSON.stringify({ image_url: imageUrl })
+    });
+    if (res && res.ok) {
+      currentRecipe.image_url = res.data.image_url || null;
+      currentRecipe.images = res.data.images || [];
+      renderRecipeHeader(currentRecipe);
+    }
+  });
 }
 
 // ── Load page ─────────────────────────────────────────────────────────────────
@@ -145,10 +164,26 @@ function buildRecipeHeaderHtml(recipe) {
     recipe.servings === 1 ? `🍽 ${t('n_servings_1')}` : `🍽 ${tf('n_servings_n', { n: recipe.servings })}`
   );
 
+  const images = recipe.images || (recipe.image_url ? [recipe.image_url] : []);
+
+  const galleryHtml = images.length > 0
+    ? `<div class="photo-gallery">
+        ${images.map(url => `
+          <div class="photo-thumb${url === recipe.image_url ? ' is-cover' : ''}">
+            <img src="${resolveImgUrl(url)}" alt="">
+            <button class="photo-thumb-delete" onclick="event.stopPropagation();deleteRecipePhoto('${url.replace(/'/g, "\\'")}')">✕</button>
+          </div>`).join('')}
+        <div class="photo-thumb-add" onclick="document.getElementById('recipe-img-input').click()" title="${t('add_photo')}">+</div>
+      </div>`
+    : '';
+
   const photoHtml = recipe.image_url
-    ? `<div class="recipe-header-photo" onclick="document.getElementById('recipe-img-input').click()">
-        <img src="http://localhost:5000${recipe.image_url}" alt="${localizedField(recipe, 'title')}">
-        <div class="recipe-header-photo-overlay">${t('change_photo')}</div>
+    ? `<div>
+        <div class="recipe-header-photo" onclick="document.getElementById('recipe-img-input').click()">
+          <img src="${resolveImgUrl(recipe.image_url)}" alt="${localizedField(recipe, 'title').replace(/"/g, '&quot;')}">
+          <div class="recipe-header-photo-overlay">${t('change_photo')}</div>
+        </div>
+        ${galleryHtml}
       </div>`
     : `<div class="recipe-header-photo recipe-header-photo-empty" onclick="document.getElementById('recipe-img-input').click()">
         <span style="font-size:2.2rem;">📷</span>
@@ -215,13 +250,14 @@ function renderPage(recipe, ingredients, steps) {
       </div>
     </div>`;
 
-  ['edit-modal', 'ing-modal', 'price-modal', 'step-add-modal', 'step-edit-modal'].forEach(id => {
+  ['edit-modal', 'price-modal', 'step-add-modal', 'step-edit-modal'].forEach(id => {
     document.getElementById(id).addEventListener('click', e => {
       if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
     });
   });
 
   initSortable();
+  makeDraggable('ing-modal');
 }
 
 // ── Section helpers ───────────────────────────────────────────────────────────
@@ -432,6 +468,13 @@ function promptAddSection() {
   showAlert(t('section_move_hint'));
 }
 
+function parseBold(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
 function renderSteps(steps) {
   if (!steps || steps.length === 0) {
     return `<div style="padding:1.5rem 1.2rem; text-align:center; color:var(--text-muted); font-size:0.85rem;">
@@ -449,7 +492,7 @@ function renderSteps(steps) {
       <div class="step-drag-handle" title="${t('section_move')}">⠿</div>
       <div class="step-num">${i + 1}</div>
       <div class="step-content">
-        <p class="step-desc">${localizedField(s, 'description') || s}</p>
+        <p class="step-desc">${parseBold(localizedField(s, 'description') || '')}</p>
         ${s.duration_min ? `<span class="step-duration">⏱ ${s.duration_min} min</span>` : ''}
       </div>
       <div class="step-actions">
@@ -858,6 +901,39 @@ function deleteRecipe() {
   );
 }
 
+// ── Auto-scroll while dragging ────────────────────────────────────────────────
+let _dragClientY = -1;
+let _autoScrollRaf = null;
+
+function _trackDragY(e) { _dragClientY = e.clientY; }
+
+function _pageScrollLoop() {
+  if (_dragClientY >= 0) {
+    const THRESHOLD = 100;
+    const MAX_SPEED = 18;
+    const y = _dragClientY;
+    const h = window.innerHeight;
+    if (y < THRESHOLD) {
+      window.scrollBy(0, -MAX_SPEED * (1 - y / THRESHOLD));
+    } else if (y > h - THRESHOLD) {
+      window.scrollBy(0, MAX_SPEED * (1 - (h - y) / THRESHOLD));
+    }
+  }
+  _autoScrollRaf = requestAnimationFrame(_pageScrollLoop);
+}
+
+function startPageAutoScroll(sortableEvt) {
+  _dragClientY = sortableEvt.originalEvent?.clientY ?? -1;
+  window.addEventListener('pointermove', _trackDragY);
+  _autoScrollRaf = requestAnimationFrame(_pageScrollLoop);
+}
+
+function stopPageAutoScroll() {
+  window.removeEventListener('pointermove', _trackDragY);
+  if (_autoScrollRaf) { cancelAnimationFrame(_autoScrollRaf); _autoScrollRaf = null; }
+  _dragClientY = -1;
+}
+
 // ── Sortable drag & drop ──────────────────────────────────────────────────────
 function initSortable() {
   const table = document.getElementById('ing-table');
@@ -868,7 +944,8 @@ function initSortable() {
       draggable: '.section-body',
       ghostClass: 'section-body-ghost',
       chosenClass: 'section-body-chosen',
-      onEnd: saveSectionOrder,
+      onStart: startPageAutoScroll,
+      onEnd(e) { stopPageAutoScroll(); saveSectionOrder(e); },
     });
   }
 
@@ -881,7 +958,8 @@ function initSortable() {
       draggable: '.ing-row',
       ghostClass: 'ing-row-ghost',
       chosenClass: 'ing-row-chosen',
-      onEnd: saveIngredientOrder,
+      onStart: startPageAutoScroll,
+      onEnd(e) { stopPageAutoScroll(); saveIngredientOrder(e); },
     });
   });
 }
@@ -968,14 +1046,22 @@ async function translateRecipe() {
 
 // ── Ingredients ───────────────────────────────────────────────────────────────
 function openIngModal() {
+  const sections = getSections(currentIngredients).filter(s => s !== '');
+  const select = document.getElementById('ing-section');
+  select.innerHTML = `<option value="">${t('section_no_section')}</option>` +
+    sections.map(s => `<option value="${s.replace(/"/g, '&quot;')}">${s}</option>`).join('');
+  document.getElementById('ing-section-group').style.display = sections.length > 0 ? '' : 'none';
   document.getElementById('ing-modal').classList.add('open');
-  document.getElementById('ing-name').focus();
+  setTimeout(() => document.getElementById('ing-name').focus(), 50);
 }
 
 function closeIngModal() {
-  document.getElementById('ing-modal').classList.remove('open');
+  const overlay = document.getElementById('ing-modal');
+  overlay.classList.remove('open');
+  overlay.dispatchEvent(new Event('modal-reset'));
   document.getElementById('ing-error').style.display = 'none';
   ['ing-name', 'ing-qty', 'ing-unit'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ing-section').value = '';
 }
 
 async function addIngredient() {
@@ -991,9 +1077,10 @@ async function addIngredient() {
     return;
   }
 
+  const section = document.getElementById('ing-section')?.value || '';
   const res = await apiFetch(`/recipes/${recipeId}/ingredients`, {
     method: 'POST',
-    body: JSON.stringify({ name, quantity, unit })
+    body: JSON.stringify({ name, quantity, unit, section })
   });
 
   if (!res || !res.ok) {

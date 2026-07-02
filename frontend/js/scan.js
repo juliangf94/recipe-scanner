@@ -5,6 +5,7 @@ let lastScanRecipe = null;
 let lastScanData = null;
 let lastScanSuccessId    = null;
 let lastScanSuccessTitle = null;
+let _duplicateExistingId = null;
 
 function renderSuccessMessage(id, title) {
   const el = document.getElementById('upload-success');
@@ -39,7 +40,7 @@ if (user) {
 function setAvatarDisplay(avatarUrl, initials) {
   const el = document.getElementById('user-avatar');
   if (avatarUrl) {
-    el.innerHTML = `<img src="http://localhost:5000${avatarUrl}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
+    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
   } else {
     el.innerHTML = `<span id="avatar-initials">${initials}</span><div class="avatar-overlay">📷</div>`;
   }
@@ -131,6 +132,13 @@ async function scanPdf() {
   document.getElementById('scan-btn').style.display = '';
 
   if (!res || !res.ok) {
+    if (res?.status === 409 && res?.data?.error_code === 'duplicate') {
+      _duplicateExistingId = res.data.existing_id;
+      const desc = document.getElementById('duplicate-modal-desc');
+      desc.textContent = tf('scan_dup_desc', { title: res.data.title });
+      document.getElementById('duplicate-modal').classList.add('open');
+      return;
+    }
     const el = document.getElementById('upload-error');
     const code = res?.data?.error_code;
     el.textContent = code ? t('err_' + code) || t('err_scan') : t('err_scan');
@@ -199,6 +207,54 @@ function showLastScan(recipe, data) {
     </div>`;
 
   card.style.display = '';
+}
+
+function closeDuplicateModal() {
+  document.getElementById('duplicate-modal').classList.remove('open');
+}
+
+function viewExistingRecipe() {
+  if (_duplicateExistingId) window.location.href = `recipe.html?id=${_duplicateExistingId}`;
+}
+
+async function forceCreateRecipe() {
+  closeDuplicateModal();
+  if (!selectedFile) return;
+
+  document.getElementById('upload-error').style.display = 'none';
+  document.getElementById('upload-success').style.display = 'none';
+  document.getElementById('scan-btn').style.display = 'none';
+  document.getElementById('scanning').style.display = '';
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+
+  let res;
+  try {
+    res = await apiUpload('/scan/?force=true', formData);
+  } catch (_) {
+    res = null;
+  }
+
+  document.getElementById('scanning').style.display = 'none';
+  document.getElementById('scan-btn').style.display = '';
+
+  if (!res || !res.ok) {
+    const el = document.getElementById('upload-error');
+    el.textContent = t('err_scan');
+    el.style.display = '';
+    return;
+  }
+
+  const recipe = res.data.recipe;
+  lastScanSuccessId = recipe.id;
+  lastScanSuccessTitle = recipe.title;
+  sessionStorage.setItem('scan_success_id', recipe.id);
+  sessionStorage.setItem('scan_success_title', recipe.title);
+  selectedFile = null;
+  document.getElementById('scan-btn').disabled = true;
+  renderSuccessMessage(recipe.id, recipe.title);
+  showLastScan(recipe, res.data);
 }
 
 function logout() { removeToken(); window.location.href = 'index.html'; }

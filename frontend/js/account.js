@@ -6,7 +6,7 @@ function setAvatarDisplay(avatarUrl, initials) {
   const sidebar = document.getElementById('user-avatar');
   const large = document.getElementById('account-avatar');
   const img = avatarUrl
-    ? `<img src="${BASE_URL.replace('/api/v1', '')}${avatarUrl}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+    ? `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
     : `<span>${initials}</span>`;
   if (sidebar) sidebar.innerHTML = img;
   if (large)   large.innerHTML   = img;

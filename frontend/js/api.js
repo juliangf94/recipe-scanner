@@ -2,6 +2,13 @@ const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hos
 const BASE_URL = IS_LOCAL
   ? 'http://localhost:5000/api/v1'
   : 'https://recipe-scanner-kfnm.onrender.com/api/v1';
+const SERVER_URL = BASE_URL.replace('/api/v1', '');
+
+function resolveImgUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('//')) return url;
+  return `${SERVER_URL}${url}`;
+}
 
 // ── Token storage ─────────────────────────────────────────────────────────────
 function getAccessToken()  { return localStorage.getItem('access_token'); }
@@ -226,6 +233,39 @@ function showConfirmModal(title, desc, callback) {
 
 function closeSharedConfirm() {
   document.getElementById('shared-confirm-modal')?.classList.remove('open');
+}
+
+// ── Draggable modal ───────────────────────────────────────────────────────────
+function makeDraggable(overlayId) {
+  const overlay = document.getElementById(overlayId);
+  if (!overlay) return;
+  const modal = overlay.querySelector('.modal');
+  const handle = modal?.querySelector('.modal-drag-handle');
+  if (!modal || !handle) return;
+
+  let active = false, ox = 0, oy = 0, tx = 0, ty = 0;
+
+  handle.addEventListener('mousedown', e => {
+    active = true;
+    ox = e.clientX - tx;
+    oy = e.clientY - ty;
+    modal.style.transition = 'none';
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!active) return;
+    tx = e.clientX - ox;
+    ty = e.clientY - oy;
+    modal.style.transform = `translate(${tx}px, ${ty}px)`;
+  });
+
+  window.addEventListener('mouseup', () => { active = false; });
+
+  overlay.addEventListener('modal-reset', () => {
+    modal.style.transform = '';
+    tx = 0; ty = 0;
+  });
 }
 
 // ── User dropdown menu ────────────────────────────────────────────────────────

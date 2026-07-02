@@ -102,6 +102,7 @@ const TRANSLATIONS = {
     // Recipe detail
     change_photo: '📷 Change photo',
     add_photo: 'Add photo',
+    confirm_delete_photo: 'This photo will be permanently deleted.',
     badge_ai: '✨ AI scanned',
     min_prep: '{n} min prep',
     n_servings_1: '1 serving',
@@ -182,6 +183,7 @@ const TRANSLATIONS = {
     btn_del_price: '🗑 Delete',
 
     // Recipe sections
+    label_section: 'Section',
     section_no_section: 'General',
     section_new: 'Add section',
     section_add: 'Add section',
@@ -271,6 +273,9 @@ const TRANSLATIONS = {
     btn_view_recipe: 'View recipe →',
     err_scan_no_text: 'The PDF has no readable text. Use a PDF with selectable text, not a scanned image.',
     err_scan_ai_failed: 'The AI could not extract the recipe. Try again or check the PDF format.',
+    scan_dup_title: 'Duplicate recipe',
+    scan_dup_desc: 'You already have a recipe called "{title}". What do you want to do?',
+    scan_dup_create: 'Create anyway',
     account_photo: 'Profile photo',
     account_change_photo: 'Change photo',
     account_photo_hint: 'JPG or PNG, max 2MB',
@@ -417,6 +422,7 @@ const TRANSLATIONS = {
     // Recipe detail
     change_photo: '📷 Cambiar foto',
     add_photo: 'Agregar foto',
+    confirm_delete_photo: 'Esta foto se eliminará permanentemente.',
     badge_ai: '✨ IA escaneado',
     min_prep: '{n} min prep',
     n_servings_1: '1 porción',
@@ -497,6 +503,7 @@ const TRANSLATIONS = {
     btn_del_price: '🗑 Eliminar',
 
     // Recipe sections
+    label_section: 'Sección',
     section_no_section: 'General',
     section_new: 'Agregar sección',
     section_add: 'Agregar sección',
@@ -586,6 +593,9 @@ const TRANSLATIONS = {
     btn_view_recipe: 'Ver receta →',
     err_scan_no_text: 'El PDF no tiene texto legible. Usá un PDF con texto seleccionable, no una imagen escaneada.',
     err_scan_ai_failed: 'La IA no pudo extraer la receta. Intentá de nuevo o verificá el formato del PDF.',
+    scan_dup_title: 'Receta duplicada',
+    scan_dup_desc: 'Ya tenés una receta llamada "{title}". ¿Qué querés hacer?',
+    scan_dup_create: 'Crear de todas formas',
     account_photo: 'Foto de perfil',
     account_change_photo: 'Cambiar foto',
     account_photo_hint: 'JPG o PNG, máx. 2MB',
@@ -732,6 +742,7 @@ const TRANSLATIONS = {
     // Recipe detail
     change_photo: '📷 Changer la photo',
     add_photo: 'Ajouter une photo',
+    confirm_delete_photo: 'Cette photo sera définitivement supprimée.',
     badge_ai: '✨ Scanné par IA',
     min_prep: '{n} min de préparation',
     n_servings_1: '1 portion',
@@ -812,6 +823,7 @@ const TRANSLATIONS = {
     btn_del_price: '🗑 Supprimer',
 
     // Recipe sections
+    label_section: 'Section',
     section_no_section: 'Général',
     section_new: 'Ajouter une section',
     section_add: 'Ajouter une section',
@@ -901,6 +913,9 @@ const TRANSLATIONS = {
     btn_view_recipe: 'Voir la recette →',
     err_scan_no_text: 'Le PDF ne contient pas de texte lisible. Utilisez un PDF avec du texte sélectionnable, pas une image scannée.',
     err_scan_ai_failed: "L'IA n'a pas pu extraire la recette. Réessayez ou vérifiez le format du PDF.",
+    scan_dup_title: 'Recette en double',
+    scan_dup_desc: 'Vous avez déjà une recette intitulée « {title} ». Que voulez-vous faire ?',
+    scan_dup_create: 'Créer quand même',
     account_photo: 'Photo de profil',
     account_change_photo: 'Changer la photo',
     account_photo_hint: 'JPG ou PNG, max 2Mo',

@@ -28,16 +28,21 @@ class ScanPdf(Resource):
             return {'error': 'File must be a PDF'}, 400
 
         file_bytes = file.read()
+        force = request.args.get('force') == 'true'
 
         result, error_code = facade.scan_pdf(
             user_id=user_id,
             file_bytes=file_bytes,
-            filename=file.filename
+            filename=file.filename,
+            force=force
         )
 
         if result is None:
             if error_code == 'no_text':
                 return {'error_code': 'scan_no_text'}, 422
+            if isinstance(error_code, tuple) and error_code[0] == 'duplicate':
+                _, existing_id, title = error_code
+                return {'error_code': 'duplicate', 'existing_id': existing_id, 'title': title}, 409
             return {'error_code': 'scan_ai_failed'}, 500
 
         recipe, ingredients, steps = result

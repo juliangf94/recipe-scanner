@@ -56,7 +56,8 @@ class IngredientList(Resource):
             recipe_id=recipe_id,
             name=data['name'],
             quantity=data['quantity'],
-            unit=data['unit']
+            unit=data['unit'],
+            section=data.get('section', '') or ''
         )
         return {'id': ingredient.id, 'name': ingredient.name,
                 'quantity': ingredient.quantity, 'unit': ingredient.unit,

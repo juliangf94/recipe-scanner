@@ -1,8 +1,11 @@
+import json
 import os
+import uuid as _uuid
 from flask import request, current_app
 from flask_restx import Namespace, Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services.facade import facade
+from app import storage as _storage
 
 ALLOWED_IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'webp'}
 
@@ -81,6 +84,9 @@ class RecipeDetail(Resource):
             return {'error': 'Recipe not found'}, 404
         if recipe.user_id != user_id:
             return {'error': 'Forbidden'}, 403
+        images = json.loads(recipe.images_json or '[]')
+        if recipe.image_url and recipe.image_url not in images:
+            images = [recipe.image_url] + images
         return {'id': recipe.id,
                 'title': recipe.title,
                 'title_en': recipe.title_en or '', 'title_es': recipe.title_es or '', 'title_fr': recipe.title_fr or '',
@@ -89,6 +95,7 @@ class RecipeDetail(Resource):
                 'servings': recipe.servings,
                 'prep_time_min': recipe.prep_time_min, 'category': recipe.category,
                 'user_id': recipe.user_id, 'image_url': recipe.image_url,
+                'images': images,
                 'translation_status': recipe.translation_status or 'pending'}, 200
 
     @jwt_required()
@@ -272,16 +279,54 @@ class RecipeImage(Resource):
         if ext not in ALLOWED_IMAGE_EXTS:
             return {'error': 'Only JPG, PNG or WebP files are accepted'}, 400
 
-        uploads_dir = os.path.join(current_app.static_folder, 'uploads', 'recipes')
-        # Remove previous image for this recipe (any extension)
-        for old_ext in ALLOWED_IMAGE_EXTS:
-            old_path = os.path.join(uploads_dir, f'{recipe_id}.{old_ext}')
-            if os.path.exists(old_path):
-                os.remove(old_path)
+        file_bytes = file.read()
+        content_type = 'image/jpeg' if ext == 'jpg' else f'image/{ext}'
+        filename = f'{recipe_id}_{_uuid.uuid4().hex[:8]}.{ext}'
 
-        filename = f'{recipe_id}.{ext}'
-        file.save(os.path.join(uploads_dir, filename))
+        image_url = _storage.upload_file(file_bytes, filename, content_type)
+        if not image_url:
+            uploads_dir = os.path.join(current_app.static_folder, 'uploads', 'recipes')
+            os.makedirs(uploads_dir, exist_ok=True)
+            with open(os.path.join(uploads_dir, filename), 'wb') as fp:
+                fp.write(file_bytes)
+            image_url = f'/static/uploads/recipes/{filename}'
 
-        image_url = f'/static/uploads/recipes/{filename}'
-        facade.update_recipe(recipe_id, image_url=image_url)
-        return {'image_url': image_url}, 200
+        images = json.loads(recipe.images_json or '[]')
+        images.append(image_url)
+        cover = recipe.image_url or image_url
+        facade.update_recipe(recipe_id, image_url=cover, images_json=json.dumps(images))
+        return {'image_url': cover, 'images': images}, 200
+
+    @jwt_required()
+    @api.response(200, 'Image deleted')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Recipe not found')
+    def delete(self, recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+
+        data = request.get_json() or {}
+        image_url = data.get('image_url', '')
+        if not image_url:
+            return {'error': 'image_url required'}, 400
+
+        images = json.loads(recipe.images_json or '[]')
+        images = [u for u in images if u != image_url]
+
+        # Delete from Supabase Storage (no-op if not configured or not a Supabase URL)
+        _storage.delete_file(_storage.path_from_url(image_url))
+        # Also clean up old local file if it was stored on disk
+        if image_url.startswith('/static/uploads/recipes/'):
+            local_name = image_url.replace('/static/uploads/recipes/', '')
+            local_path = os.path.join(current_app.static_folder, 'uploads', 'recipes', local_name)
+            if os.path.exists(local_path):
+                os.remove(local_path)
+
+        new_cover = images[0] if images else None
+        cover = recipe.image_url if recipe.image_url != image_url else new_cover
+        facade.update_recipe(recipe_id, image_url=cover, images_json=json.dumps(images))
+        return {'image_url': cover, 'images': images}, 200

@@ -5,6 +5,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, get_jwt_identity)
 from app.services.facade import facade
 from app.utils.security import check_password, hash_password
+from app import storage as _storage
 
 ALLOWED_IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'webp'}
 
@@ -164,15 +165,26 @@ class UserAvatar(Resource):
         if ext not in ALLOWED_IMAGE_EXTS:
             return {'error': 'Only JPG, PNG or WebP files are accepted'}, 400
 
-        uploads_dir = os.path.join(current_app.static_folder, 'uploads', 'avatars')
+        file_bytes = file.read()
+        content_type = 'image/jpeg' if ext == 'jpg' else f'image/{ext}'
+        avatar_path = f'avatars/{user_id}.{ext}'
+
+        # Delete old avatars from Supabase
         for old_ext in ALLOWED_IMAGE_EXTS:
-            old_path = os.path.join(uploads_dir, f'{user_id}.{old_ext}')
-            if os.path.exists(old_path):
-                os.remove(old_path)
+            _storage.delete_file(f'avatars/{user_id}.{old_ext}')
 
-        filename = f'{user_id}.{ext}'
-        file.save(os.path.join(uploads_dir, filename))
+        avatar_url = _storage.upload_file(file_bytes, avatar_path, content_type)
+        if not avatar_url:
+            # Fallback: local filesystem
+            uploads_dir = os.path.join(current_app.static_folder, 'uploads', 'avatars')
+            os.makedirs(uploads_dir, exist_ok=True)
+            for old_ext in ALLOWED_IMAGE_EXTS:
+                old_path = os.path.join(uploads_dir, f'{user_id}.{old_ext}')
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            with open(os.path.join(uploads_dir, f'{user_id}.{ext}'), 'wb') as fp:
+                fp.write(file_bytes)
+            avatar_url = f'/static/uploads/avatars/{user_id}.{ext}'
 
-        avatar_url = f'/static/uploads/avatars/{filename}'
         facade.update_user(user_id, avatar_url=avatar_url)
         return {'avatar_url': avatar_url}, 200

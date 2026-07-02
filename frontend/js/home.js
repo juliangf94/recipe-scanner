@@ -12,7 +12,7 @@ if (user) {
 function setAvatarDisplay(avatarUrl, initials) {
   const el = document.getElementById('user-avatar');
   if (avatarUrl) {
-    el.innerHTML = `<img src="http://localhost:5000${avatarUrl}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
+    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
   } else {
     el.innerHTML = `<span id="avatar-initials">${initials}</span><div class="avatar-overlay">📷</div>`;
   }
@@ -88,7 +88,7 @@ function renderHome(data) {
         const emoji = cardEmoji(r.category);
         const bannerCls = bannerClass(r.category);
         const imgHtml = r.image_url
-          ? `<img src="http://localhost:5000${r.image_url}" alt="${title}" style="width:100%;height:100%;object-fit:cover;">`
+          ? `<img src="${resolveImgUrl(r.image_url)}" alt="${title}" style="width:100%;height:100%;object-fit:cover;">`
           : `<div class="home-recipe-banner ${bannerCls}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2.2rem;">${emoji}</div>`;
 
         return `

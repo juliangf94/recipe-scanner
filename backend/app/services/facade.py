@@ -1,4 +1,5 @@
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 import deepl
 import fitz
@@ -178,12 +179,13 @@ class RecipeScannerFacade:
             setattr(ingredient, f'name_{col}', translated[0] or name)
         self._ingredients.update(ingredient)
 
-    def add_ingredient(self, recipe_id, name, quantity, unit, skip_translate=False):
+    def add_ingredient(self, recipe_id, name, quantity, unit, skip_translate=False, section=''):
         ingredient = Ingredient(
             name=name,
             quantity=quantity,
             unit=unit,
-            recipe_id=recipe_id
+            recipe_id=recipe_id,
+            section=section or None
         )
         saved = self._ingredients.save(ingredient)
         if not skip_translate:
@@ -283,32 +285,61 @@ class RecipeScannerFacade:
             except Exception as e:
                 logging.warning('DeepL failed (%s), trying LibreTranslate: %s', target_lang, e)
 
-        results = self._translate_with_libretranslate(texts, target_lang)
+        results = self._translate_with_mymemory(texts, target_lang, source_lang=source_lang)
         any_translated = any(r != o for r, o in zip(results, texts))
-        return results, 'libretranslate' if any_translated else 'none'
+        return results, 'mymemory' if any_translated else 'none'
 
-    def _translate_with_libretranslate(self, texts, target_lang):
-        """Fallback translation via LibreTranslate public API."""
-        lt_lang = self._LIBRE_LANG.get(target_lang, target_lang.lower()[:2])
-        translated = []
-        for text in texts:
-            if not text or not text.strip():
-                translated.append(text)
-                continue
+    def _translate_with_mymemory(self, texts, target_lang, source_lang=None):
+        """Fallback translation via MyMemory API (free, no key required). Runs in parallel."""
+        lt_target = self._LIBRE_LANG.get(target_lang, target_lang.lower()[:2])
+
+        if source_lang:
+            lt_source = self._LIBRE_LANG.get(source_lang.upper(), source_lang.lower()[:2])
+        else:
             try:
-                res = requests.post(
-                    'https://libretranslate.de/translate',
-                    json={'q': text, 'source': 'auto', 'target': lt_lang},
-                    timeout=3
+                from langdetect import detect
+                sample = ' '.join(t for t in texts[:5] if t and t.strip())[:300]
+                lt_source = detect(sample) if sample.strip() else 'fr'
+            except Exception:
+                lt_source = 'fr'
+
+        if lt_source == lt_target:
+            return texts
+
+        langpair = f'{lt_source}|{lt_target}'
+
+        def _translate_one(text):
+            if not text or not text.strip():
+                return text
+            try:
+                res = requests.get(
+                    'https://api.mymemory.translated.net/get',
+                    params={'q': text[:500], 'langpair': langpair},
+                    timeout=5
                 )
                 if res.ok:
-                    translated.append(res.json().get('translatedText', text))
-                else:
-                    translated.append(text)
+                    data = res.json()
+                    if data.get('responseStatus') == 200:
+                        result = data['responseData']['translatedText']
+                        if 'QUERY LENGTH LIMIT' not in result and 'MYMEMORY WARNING' not in result:
+                            return result
             except Exception as e:
-                logging.error('LibreTranslate failed (%s): %s', lt_lang, e)
-                translated.append(text)
-        return translated
+                logging.error('MyMemory failed (%s): %s', langpair, e)
+            return text
+
+        results = list(texts)
+        try:
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                future_map = {executor.submit(_translate_one, t): i for i, t in enumerate(texts)}
+                for future in as_completed(future_map, timeout=22):
+                    idx = future_map[future]
+                    try:
+                        results[idx] = future.result()
+                    except Exception:
+                        pass
+        except Exception:
+            logging.warning('MyMemory: some translations timed out for %s', langpair)
+        return results
 
     def _translate_recipe(self, recipe, ingredients, steps):
         """Populate *_en / *_es / *_fr columns on recipe, ingredients, and steps."""
@@ -327,7 +358,7 @@ class RecipeScannerFacade:
         for lang, col in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]:
             translated, provider = self._translate_batch(all_texts, lang, source_lang=source_lang)
 
-            if provider in ('deepl', 'libretranslate', 'original'):
+            if provider in ('deepl', 'mymemory', 'libretranslate', 'original'):
                 all_failed = False
                 if provider not in ('original', 'none'):
                     used_provider = provider
@@ -353,7 +384,7 @@ class RecipeScannerFacade:
 
     # --- Scan (PDF + Groq) --- api/v1/scan.py ---
 
-    def scan_pdf(self, user_id, file_bytes, filename):
+    def scan_pdf(self, user_id, file_bytes, filename, force=False):
         text = self._extract_pdf_text(file_bytes)
         if not text.strip():
             return None, 'no_text'
@@ -361,6 +392,17 @@ class RecipeScannerFacade:
         data = self._call_groq(text)
         if data is None:
             return None, 'groq_failed'
+
+        if not force:
+            title = data.get('title', '').strip().lower()
+            if title:
+                existing = next(
+                    (r for r in self.get_recipes_by_user(user_id)
+                     if r.title.strip().lower() == title),
+                    None
+                )
+                if existing:
+                    return None, ('duplicate', existing.id, data.get('title', ''))
 
         recipe = self.create_recipe(
             user_id=user_id,

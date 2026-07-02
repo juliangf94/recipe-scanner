@@ -16,7 +16,7 @@ if (user) {
 function setAvatarDisplay(avatarUrl, initials) {
   const el = document.getElementById('user-avatar');
   if (avatarUrl) {
-    el.innerHTML = `<img src="http://localhost:5000${avatarUrl}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
+    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
   } else {
     el.innerHTML = `<span id="avatar-initials">${initials}</span><div class="avatar-overlay">📷</div>`;
   }
@@ -68,7 +68,7 @@ function recipeCard(r) {
   const localTitle = localizedField(r, 'title');
   const localDesc  = localizedField(r, 'description');
   const bannerContent = r.image_url
-    ? `<img src="http://localhost:5000${r.image_url}" alt="${localTitle}" style="width:100%;height:100%;object-fit:cover;">
+    ? `<img src="${resolveImgUrl(r.image_url)}" alt="${localTitle}" style="width:100%;height:100%;object-fit:cover;">
        ${r.category ? `<span class="cat-badge" style="position:absolute;top:0.5rem;left:0.5rem;">${catLabel}</span>` : ''}`
     : `${r.category ? `<span class="cat-badge">${catLabel}</span>` : ''}
        <span style="font-size:3rem;">${emoji}</span>`;

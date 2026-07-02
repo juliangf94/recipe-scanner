@@ -170,6 +170,7 @@
       <div class="form-group">
         <label data-i18n="label_step_desc_req">Description *</label>
         <textarea id="step-edit-desc" rows="4"></textarea>
+        <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem;">Tip: <strong>**texto**</strong> → negrita</p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeEditStepModal()">Cancel</button>
@@ -179,27 +180,36 @@
   </div>
 
   <!-- Modal: add ingredient -->
-  <div class="modal-overlay" id="ing-modal">
-    <div class="modal">
-      <h2 data-i18n="modal_add_ing">Add ingredient</h2>
-      <div id="ing-error" class="alert alert-error" style="display:none"></div>
-      <div class="form-group">
-        <label data-i18n="label_name_req">Name *</label>
-        <input type="text" id="ing-name" data-i18n-placeholder="ph_ing_name" placeholder="Flour">
+  <div class="modal-overlay modal-overlay-transparent" id="ing-modal">
+    <div class="modal modal-floating">
+      <div class="modal-drag-handle">
+        <span data-i18n="modal_add_ing">Add ingredient</span>
+        <button class="modal-close-x" onclick="closeIngModal()">✕</button>
       </div>
-      <div class="form-row">
+      <div style="padding:1.2rem 1.5rem 1.5rem;">
+        <div id="ing-error" class="alert alert-error" style="display:none"></div>
         <div class="form-group">
-          <label data-i18n="label_qty_req">Quantity *</label>
-          <input type="text" id="ing-qty" placeholder="500">
+          <label data-i18n="label_name_req">Name *</label>
+          <input type="text" id="ing-name" data-i18n-placeholder="ph_ing_name" placeholder="Flour">
         </div>
-        <div class="form-group">
-          <label data-i18n="label_unit_req">Unit *</label>
-          <input type="text" id="ing-unit" placeholder="g">
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="label_qty_req">Quantity *</label>
+            <input type="text" id="ing-qty" placeholder="500">
+          </div>
+          <div class="form-group">
+            <label data-i18n="label_unit_req">Unit *</label>
+            <input type="text" id="ing-unit" placeholder="g">
+          </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeIngModal()">Cancel</button>
-        <button class="btn btn-orange" data-i18n="btn_add" onclick="addIngredient()">Add</button>
+        <div class="form-group" id="ing-section-group">
+          <label data-i18n="label_section">Section</label>
+          <select id="ing-section"></select>
+        </div>
+        <div class="modal-footer" style="padding:0;margin-top:1rem;">
+          <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeIngModal()">Cancel</button>
+          <button class="btn btn-orange" data-i18n="btn_add" onclick="addIngredient()">Add</button>
+        </div>
       </div>
     </div>
   </div>
@@ -265,7 +275,7 @@
   </div>
 
   <!-- Modal: upload recipe image -->
-  <input type="file" id="recipe-img-input" accept="image/*" style="display:none" onchange="uploadRecipeImage(event)">
+  <input type="file" id="recipe-img-input" accept="image/*" multiple style="display:none" onchange="uploadRecipeImage(event)">
 
   <!-- Modal: confirm delete -->
   <div class="modal-overlay" id="confirm-delete-modal">
