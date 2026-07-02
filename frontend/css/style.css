@@ -1614,6 +1614,8 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   .sidebar-lang .lang-btn { padding: 3px 5px; font-size: 0.72rem; letter-spacing: 0; }
 }
 
+.mobile-only-nav { display: none; }
+
 /* bottom-nav mobile: float lang toggle above the bar */
 @media (max-width: 600px) {
   .sidebar-lang {
@@ -1901,8 +1903,21 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 }
 
 @media (max-width: 600px) {
-  .home-quick-actions { flex-direction: row; flex-wrap: wrap; }
-  .home-quick-btn { flex: 1; }
+  .home-hero {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.1rem 1.25rem 1.25rem;
+    border-radius: 12px;
+  }
+  .home-hero-left { width: 100%; }
+  .home-total-amount { font-size: 2rem; }
+  .home-quick-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 0.5rem;
+  }
+  .home-quick-btn { flex: 1; min-width: 0; }
 }
 
 /* Brand badge */
@@ -2001,6 +2016,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   }
   .nav-item span[data-i18n] { display: block; font-size: 0.65rem; }
   .nav-item .nav-icon { font-size: 1.1rem; width: auto; }
+  .mobile-only-nav { display: flex; }
 
   .app-layout {
     margin-left: 0;
