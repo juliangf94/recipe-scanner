@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+  <title>RecipeScanner — Account Settings</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .account-page { max-width: 560px; margin: 0 auto; }
+    .account-section {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .account-section h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .avatar-upload-area {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .avatar-large {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .avatar-large img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-upload-actions { display: flex; flex-direction: column; gap: 0.5rem; }
+    .btn-upload {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text);
+      transition: background 0.15s;
+    }
+    .btn-upload:hover { background: var(--bg-light); }
+    .avatar-hint { font-size: 0.8rem; color: var(--text-muted); }
+    .user-info-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-bottom: 0.75rem;
+    }
+    .user-info-row:last-child { margin-bottom: 0; }
+    .info-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .info-value { font-size: 1rem; color: var(--text); font-weight: 500; }
+    .btn-danger {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.25rem;
+      border-radius: 8px;
+      border: 1.5px solid #DC2626;
+      background: #fff;
+      color: #DC2626;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-danger:hover { background: #DC2626; color: #fff; }
+    .btn-logout-full {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.25rem;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      width: 100%;
+      margin-bottom: 0.75rem;
+    }
+    .btn-logout-full:hover { background: var(--bg-light); }
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    .confirm-overlay.open { display: flex; }
+    .confirm-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 2rem;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+    }
+    .confirm-box h3 { font-size: 1.1rem; margin: 0 0 0.5rem; color: var(--text); }
+    .confirm-box p { font-size: 0.9rem; color: var(--text-muted); margin: 0 0 1.5rem; }
+    .confirm-actions { display: flex; gap: 0.75rem; justify-content: center; }
+    .btn-cancel {
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-confirm-delete {
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      border: none;
+      background: #DC2626;
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="home.html" class="logo">
+        <div class="logo-icon">🍴</div>
+        <span class="logo-text">Recipe<span>Scanner</span></span>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="home.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span data-i18n="nav_home">Home</span>
+      </a>
+      <a href="dashboard.html" class="nav-item">
+        <span class="nav-icon">📖</span>
+        <span data-i18n="nav_recipes">My Recipes</span>
+      </a>
+      <a href="scan.html" class="nav-item">
+        <span class="nav-icon">⚡</span>
+        <span data-i18n="nav_scan">Scan Recipe</span>
+      </a>
+      <a href="prices.html" class="nav-item">
+        <span class="nav-icon">🏷</span>
+        <span data-i18n="nav_prices">My Prices</span>
+      </a>
+    </nav>
+    <div class="sidebar-lang">
+      <div class="lang-toggle">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+        <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar" id="user-avatar">
+        <span id="avatar-initials">?</span>
+      </div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-firstname" id="user-firstname">…</span>
+        <span class="sidebar-user-lastname" id="user-lastname"></span>
+      </div>
+      <div class="user-menu-wrapper">
+        <button class="sidebar-user-menu" onclick="toggleUserMenu(event)" title="Menu">⋯</button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="account.html" class="user-dropdown-item">⚙️ <span data-i18n="nav_account">Account Settings</span></a>
+          <button class="user-dropdown-item user-dropdown-logout" onclick="logout()">⏻ <span data-i18n="nav_signout">Log out</span></button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="app-layout">
+    <div class="account-page">
+
+      <!-- Profile photo -->
+      <div class="account-section">
+        <h2 data-i18n="account_photo">Profile photo</h2>
+        <div class="avatar-upload-area">
+          <div class="avatar-large" id="account-avatar">
+            <span id="account-initials">?</span>
+          </div>
+          <div class="avatar-upload-actions">
+            <button class="btn-upload" onclick="document.getElementById('avatar-file').click()">
+              📷 <span data-i18n="account_change_photo">Change photo</span>
+            </button>
+            <span class="avatar-hint" data-i18n="account_photo_hint">JPG or PNG, max 2MB</span>
+          </div>
+        </div>
+        <input type="file" id="avatar-file" accept="image/*" style="display:none" onchange="uploadAvatar(event)">
+      </div>
+
+      <!-- Account info -->
+      <div class="account-section">
+        <h2 data-i18n="account_info">Account info</h2>
+        <div class="user-info-row">
+          <span class="info-label" data-i18n="account_name">Name</span>
+          <span class="info-value" id="account-fullname">…</span>
+        </div>
+        <div class="user-info-row">
+          <span class="info-label" data-i18n="account_email">Email</span>
+          <span class="info-value" id="account-email">…</span>
+        </div>
+      </div>
+
+      <!-- Session & account actions -->
+      <div class="account-section">
+        <h2 data-i18n="account_actions">Account actions</h2>
+        <button class="btn-logout-full" onclick="logout()">
+          ⏻ <span data-i18n="nav_signout">Log out</span>
+        </button>
+        <button class="btn-danger" onclick="openDeleteConfirm()">
+          🗑️ <span data-i18n="account_delete">Delete account</span>
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Delete confirmation modal -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-box">
+      <h3 data-i18n="account_delete_title">Delete account?</h3>
+      <p data-i18n="account_delete_desc">This will permanently delete your account and all your recipes. This action cannot be undone.</p>
+      <div class="confirm-actions">
+        <button class="btn-cancel" onclick="closeDeleteConfirm()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn-confirm-delete" onclick="deleteAccount()" data-i18n="account_delete_confirm">Yes, delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/i18n.js?v=21"></script>
+  <script src="js/api.js"></script>
+  <script src="js/account.js"></script>
+</body>
+</html>

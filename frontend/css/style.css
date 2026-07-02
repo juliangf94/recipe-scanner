@@ -167,15 +167,56 @@ a:hover { text-decoration: underline; }
   border: none;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 1rem;
-  padding: 2px;
+  font-size: 1.2rem;
+  padding: 4px 6px;
   border-radius: 6px;
   transition: color 0.15s, background 0.15s;
+  line-height: 1;
 }
 .sidebar-user-menu:hover {
-  color: #DC2626;
-  background: #FEE2E2;
+  color: var(--text);
+  background: var(--border);
 }
+
+.user-menu-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+.user-dropdown {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  min-width: 190px;
+  z-index: 200;
+  overflow: hidden;
+}
+.user-dropdown.open { display: block; }
+.user-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  transition: background 0.12s;
+}
+.user-dropdown-item:hover { background: var(--bg-light); }
+.user-dropdown-logout {
+  color: #DC2626;
+  border-top: 1px solid var(--border);
+}
+.user-dropdown-logout:hover { background: #FEE2E2; }
 
 /* ── App Layout ──────────────────────────────────────────── */
 .app-layout {

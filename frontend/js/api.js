@@ -161,3 +161,12 @@ async function apiUpload(path, formData) {
   if (res.status === 204) return null;
   return res.json().then(data => ({ ok: res.ok, status: res.status, data }));
 }
+
+// ── User dropdown menu ────────────────────────────────────────────────────────
+function toggleUserMenu(e) {
+  e.stopPropagation();
+  document.getElementById('user-dropdown').classList.toggle('open');
+}
+document.addEventListener('click', () => {
+  document.getElementById('user-dropdown')?.classList.remove('open');
+});
