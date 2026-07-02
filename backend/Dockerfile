@@ -26,4 +26,4 @@ USER appuser
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/docs')" || exit 1
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "run:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--preload", "run:app"]
