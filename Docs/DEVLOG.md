@@ -18,7 +18,7 @@ Fecha de entrega: finales de junio 2026
 | BDD desarrollo | SQLite | Sin servidor, archivo local, ideal para desarrollo |
 | BDD producción | PostgreSQL | Robusto, concurrente, estándar en producción |
 | API docs | flask_restx (Swagger UI) | Documentación automática en `/api/docs`, preparado para app móvil |
-| Frontend | HTML + JS estático | Desacoplado del backend, consume la misma API REST que consumiría una app móvil |
+| Frontend | HTML + JS estático | Sin build step, sin framework reactivo — justificado en Decisión 18; la misma API sirve a cualquier cliente futuro |
 | Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 100 tests, 0 failures |
 | Tests end-to-end | Newman + Postman | 331 assertions contra el servidor en vivo — 109 requests, 0 failures |
 | Variables de entorno | python-dotenv | Carga `.env` en desarrollo; en producción las claves van directo al servidor |
@@ -939,6 +939,30 @@ def log_cook(self, recipe_id, user_id):  → registra una entrada
 def get_week_cook_count(self, user_id):  → cuántas veces cocinó esta semana
 def get_week_cooked_recipe_ids(user_id): → qué recetas cocinó esta semana
 ```
+
+### Decisión 18 — Vanilla JS en lugar de React (o Vue/Svelte)
+
+**Decisión:** El frontend se construyó con HTML + CSS + JavaScript puro, sin ningún framework reactivo.
+
+**Por qué NO React:**
+
+1. **Estado no compartido entre páginas** — cada página (`prices.js`, `home.js`, `scan.js`) es autocontenida. No existe un árbol de componentes profundo con estado global que justifique un framework reactivo.
+
+2. **Sin build step** — con vanilla JS no hay Vite, webpack, ni transpilador. Se guarda el archivo y el cambio es inmediato. Para un proyecto de portfolio con iteraciones rápidas, esto es una ventaja real.
+
+3. **Complejidad ya alta** — el stack ya incluye Flask, SQLAlchemy, Supabase, Groq API, DeepL, JWT y Docker. Agregar JSX + hooks + bundler habría sumado fricción sin resolver ningún problema concreto.
+
+4. **API-first architecture** — el backend es una API REST pura. El frontend consume los mismos endpoints que consumiría una app móvil (React Native, Flutter) o cualquier otro cliente. Usar vanilla JS o React no cambia esa propiedad; la arquitectura ya está desacoplada.
+
+5. **Mantenibilidad académica** — en una presentación técnica, vanilla JS es más fácil de explicar línea por línea que el ciclo de vida de componentes React.
+
+**¿Cuándo tendría sentido migrar a React / Next.js?**
+
+- Cuando haya estado complejo compartido entre muchas vistas simultáneas (ej. edición colaborativa en tiempo real).
+- Cuando el número de páginas o componentes reutilizables supere ~10 y el copy-paste de HTML se vuelva insostenible.
+- Si se construye una PWA o se integra con React Native para móvil — en ese caso Next.js + tRPC o una API REST compartida sería lo natural.
+
+**Conclusión:** vanilla JS fue la decisión correcta para el alcance de este proyecto. La misma API REST que alimenta el frontend podría alimentar mañana un cliente React, Vue o móvil sin cambiar una sola línea del backend.
 
 ---
 
