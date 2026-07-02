@@ -9,11 +9,18 @@ let _duplicateExistingId = null;
 
 function renderSuccessMessage(id, title) {
   const el = document.getElementById('upload-success');
-  el.innerHTML = `${tf('scan_ok', { title })}
+  el.style.position = 'relative';
+  el.innerHTML = `
+    <button onclick="dismissScanSuccess()" style="position:absolute;top:0.35rem;right:0.5rem;background:none;border:none;font-size:1rem;line-height:1;cursor:pointer;opacity:0.55;" title="Cerrar">✕</button>
+    ${tf('scan_ok', { title })}
     <div style="margin-top:0.6rem;">
       <a href="recipe.html?id=${id}" class="btn btn-orange btn-sm">${t('btn_view_recipe')}</a>
     </div>`;
   el.style.display = '';
+}
+
+function dismissScanSuccess() {
+  document.getElementById('upload-success').style.display = 'none';
 }
 
 // ── Restore scan success after any page reload ────────────────────────────────
