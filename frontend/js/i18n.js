@@ -191,6 +191,7 @@ const TRANSLATIONS = {
     section_move: 'Move to section',
     section_created_hint: 'Section "{name}" ready. Use the ⠿ icon on any ingredient to move it here.',
     section_move_hint: 'Use the ⠿ icon on each ingredient to move it to a section.',
+    section_empty_hint: 'Empty section — use the ⠿ icon on an ingredient to move it here.',
 
     // Sort
     sort_by: 'Sort by',
@@ -504,6 +505,7 @@ const TRANSLATIONS = {
     section_move: 'Mover a sección',
     section_created_hint: 'Sección "{name}" lista. Usá el ícono ⠿ en cualquier ingrediente para moverlo aquí.',
     section_move_hint: 'Usá el ícono ⠿ en cada ingrediente para moverlo a una sección.',
+    section_empty_hint: 'Sección vacía — usá el ícono ⠿ en un ingrediente para moverlo aquí.',
 
     // Sort
     sort_by: 'Ordenar por',
@@ -817,6 +819,7 @@ const TRANSLATIONS = {
     section_move: 'Déplacer vers une section',
     section_created_hint: 'Section « {name} » prête. Utilisez l\'icône ⠿ sur un ingrédient pour le déplacer ici.',
     section_move_hint: 'Utilisez l\'icône ⠿ sur chaque ingrédient pour le déplacer vers une section.',
+    section_empty_hint: 'Section vide — utilisez l\'icône ⠿ sur un ingrédient pour le déplacer ici.',
 
     // Sort
     sort_by: 'Trier par',

@@ -8,6 +8,7 @@ let currentRecipe = null;
 let currentIngredients = [];
 let currentSteps = [];
 let currentCostData = null;
+let localSections = [];
 let currentPriceIngId = null;
 let allStores = [];
 let allBrands = [];
@@ -229,6 +230,9 @@ function getSections(ingredients) {
     const s = i.section || '';
     if (!seen.has(s)) { seen.add(s); order.push(s); }
   });
+  localSections.forEach(s => {
+    if (!seen.has(s)) { seen.add(s); order.push(s); }
+  });
   return order;
 }
 
@@ -268,7 +272,9 @@ function renderIngredientsTable(ingredients) {
         </td>
       </tr>`;
 
-    const rows = group.map(i => renderIngRow(i, sections)).join('');
+    const rows = group.length > 0
+      ? group.map(i => renderIngRow(i, sections)).join('')
+      : `<tr><td colspan="7" style="padding:0.75rem 1.2rem;color:var(--text-muted);font-size:0.85rem;font-style:italic;">${t('section_empty_hint')}</td></tr>`;
     return headerRow + rows;
   }).join('');
 
@@ -393,7 +399,11 @@ function moveToSection(ingId, value) {
 
 function addSection() {
   showPrompt(t('section_new_name_prompt'), '', (name) => {
-    showAlert(tf('section_created_hint', { name }));
+    if (!localSections.includes(name) && !currentIngredients.some(i => (i.section || '') === name)) {
+      localSections.push(name);
+    }
+    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
+    loadCost();
   });
 }
 
