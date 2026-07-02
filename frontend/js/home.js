@@ -12,7 +12,8 @@ if (user) {
 function setAvatarDisplay(avatarUrl, initials) {
   const el = document.getElementById('user-avatar');
   if (avatarUrl) {
-    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    const src = supabaseThumb(resolveImgUrl(avatarUrl), 96, 80);
+    el.innerHTML = `<img src="${src}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   } else {
     el.innerHTML = `<span id="avatar-initials">${initials}</span><div class="avatar-overlay">📷</div>`;
   }
@@ -88,7 +89,7 @@ function renderHome(data) {
         const emoji = cardEmoji(r.category);
         const bannerCls = bannerClass(r.category);
         const imgHtml = r.image_url
-          ? `<img src="${supabaseThumb(resolveImgUrl(r.image_url), 120)}" alt="${title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
+          ? `<img src="${supabaseThumb(resolveImgUrl(r.image_url), 120, 60)}" alt="${title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
           : `<div class="home-recipe-banner ${bannerCls}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2.2rem;">${emoji}</div>`;
 
         return `
@@ -131,19 +132,33 @@ function countPricedIngs(data) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 let _summaryData = null;
+const SUMMARY_CACHE = 'rs_home_summary_v1';
 
 document.addEventListener('langchange', () => {
   if (_summaryData) renderHome(_summaryData);
 });
 
 (async () => {
+  // Render from cache immediately — eliminates cold-start wait on repeat visits
+  const cached = localStorage.getItem(SUMMARY_CACHE);
+  if (cached) {
+    try {
+      _summaryData = JSON.parse(cached);
+      renderHome(_summaryData);
+      applyTranslations();
+    } catch (_) { /* corrupt cache — fallthrough to API */ }
+  }
+
   const res = await apiFetch('/summary');
   if (!res || !res.ok) {
-    document.getElementById('home-content').innerHTML =
-      `<p class="text-muted">${t('err_load')}</p>`;
+    if (!_summaryData) {
+      document.getElementById('home-content').innerHTML =
+        `<p class="text-muted">${t('err_load')}</p>`;
+    }
     return;
   }
   _summaryData = res.data;
+  localStorage.setItem(SUMMARY_CACHE, JSON.stringify(res.data));
   renderHome(_summaryData);
   applyTranslations();
 })();
