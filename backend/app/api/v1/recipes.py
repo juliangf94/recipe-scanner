@@ -30,7 +30,8 @@ recipe_update_model = api.model('RecipeUpdate', {
     'description_fr': fields.String(description='Description in French'),
     'servings': fields.Integer(description='Number of servings'),
     'prep_time_min': fields.Integer(description='Preparation time in minutes'),
-    'category': fields.String(description='Recipe category')
+    'category': fields.String(description='Recipe category'),
+    'image_url': fields.String(description='Cover photo URL'),
 })
 
 

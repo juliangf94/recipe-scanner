@@ -39,7 +39,7 @@ if (user) {
 function setAvatarDisplay(avatarUrl, initials) {
   const el = document.getElementById('user-avatar');
   if (avatarUrl) {
-    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="avatar-overlay">📷</div>`;
+    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   } else {
     el.innerHTML = `<span id="avatar-initials">${initials}</span><div class="avatar-overlay">📷</div>`;
   }
@@ -72,6 +72,18 @@ async function uploadRecipeImage(event) {
     }
   }
   renderRecipeHeader(currentRecipe);
+}
+
+async function setCoverPhoto(imageUrl) {
+  if (imageUrl === currentRecipe.image_url) return;
+  const res = await apiFetch(`/recipes/${recipeId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ image_url: imageUrl })
+  });
+  if (res && res.ok) {
+    currentRecipe.image_url = imageUrl;
+    renderRecipeHeader(currentRecipe);
+  }
 }
 
 async function deleteRecipePhoto(imageUrl) {
@@ -169,7 +181,7 @@ function buildRecipeHeaderHtml(recipe) {
   const galleryHtml = images.length > 0
     ? `<div class="photo-gallery">
         ${images.map(url => `
-          <div class="photo-thumb${url === recipe.image_url ? ' is-cover' : ''}">
+          <div class="photo-thumb${url === recipe.image_url ? ' is-cover' : ''}" onclick="setCoverPhoto('${url.replace(/'/g, "\\'")}')">
             <img src="${resolveImgUrl(url)}" alt="">
             <button class="photo-thumb-delete" onclick="event.stopPropagation();deleteRecipePhoto('${url.replace(/'/g, "\\'")}')">✕</button>
           </div>`).join('')}
