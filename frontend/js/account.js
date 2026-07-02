@@ -5,11 +5,17 @@ const user = getUser();
 function setAvatarDisplay(avatarUrl, initials) {
   const sidebar = document.getElementById('user-avatar');
   const large = document.getElementById('account-avatar');
-  const img = avatarUrl
-    ? `<img src="${supabaseThumb(resolveImgUrl(avatarUrl), 96, 80)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
-    : `<span>${initials}</span>`;
-  if (sidebar) sidebar.innerHTML = img;
-  if (large)   large.innerHTML   = img;
+  const baseUrl = resolveImgUrl(avatarUrl);
+  if (sidebar) {
+    sidebar.innerHTML = avatarUrl
+      ? `<img src="${supabaseThumb(baseUrl, 96, 80)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+      : `<span>${initials}</span>`;
+  }
+  if (large) {
+    large.innerHTML = avatarUrl
+      ? `<img src="${supabaseThumb(baseUrl, 300, 85)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+      : `<span>${initials}</span>`;
+  }
   document.getElementById('account-initials')?.remove();
 }
 
