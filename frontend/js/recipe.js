@@ -632,7 +632,7 @@ function deleteStep(stepId) {
     t('confirm_del_step_desc'),
     async () => {
       const res = await apiFetch(`/recipes/${recipeId}/steps/${stepId}`, { method: 'DELETE' });
-      if (!res || !res.ok) return;
+      if (res && !res.ok) return;  // null = 204 success; only bail on explicit error
       currentSteps = currentSteps.filter(s => s.id !== stepId);
       document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
     }
@@ -805,7 +805,7 @@ async function clearManualPrice() {
   const res = await apiFetch(`/recipes/${recipeId}/ingredients/${currentPriceIngId}/price`, {
     method: 'DELETE'
   });
-  if (!res || !res.ok) return;
+  if (res && !res.ok) return;  // null = 204 success; only bail on explicit error
   closePriceModal();
   loadCost();
 }
