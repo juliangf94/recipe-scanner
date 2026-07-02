@@ -32,22 +32,25 @@ Backend (Flask)  ──► JSON únicamente  ◄──  Cualquier cliente
 frontend/
 ├── index.html          ← Login
 ├── register.html       ← Registro
-├── home.html           ← Resumen de costos y recetas top
+├── home.html           ← Resumen semanal de cocina y recetas top
 ├── dashboard.html      ← Lista de recetas con filtros y búsqueda
-├── recipe.html         ← Detalle de receta, ingredientes, precios, pasos
-├── scan.html           ← Escanear PDF con IA
-├── prices.html         ← Mis precios custom, tiendas, marcas
+├── recipe.html         ← Detalle de receta, ingredientes, precios, pasos, galería de fotos
+├── scan.html           ← Escanear PDF con IA (con modal anti-duplicados)
+├── prices.html         ← Mis precios custom (tabla editable inline), tiendas, marcas
+├── account.html        ← Ajustes de cuenta: nombre, email, contraseña, avatar
+├── privacy.html        ← Política de privacidad
+├── terms.html          ← Términos de uso
 ├── css/
 │   └── style.css       ← Estilos globales (dark/light, WCAG AA)
 └── js/
     ├── i18n.js         ← Sistema de traducción (EN/ES/FR) — se carga primero
     ├── api.js          ← Tokens JWT + fetch wrapper con auto-refresh — se carga segundo
     ├── auth.js         ← Login, registro, localStorage
-    ├── home.js         ← Resumen de costos y recetas top
-    ├── dashboard.js    ← Dashboard de recetas
-    ├── recipe.js       ← Detalle de receta, ingredientes, precios, secciones
-    ├── prices.js       ← Gestión de precios custom, tiendas y marcas
-    └── scan.js         ← Carga de PDF y escaneo con IA
+    ├── home.js         ← Resumen semanal (cook log) y recetas top
+    ├── dashboard.js    ← Dashboard de recetas con búsqueda y filtros
+    ├── recipe.js       ← Detalle de receta, secciones, precios, fotos múltiples
+    ├── prices.js       ← Tabla inline editable, stores, brands, ordenamiento
+    └── scan.js         ← Carga de PDF, escaneo, modal duplicados, dismiss éxito
 ```
 
 Cada HTML carga sus scripts en orden al final del `<body>`:
@@ -555,18 +558,115 @@ Cada fila de la tabla tiene su propio `<select>` con las tiendas del usuario. Al
 
 ## `frontend/js/prices.js`
 
-Gestiona la página "My Prices": lista de precios custom con ordenamiento, modales para agregar/editar con modo dual, y gestión de tiendas.
+Gestiona la página "My Prices": tabla editable inline estilo Excel con precios custom, ordenamiento, y modales para gestión de tiendas y marcas.
 
-### Carga en paralelo e inicialización
+### Arquitectura: tabla inline en lugar de modales
+
+A diferencia del sistema anterior (que usaba modales separados para agregar y editar), `prices.js` actual implementa una tabla donde cada celda es directamente editable — las celdas de datos son `<input>` y `<select>` que el usuario puede modificar sin abrir ningún modal.
+
+### Carga en serie e inicialización
 
 ```javascript
 async function init() {
-  await loadStores();  // primero: necesitamos las tiendas para los dropdowns
-  await loadPrices();  // segundo: los precios usan store_name
+  await Promise.all([loadStores(), loadBrands()]);  // en paralelo
+  await loadPrices();                                // después: usa allStores y allBrands
 }
 ```
 
-Se cargan en serie (no con `Promise.all`) porque `loadPrices()` necesita `allStores` ya cargado para enriquecer los precios con `store_name`.
+### Construcción de la tabla
+
+```javascript
+function renderTable(prices) {
+  wrap.innerHTML = `
+    <table class="ing-table prices-inline-table">
+      <thead>...</thead>
+      <tbody>
+        ${prices.map(p => buildPriceRow(p)).join('')}
+        ${buildNewRow()}   <!-- fila vacía al final para crear nuevos precios -->
+      </tbody>
+    </table>`;
+}
+
+function buildPriceRow(p) {
+  const ppkg = calcPricePerKg(p.bought_qty, p.bought_unit, p.bought_price) ?? p.price_per_kg;
+  return `
+    <tr class="price-row" data-id="${p.id}" onfocusout="handleRowFocusOut(event,'${p.id}')">
+      <td class="cell-name">${tIng(p.ingredient_name)}</td>
+      <td><select class="cell-sel store-cell" onchange="updateCalc(this)">
+        ${storeOptions(p.store_id)}
+      </select></td>
+      <td><select class="cell-sel brand-cell" ...>${brandOptions(p.brand_id)}</select></td>
+      <td><input class="cell-inp qty-cell" type="text" inputmode="decimal"
+           value="${p.bought_qty || ''}" oninput="updateCalc(this)"></td>
+      <td><select class="cell-sel unit-cell" ...>${unitOptions(p.bought_unit)}</select></td>
+      <td><input class="cell-inp price-cell" type="text" inputmode="decimal"
+           value="${priceVal}" oninput="updateCalc(this)"></td>
+      <td class="ppkg-cell">${ppkg != null ? '€' + ppkg.toFixed(2) : '—'}</td>
+      <td><button onclick="deletePrice('${p.id}',...)">...</button></td>
+    </tr>`;
+}
+```
+
+### `updateCalc()` — recálculo €/kg en tiempo real
+
+```javascript
+function updateCalc(el) {
+  const row = el.closest('tr');
+  const qty   = parseFloat((row.querySelector('.qty-cell')?.value  || '').replace(',', '.'));
+  const unit  = row.querySelector('.unit-cell')?.value || 'g';
+  const price = parseFloat((row.querySelector('.price-cell')?.value || '').replace(',', '.'));
+  const ppkgCell = row.querySelector('.ppkg-cell');
+  if (!isNaN(qty) && qty > 0 && !isNaN(price) && price > 0) {
+    const ppkg = calcPricePerKg(qty, unit, price);
+    ppkgCell.textContent = ppkg != null ? '€' + ppkg.toFixed(2) : '—';
+  } else if (!isNaN(price) && price > 0) {
+    ppkgCell.textContent = '€' + price.toFixed(2);  // precio directo €/kg
+  } else {
+    ppkgCell.textContent = '—';
+  }
+}
+```
+
+Se llama con `oninput` y `onchange` desde cualquier celda editable de la fila — la columna €/kg se actualiza con cada tecla.
+
+### Guardado automático con `onfocusout`
+
+```javascript
+function handleRowFocusOut(event, priceId) {
+  // focusout burbujea: si el foco va a otro elemento DENTRO de la fila → no guardar
+  // (el usuario está tabulando entre celdas de la misma fila)
+  if (event.currentTarget.contains(event.relatedTarget)) return;
+  if (priceId === 'new') {
+    saveNewRow(event.currentTarget);
+  } else {
+    saveRowEdit(priceId, event.currentTarget);
+  }
+}
+```
+
+`event.currentTarget` es el `<tr>`. `event.relatedTarget` es el elemento que recibe el foco a continuación. Si `relatedTarget` está DENTRO del `<tr>`, el usuario simplemente tabuló a la siguiente celda de la misma fila → no se guarda todavía. Si salió completamente de la fila → se guarda.
+
+### Dual-mode del campo precio
+
+```javascript
+async function saveRowEdit(priceId, row) {
+  const qty   = parseFloat(row.querySelector('.qty-cell')?.value.replace(',', '.'));
+  const price = parseFloat(row.querySelector('.price-cell')?.value.replace(',', '.'));
+  const hasQty = !isNaN(qty) && qty > 0;
+  const hasPrice = !isNaN(price) && price > 0;
+  if (!hasPrice) return; // sin precio → no guardar
+
+  let body = { store_id: storeId, brand_id: brandId };
+  if (hasQty) {
+    // modo "por cantidad": guarda bought_qty/unit/price, calcula €/kg en el backend
+    body.bought_qty = qty; body.bought_unit = unit; body.bought_price = price;
+  } else {
+    // modo directo: el valor en la celda precio YA es el €/kg
+    body.price_per_kg = price;
+  }
+  await apiFetch(`/prices/${priceId}`, { method: 'PUT', body: JSON.stringify(body) });
+}
+```
 
 ### Ordenamiento client-side
 
@@ -575,35 +675,19 @@ function sortedPrices(prices) {
   const mode = document.getElementById('sort-select')?.value || 'name-asc';
   const copy = [...prices]; // nunca mutar el array original
   switch (mode) {
-    case 'name-asc':   return copy.sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name));
-    case 'name-desc':  return copy.sort((a, b) => b.ingredient_name.localeCompare(a.ingredient_name));
-    case 'price-asc':  return copy.sort((a, b) => a.price_per_kg - b.price_per_kg);
-    case 'price-desc': return copy.sort((a, b) => b.price_per_kg - a.price_per_kg);
-    case 'store':      return copy.sort((a, b) => {
-      const sa = (a.store_name || '').toLowerCase();
-      const sb = (b.store_name || '').toLowerCase();
+    case 'name-asc':  return copy.sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name));
+    case 'price-asc': return copy.sort((a, b) => a.price_per_kg - b.price_per_kg);
+    case 'store':     return copy.sort((a, b) => {
+      const sa = allStores.find(s => s.id === a.store_id)?.name || '';
+      const sb = allStores.find(s => s.id === b.store_id)?.name || '';
       return sa !== sb ? sa.localeCompare(sb) : a.ingredient_name.localeCompare(b.ingredient_name);
     });
+    // ...etc
   }
 }
 ```
 
-`[...prices]` crea una copia superficial del array antes de ordenar. `Array.sort()` muta el array original — si no se copia, `allPrices` (el array maestro) quedaría en un orden diferente al que vino del servidor, causando bugs al re-renderizar.
-
-`localeCompare()` ordena strings respetando acentos y caracteres especiales (`"ñ"`, `"é"`) — importante para ingredientes en español.
-
-En el caso `'store'`, el orden secundario es por nombre del ingrediente: todos los precios sin tienda van juntos al inicio, luego por tienda A-Z, y dentro de cada tienda por ingrediente A-Z.
-
-### Preview en vivo del €/kg
-
-```javascript
-['add-bought-qty', 'add-bought-price'].forEach(id => {
-  document.getElementById(id).addEventListener('input', updateAddPreview);
-});
-document.getElementById('add-bought-unit').addEventListener('change', updateAddPreview);
-```
-
-Listeners en los tres campos del modo "por cantidad". `'input'` se dispara con cada tecla, `'change'` se dispara al seleccionar una opción del `<select>`. El preview se actualiza en tiempo real mientras el usuario escribe.
+`[...prices]` crea una copia superficial — `Array.sort()` muta el original, lo que causaría re-renders incorrectos. `localeCompare()` respeta acentos y caracteres especiales (ñ, é).
 
 ---
 
@@ -679,19 +763,53 @@ async function scanPdf() {
   document.getElementById('scanning').style.display = 'none';
   document.getElementById('scan-btn').style.display = '';
 
+  // Manejo de duplicado (409)
+  if (res?.status === 409 && res?.data?.error_code === 'duplicate') {
+    document.getElementById('duplicate-modal').classList.add('open');
+    return;
+  }
+
   if (!res || !res.ok) { /* error */ return; }
 
-  showLastScan(res.data.recipe, res.data);
-
-  setTimeout(() => {
-    window.location.href = `recipe.html?id=${res.data.recipe.id}`;
-  }, 2000);
+  const recipe = res.data.recipe;
+  renderSuccessMessage(recipe.id, recipe.title);  // muestra cartel verde con botón
+  showLastScan(recipe, res.data);                 // muestra resumen debajo del formulario
 }
 ```
 
-`apiUpload()` (en `api.js`) es distinto de `apiFetch()` porque no agrega `Content-Type: application/json` — con `FormData`, el browser establece automáticamente `Content-Type: multipart/form-data` con el boundary correcto. Si se sobreescribiera ese header manualmente, el backend no podría parsear el archivo.
+`apiUpload()` (en `api.js`) es distinto de `apiFetch()` porque no agrega `Content-Type: application/json` — con `FormData`, el browser establece automáticamente `Content-Type: multipart/form-data` con el boundary correcto.
 
-El `setTimeout` de 2 segundos deja al usuario ver el resumen del resultado antes de redirigir a la receta creada.
+Ya **no hay auto-redirect** — el usuario ve el mensaje de éxito con un botón "Ver receta" y una X para cerrar. El usuario decide cuándo navegar.
+
+### Mensaje de éxito con X para cerrar
+
+```javascript
+function renderSuccessMessage(id, title) {
+  const el = document.getElementById('upload-success');
+  el.style.position = 'relative';
+  el.innerHTML = `
+    <button onclick="dismissScanSuccess()"
+      style="position:absolute;top:0.35rem;right:0.5rem;background:none;border:none;
+             font-size:1rem;cursor:pointer;opacity:0.55;" title="Cerrar">✕</button>
+    ${tf('scan_ok', { title })}
+    <div style="margin-top:0.6rem;">
+      <a href="recipe.html?id=${id}" class="btn btn-orange btn-sm">${t('btn_view_recipe')}</a>
+    </div>`;
+  el.style.display = '';
+}
+
+function dismissScanSuccess() {
+  document.getElementById('upload-success').style.display = 'none';
+}
+```
+
+La X está posicionada absolutamente dentro del cartel. Si el usuario navega fuera de `scan.html` y vuelve, el cartel ya no está — es un elemento en el DOM de esa página, no se persiste en localStorage.
+
+### Modal de duplicados
+
+Si el backend detecta que ya existe una receta con el mismo título (HTTP 409), se muestra un modal con dos opciones:
+- "Ver receta existente" → navega al ID existente
+- "Crear de todas formas" → reenvía el mismo PDF con `?force=true`
 
 ### Resumen del resultado con i18n
 
@@ -793,3 +911,43 @@ function logout() { removeToken(); window.location.href = 'index.html'; }
 ```
 
 `removeToken()` es un alias de `clearTokens()` — borra `access_token`, `refresh_token`, y `user` de `localStorage`. El backend no tiene un endpoint de logout porque los tokens son stateless. Si se quisiera invalidación inmediata (por ejemplo, en caso de compromiso de cuenta), habría que implementar una lista de tokens revocados en el backend — fuera del scope actual del proyecto.
+
+---
+
+# Sesión 13 — Frontend · Imágenes y helper `resolveImgUrl`
+
+## `resolveImgUrl()` — URL de imagen desde Supabase o local
+
+```javascript
+function resolveImgUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;  // Supabase → URL absoluta lista para usar
+  return SERVER_URL + url;                  // fallback local → /static/uploads/...
+}
+```
+
+El backend puede guardar dos tipos de URL de imagen:
+1. **Supabase** → URL absoluta `https://xxx.supabase.co/storage/v1/object/public/...`
+2. **Fallback local** → URL relativa `/static/uploads/avatars/user-id.jpg`
+
+`resolveImgUrl()` unifica los dos casos. Si la URL ya es absoluta (empieza con `http`), se usa directamente. Si es relativa, se le antepone `SERVER_URL` (la URL del backend: `https://recipe-scanner-kfnm.onrender.com`).
+
+Esta función se usa en todos los JS que renderizan imágenes: `recipe.js`, `scan.js`, `prices.js`, etc.
+
+## `tIng()` — traducción de ingredientes en el frontend
+
+```javascript
+function tIng(name, nameEn, nameEs, nameFr) {
+  const lang = getLang();
+  if (lang === 'en' && nameEn) return nameEn;
+  if (lang === 'es' && nameEs) return nameEs;
+  if (lang === 'fr' && nameFr) return nameFr;
+  return name; // fallback al nombre original
+}
+```
+
+Los ingredientes tienen columnas `name_en`, `name_es`, `name_fr` en la BD. `tIng()` selecciona la traducción correspondiente al idioma activo. Si la traducción no existe (puede fallar si el servicio de traducción no estuvo disponible), usa el nombre original.
+
+## Soporte trilingüe EN/ES/FR completo
+
+El sistema i18n soporta tres idiomas (no solo EN/ES). El objeto `TRANSLATIONS` en `i18n.js` tiene claves para los tres idiomas. Los botones de idioma en el sidebar son EN / ES / FR. Las traducciones del backend (ingredientes, pasos, título) también están en tres idiomas con columnas `_en`, `_es`, `_fr`.

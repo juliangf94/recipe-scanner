@@ -799,3 +799,161 @@ def get(self, recipe_id):
 ```
 
 Este fix está cubierto por el test `test_get_other_user_recipe_returns_403` en `tests/test_api.py`.
+
+---
+
+## Decisiones técnicas — Sprint 8-9 (Supabase + UX)
+
+### Decisión 14 — Supabase Storage para imágenes persistentes
+
+**Problema:** Render tiene filesystem efímero — tras reiniciar el contenedor (15 min de inactividad), todas las imágenes subidas se pierden. Guardar en `/static/uploads/` no es viable en producción.
+
+**Decisión:** Usar Supabase Storage (S3-compatible, gratuito hasta 1GB) para todos los archivos subidos por usuarios.
+
+**Implementación:**
+
+```python
+# backend/app/storage.py
+import os, requests
+
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
+BUCKET = 'recipes'
+
+def upload_file(file_bytes, path, content_type):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return None  # fallback al caller
+    url = f'{SUPABASE_URL}/storage/v1/object/{BUCKET}/{path}'
+    r = requests.put(url, data=file_bytes, headers={
+        'Authorization': f'Bearer {SUPABASE_KEY}',
+        'Content-Type': content_type,
+        'x-upsert': 'true'
+    }, timeout=20)
+    if r.ok:
+        return f'{SUPABASE_URL}/storage/v1/object/public/{BUCKET}/{path}'
+    return None
+
+def delete_file(path):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    requests.delete(
+        f'{SUPABASE_URL}/storage/v1/object/{BUCKET}/{path}',
+        headers={'Authorization': f'Bearer {SUPABASE_KEY}'},
+        timeout=10
+    )
+```
+
+Cada endpoint de upload (`/auth/me/avatar`, `/recipes/<id>/images`) intenta primero Supabase. Si retorna `None`, hace fallback al filesystem local con URL relativa `/static/uploads/...`.
+
+**`resolveImgUrl()` en el frontend:**
+```javascript
+function resolveImgUrl(url) {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;  // Supabase → URL absoluta ya lista
+    return SERVER_URL + url;                 // fallback local → prefijamos backend URL
+}
+```
+
+---
+
+### Decisión 15 — DeepL como primario + MyMemory API como fallback de traducciones
+
+**Decisión:** El sistema de traducción intenta DeepL primero (si `DEEPL_API_KEY` está configurada) y cae a MyMemory API si no hay clave o si falla.
+
+**Por qué no solo MyMemory:**
+- DeepL tiene mayor calidad, especialmente para textos culinarios con terminología específica.
+- Si un usuario o el entorno tiene una clave DeepL, se usa automáticamente sin cambiar código.
+
+**Por qué MyMemory como fallback:**
+- No requiere API key — es completamente gratuito.
+- 500k caracteres/día con email registrado (`chuliangf94@gmail.com` como `de` param).
+- Cubre perfectamente el volumen de una app de recetas personales.
+
+**Implementación paralela (3 idiomas simultáneos):**
+```python
+with ThreadPoolExecutor(max_workers=3) as executor:
+    futures = {
+        executor.submit(_batch_for_lang, lc): lc
+        for lc in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]
+    }
+```
+Las 3 traducciones corren en paralelo para mantenerse dentro del límite de 30s de Render.
+
+---
+
+### Decisión 16 — Tabla de precios editable inline (Excel-style)
+
+**Decisión:** Reemplazar el sistema de modales (Add modal + Edit modal) en `prices.html` por una tabla con celdas `<input>` y `<select>` editables directamente.
+
+**Por qué:**
+- El workflow de editar precios era tedioso: click botón → modal → completar campos → guardar → cerrar modal.
+- Una tabla editable inline es significativamente más rápida y natural — se parece a Excel o Google Sheets.
+
+**Cómo funciona el guardado automático:**
+```javascript
+// Cada <tr> tiene onfocusout al nivel de la fila
+<tr onfocusout="handleRowFocusOut(event, '${p.id}')">
+  <td><input class="qty-cell" ...></td>
+  <td><select class="store-cell" ...></select></td>
+  ...
+</tr>
+
+function handleRowFocusOut(event, priceId) {
+  // Si el foco se va a otro elemento DENTRO de la fila → no guardar
+  // (el usuario está tabulando entre celdas de la misma fila)
+  if (event.currentTarget.contains(event.relatedTarget)) return;
+  // Si el foco sale de la fila completamente → guardar
+  if (priceId === 'new') saveNewRow(event.currentTarget);
+  else saveRowEdit(priceId, event.currentTarget);
+}
+```
+
+La fila vacía al pie de la tabla (`.new-price-row`) es siempre visible y crea un nuevo precio al completar el ingrediente y salir.
+
+**Dual-mode de precio (en la misma celda):**
+- Si la columna `Qty` tiene valor → interpreta `Price` como precio pagado por esa cantidad → calcula €/kg
+- Si `Qty` está vacío → interpreta `Price` directamente como €/kg
+
+---
+
+### Decisión 17 — Cook Log y resumen semanal en Home
+
+**Decisión:** Agregar un `CookLog` que registra cada vez que el usuario marca una receta como "cocinada", y mostrar un resumen semanal en `home.html`.
+
+**Por qué:**
+- Agrega valor real al producto — el usuario puede ver cuántas veces cocinó en la semana.
+- `home.html` se convierte en el dashboard inicial con métricas útiles.
+
+**Modelo:**
+```python
+class CookLog(db.Model):
+    id = db.Column(db.String(36), primary_key=True)
+    recipe_id = db.Column(db.String(36), db.ForeignKey('recipes.id'))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'))
+    cooked_at = db.Column(db.DateTime)
+```
+
+**Facade:**
+```python
+def log_cook(self, recipe_id, user_id):  → registra una entrada
+def get_week_cook_count(self, user_id):  → cuántas veces cocinó esta semana
+def get_week_cooked_recipe_ids(user_id): → qué recetas cocinó esta semana
+```
+
+---
+
+### Fase 10 — Supabase + UX mejorada ✅
+
+- [x] `app/storage.py` — wrapper Supabase Storage
+- [x] `POST /api/v1/auth/me/avatar` — upload avatar con fallback local
+- [x] `POST /api/v1/recipes/<id>/images` + `DELETE` — galería multi-foto por receta
+- [x] `Recipe.images_json` — columna TEXT con array JSON de URLs
+- [x] `resolveImgUrl()` en todos los JS del frontend
+- [x] Traducciones con DeepL (primario) + MyMemory API (fallback paralelo con ThreadPoolExecutor)
+- [x] Detección de idioma fuente con `langdetect` (para evitar traducir al mismo idioma)
+- [x] Pasos de receta traducidos en EN/ES/FR (no solo títulos e ingredientes)
+- [x] `CookLog` model + Facade + endpoint `POST /recipes/<id>/cook`
+- [x] `home.html` + `home.js` con resumen semanal
+- [x] `prices.js` — tabla inline editable (reemplaza modales)
+- [x] `scan.js` — botón X para cerrar éxito del scan + modal anti-duplicados
+- [x] `__init__.py` — safe `ALTER TABLE` idempotente para columnas nuevas

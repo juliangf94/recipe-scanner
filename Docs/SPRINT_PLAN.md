@@ -292,18 +292,54 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 
 ---
 
-## Sprint 8 — Base de datos persistente ⏳ PENDING
+## Sprint 8 — Base de datos persistente ✅ COMPLETE
 
 **Goal:** Reemplazar SQLite en producción por PostgreSQL con Supabase para persistencia real de datos.
+Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 
 **Duration:** Week 11
 
 | Task | Priority | Status |
 |---|---|---|
-| Crear proyecto en Supabase (EU West) | Must Have | Pending |
-| Configurar `DATABASE_URL` en Render con URL de Supabase | Must Have | Pending |
-| Verificar que los datos persisten tras reinicio del contenedor | Must Have | Pending |
-| Merge `develop` → `main` | Must Have | Pending |
+| Crear proyecto en Supabase (EU West) | Must Have | ✅ Done |
+| Configurar `DATABASE_URL` en Render con URL de Supabase PostgreSQL | Must Have | ✅ Done |
+| Verificar que los datos persisten tras reinicio del contenedor | Must Have | ✅ Done |
+| `app/storage.py` — wrapper Supabase Storage (upload/delete/public_url) | Should Have | ✅ Done |
+| Avatar upload endpoint `POST /api/v1/auth/me/avatar` | Should Have | ✅ Done |
+| Recipe images: `POST /api/v1/recipes/<id>/images`, `DELETE /api/v1/recipes/<id>/images/<idx>` | Should Have | ✅ Done |
+| `resolveImgUrl()` en frontend — URL Supabase absoluta vs relativa local | Should Have | ✅ Done |
+| `__init__.py` safe `ALTER TABLE` para columnas nuevas (idempotente) | Must Have | ✅ Done |
+| Merge `develop` → `main` | Should Have | Pending |
+
+**Architectural notes:**
+- Supabase Storage bucket `recipes` para fotos de recetas y `avatars` para fotos de perfil.
+- `storage.py` tiene fallback automático al filesystem local si Supabase no responde.
+- `Recipe.images_json` almacena un array JSON de URLs de imágenes (soporta múltiples fotos por receta).
+- Las `ALTER TABLE` en `__init__.py` son idempotentes — usan `try/except` con `rollback()` para no fallar si la columna ya existe.
+
+---
+
+## Sprint 9 — UX mejorada + Traducciones ✅ COMPLETE
+
+**Goal:** Mejorar la experiencia de usuario con la tabla de precios inline y mejorar las traducciones automáticas.
+
+**Duration:** Week 12
+
+| Task | Priority | Status |
+|---|---|---|
+| Tabla de precios editable inline (Excel-style) — reemplaza modales add/edit | Should Have | ✅ Done |
+| `handleRowFocusOut()` — guardado automático al salir de la fila | Should Have | ✅ Done |
+| Fila "new" al pie de la tabla para crear precios sin modal | Should Have | ✅ Done |
+| `updateCalc()` — recálculo de €/kg en tiempo real con cada tecla | Should Have | ✅ Done |
+| Traducción MyMemory como fallback de DeepL (paralelo con `ThreadPoolExecutor`) | Must Have | ✅ Done |
+| Detección de idioma fuente con `langdetect` (fallback si DeepL no disponible) | Should Have | ✅ Done |
+| Traducciones EN/ES/FR de pasos de receta (no solo ingredientes) | Must Have | ✅ Done |
+| `dismissScanSuccess()` — botón X para cerrar el mensaje de scan exitoso | Could Have | ✅ Done |
+| Prevención de duplicados en scan — modal de confirmación para recetas duplicadas | Should Have | ✅ Done |
+| Cook log: `POST /recipes/<id>/cook` registra cocinada, conteo semanal en home | Could Have | ✅ Done |
+| Home page (`home.html`) con resumen semanal de cocina | Could Have | ✅ Done |
+| Múltiples fotos de receta — galería con imagen activa clickeable | Should Have | ✅ Done |
+| i18n `th_unit` agregado (columna Unidad en tabla de precios) | Could Have | ✅ Done |
 
 ---
 

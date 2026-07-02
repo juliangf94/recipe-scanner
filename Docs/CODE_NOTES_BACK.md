@@ -10,8 +10,15 @@
 > | Sesión 7–8 | Sprint 4 — Precios + SQLAlchemy | ✅ Completo |
 > | Sesión 9–15 | Sprint 5 — Frontend HTML/JS estático | ✅ Completo |
 > | Sesión 16+ | Sprint 6 — Hardening + Migración Qwen + 100 tests total | ✅ Completo |
+> | Sprint 7 | Deploy en Render + Netlify | ✅ Completo — ver `DEPLOY.md` |
+> | Sprint 8 | Supabase PostgreSQL + Supabase Storage | ✅ Completo — ver `DEPLOY.md` |
+> | Sprint 9 | Tabla precios inline + traducciones + cook log | ✅ Completo — ver `DEVLOG.md` |
 >
 > Cada sesión = una unidad de trabajo de 2–3 horas. Cada sprint = 1–2 sesiones con un objetivo entregable.
+>
+> **⚠️ Nota:** Este archivo documenta en detalle las Sesiones 1–16 (Sprints 1–6).
+> Las decisiones técnicas de Sprints 7–9 (deploy, Supabase, tabla inline, traducciones,
+> cook log) están documentadas en `DEVLOG.md` (Decisiones 14–17) y `SPRINT_PLAN.md`.
 
 ---
 

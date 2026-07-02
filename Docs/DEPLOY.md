@@ -17,12 +17,14 @@ Usuario (browser / móvil)
 │  HTML + CSS + JS     │       │  gunicorn + Flask            │
 └─────────────────────┘        └──────────┬───────────────────┘
                                            │
-                                           ▼
-                                ┌─────────────────────┐
-                                │  Base de datos       │
-                                │  SQLite (actual)     │
-                                │  PostgreSQL (futuro) │
-                                └─────────────────────┘
+                              ┌────────────┴────────────┐
+                              ▼                         ▼
+                   ┌─────────────────────┐  ┌──────────────────────┐
+                   │  Supabase            │  │  Supabase Storage    │
+                   │  PostgreSQL (prod)   │  │  Bucket "recipes"    │
+                   │  DATABASE_URL        │  │  Bucket "avatars"    │
+                   │  (persistente)       │  │  (fotos persistentes)│
+                   └─────────────────────┘  └──────────────────────┘
 ```
 
 **URLs de producción:**
@@ -109,7 +111,10 @@ El bind mount `./backend:/app` sincroniza el código local con el contenedor —
 | `SECRET_KEY` | Clave aleatoria generada con `secrets.token_hex(32)` |
 | `JWT_SECRET_KEY` | Clave aleatoria separada para JWT |
 | `GROQ_API_KEY` | API key de console.groq.com |
-| `DATABASE_URL` | URL de base de datos (ver sección Base de datos) |
+| `DATABASE_URL` | URL de PostgreSQL Supabase (ver sección Base de datos) |
+| `SUPABASE_URL` | URL del proyecto Supabase (https://xxx.supabase.co) |
+| `SUPABASE_KEY` | Anon/Service key de Supabase (para Storage) |
+| `DEEPL_API_KEY` | *(Opcional)* API key de DeepL — si no está, se usa MyMemory |
 
 ### Comportamiento del free tier
 
@@ -194,31 +199,44 @@ En desarrollo local apunta a `localhost:5000`. En Netlify (producción) apunta a
 
 ## Base de datos
 
-### Estado actual — SQLite
+### Estado actual — PostgreSQL con Supabase ✅
 
-El backend usa SQLite como fallback cuando `DATABASE_URL` no está configurada:
+En producción la app usa **PostgreSQL en Supabase** — datos persistentes aunque Render reinicie el contenedor.
+
+La variable `DATABASE_URL` en Render apunta a Supabase:
 ```
-/app/instance/production.db
+postgresql://postgres:[password]@[host].supabase.co:5432/postgres
 ```
 
-**Limitación:** en el free tier de Render el filesystem no es persistente. Si el contenedor se reinicia (automático tras 15 min de inactividad), los datos se pierden.
+El código tiene fallback a SQLite local si `DATABASE_URL` no está configurada (útil para desarrollo local sin Docker):
+```python
+# config.py
+SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+    'sqlite:////app/instance/production.db'
+```
 
-**Apropiado para:** demos cortas, presentación al jury.
-**No apropiado para:** uso real desde el celular, datos que deben persistir.
+SQLAlchemy detecta el tipo de base de datos automáticamente por la URL — no hay que cambiar ningún código al migrar entre SQLite y PostgreSQL.
 
-### Próximo paso — PostgreSQL con Supabase
+**En desarrollo local** se puede usar SQLite (sin configurar `DATABASE_URL`) o apuntar a Supabase real desde `.env`.
 
-Para datos persistentes sin costo permanente, migrar a Supabase (PostgreSQL gratuito sin límite de tiempo):
+### Supabase Storage — fotos persistentes
 
-1. Crear cuenta en supabase.com (login con GitHub)
-2. Nuevo proyecto → región EU West → anotar contraseña
-3. Settings → Database → Connection string → URI → copiar
-4. En Render → Environment → `DATABASE_URL` = *(URL de Supabase)*
-5. Render reinicia automáticamente con PostgreSQL
+Render tiene filesystem efímero. Para fotos de recetas y avatares se usa Supabase Storage:
 
-El código no cambia — SQLAlchemy detecta el tipo de base de datos por la URL:
-- `sqlite:///...` → SQLite
-- `postgresql://...` → PostgreSQL
+```python
+# backend/app/storage.py
+def upload_file(file_bytes, path, content_type):
+    # Sube a Supabase → retorna URL pública permanente
+    # Si falla → retorna None (el endpoint hace fallback a /static/uploads/)
+
+def delete_file(path):
+    # Elimina de Supabase (silencioso si no existe)
+
+def get_public_url(path):
+    # Retorna https://xxx.supabase.co/storage/v1/object/public/recipes/<path>
+```
+
+Variables necesarias: `SUPABASE_URL` y `SUPABASE_KEY` en Render (y en `.env` local si se quiere usar Storage en dev).
 
 ---
 

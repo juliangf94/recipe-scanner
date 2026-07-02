@@ -59,15 +59,16 @@ No explica línea a línea — explica QUÉ hace cada parte y POR QUÉ existe.
 │  FACADE  (backend/app/services/facade.py)                   │
 │  Toda la lógica de negocio en un solo lugar                 │
 │                                                             │
-│  ├── Repositorios → base de datos                           │
+│  ├── DbStorage (SQLAlchemy) → base de datos                 │
 │  ├── Groq API → extracción de recetas desde PDF             │
 │  ├── Open Food Facts → precios de ingredientes              │
-│  └── DeepL/LibreTranslate → traducciones EN/ES/FR           │
+│  ├── DeepL/MyMemory API → traducciones EN/ES/FR             │
+│  └── Supabase Storage → fotos de recetas y avatares         │
 └──────────┬──────────────┬──────────────┬────────────────────┘
            │              │              │
            ▼              ▼              ▼
       SQLAlchemy       Groq API      Open Food Facts
-      (SQLite/PG)    (Qwen 3.6-27b)   (precios)
+      (Supabase PG)   (llama-3.3)     (precios)
 ```
 
 ---
@@ -157,6 +158,44 @@ La API no toca la base de datos directamente — siempre pasa por la Facade.
 facade = RecipeScannerFacade()  # instancia única, creada al iniciar la app
 ```
 
+### ¿Con qué se comunica la Facade?
+
+Esta pregunta es clave para entender el patrón:
+
+```
+PREGUNTA:  ¿la Facade se comunica con la API o con los modelos?
+RESPUESTA: Ninguna de las dos.
+
+La Facade se comunica con DbStorage.
+DbStorage es el que crea e interactúa con las instancias de los modelos SQLAlchemy.
+
+El flujo correcto es:
+  API → llama métodos de Facade → Facade crea objetos modelo → Facade llama DbStorage → DbStorage hace db.session.add() / commit()
+
+La API NO toca DbStorage directamente.
+La Facade NO toca db.session directamente (salvo casos puntuales como CookLog).
+Los modelos (User, Recipe, etc.) son solo clases de datos — no tienen lógica propia.
+```
+
+Ejemplo concreto con `register_user`:
+```python
+# En auth.py (API):
+user = facade.register_user(first_name, last_name, email, password)
+# La API no sabe cómo se guarda — solo llama a Facade.
+
+# En facade.py (Facade):
+def register_user(self, first_name, last_name, email, password):
+    user = User(...)              # crea instancia del modelo
+    user.password_hash = hash_password(password)
+    return self._users.save(user) # delega a DbStorage
+
+# En db_storage.py (DbStorage):
+def save(self, obj):
+    db.session.add(obj)
+    db.session.commit()
+    return obj
+```
+
 ### Grupos de funciones en la Facade
 
 **Usuarios:**
@@ -189,7 +228,7 @@ scan_pdf()
   ├── add_step() x N        → guarda cada paso
   │
   └── _translate_recipe()   → traduce title/ingredients/steps a EN/ES/FR
-                               usando DeepL o LibreTranslate
+                               usando DeepL (si hay API key) o MyMemory API (fallback gratuito)
 ```
 
 **Precios — flujo completo:**
@@ -379,11 +418,13 @@ facade.scan_pdf(user_id, file_bytes, filename)
         │
         └── _translate_recipe()
             Traduce title, ingredients y steps a EN/ES/FR
-            usando DeepL (si hay API key) o LibreTranslate (fallback)
-            → guarda en name_en, name_es, name_fr, etc.
+            usando DeepL (si hay API key) o MyMemory API (fallback gratuito, 500k chars/día)
+            Las 3 traducciones (EN/ES/FR) corren en paralelo con ThreadPoolExecutor
+            → guarda en name_en, name_es, name_fr, title_en, title_es, etc.
         │
         ▼
-Retorna recipe_id → frontend redirige a recipe.html?id=<recipe_id>
+Retorna recipe_id → frontend muestra mensaje de éxito con botón "Ver receta" (scan.html)
+                    El usuario puede cerrar el mensaje con la X o hacer click en "Ver receta"
 ```
 
 ---
@@ -417,13 +458,66 @@ Retorna:
 
 ---
 
-## 9. Preguntas frecuentes del profesor
+## 9. Supabase Storage — fotos persistentes
+
+Render tiene un filesystem efímero: si el contenedor se reinicia, los archivos subidos se pierden. Para persistir fotos de recetas y avatares usamos Supabase Storage.
+
+```
+Usuario sube foto (avatar o foto de receta)
+        │
+        ▼
+POST /api/v1/auth/me/avatar   (o POST /api/v1/recipes/<id>/images)
+        │
+        ▼
+backend/app/storage.py
+  ├── upload_file(bytes, path, content_type)
+  │     └── Supabase REST API → guarda en bucket "recipes" o "avatars"
+  │         retorna URL pública permanente (https://xxx.supabase.co/...)
+  │
+  └── Si Supabase falla → fallback local a /static/uploads/
+        (relativa → el frontend llama resolveImgUrl() para construir la URL completa)
+
+La URL se guarda en:
+  - User.avatar_url     (para avatares)
+  - Recipe.images_json  (array JSON de URLs para múltiples fotos de receta)
+```
+
+**resolveImgUrl() en el frontend:**
+```javascript
+function resolveImgUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;   // Supabase: URL absoluta → usar tal cual
+  return SERVER_URL + url;                  // fallback local: /static/... → backend URL
+}
+```
+
+---
+
+## 10. Preguntas frecuentes del profesor
+
+**¿La Facade se comunica con la API o con los modelos?**
+Ninguna de las dos directamente. La **API** llama métodos de la Facade. La Facade crea instancias de modelos (User, Recipe, etc.) y las pasa a **DbStorage**. DbStorage es quien llama `db.session.add()` y `db.session.commit()`.
+```
+API → Facade → DbStorage → db.session (SQLAlchemy ORM)
+```
+Los modelos son clases pasivas de datos — no tienen lógica de persistencia propia.
+
+**¿Qué pasa cuando un usuario se registra, paso a paso?**
+```
+1. Frontend envía POST /api/v1/auth/register {first_name, last_name, email, password}
+2. auth.py (Resource): valida que el email no existe → llama facade.register_user()
+3. facade.register_user(): crea User(first_name, last_name, email, password_hash=hash_password(password))
+4. hash_password(): llama bcrypt.generate_password_hash() → hash seguro con salt
+5. self._users.save(user) → DbStorage.save(): db.session.add(user) + db.session.commit()
+6. Retorna {user_id, message: "User created successfully"} con HTTP 201
+7. Frontend (auth.js): hace auto-login (POST /auth/login) y redirige al dashboard
+```
 
 **¿Por qué Flask y no Django?**
 Flask da control total — cada componente (JWT, ORM, Swagger) lo elegimos e integramos nosotros. Con Django el framework toma esas decisiones. Para el jury es mejor poder explicar cada línea.
 
 **¿Por qué Groq y no OpenAI?**
-Groq tiene un tier gratuito generoso y hardware LPU especializado para LLMs — es significativamente más rápido que OpenAI. El modelo Qwen 3.6-27b es open-source (Alibaba).
+Groq tiene un tier gratuito generoso y hardware LPU especializado para LLMs — es significativamente más rápido que OpenAI. El modelo usado es open-source (Meta LLaMA o Alibaba Qwen).
 
 **¿Por qué JWT y no sesiones?**
 JWT es stateless — el servidor no guarda nada. Cualquier instancia del servidor puede verificar el token. Es el estándar para APIs REST y es compatible con apps móviles futuras.
@@ -437,5 +531,14 @@ El frontend desacoplado consume la misma API REST que consumiría una app móvil
 **¿Por qué Docker?**
 Garantiza que el entorno de producción sea idéntico al de desarrollo. "Funciona en mi máquina" deja de ser un problema. Es el estándar en la industria para deployar aplicaciones.
 
+**¿Por qué MyMemory y no DeepL para traducciones?**
+DeepL es el primario — si `DEEPL_API_KEY` está configurada, se usa DeepL (calidad superior). MyMemory es el fallback gratuito — no requiere API key, permite 500k chars/día con email registrado. En producción sin clave DeepL, MyMemory traduce correctamente los ingredientes y pasos.
+
+**¿Por qué Supabase Storage y no guardar en el servidor?**
+Render tiene filesystem efímero — al reiniciar el contenedor (después de 15 min de inactividad), todos los archivos subidos se pierden. Supabase Storage es persistente, gratuito hasta 1GB, y retorna URLs públicas permanentes. El código tiene fallback local si Supabase falla.
+
 **¿Cómo se aseguran que un usuario no accede a datos de otro?**
 Cada endpoint verifica `recipe.user_id == get_jwt_identity()`. Si no coincide, devuelve 403. Hay tests específicos para esto: `test_get_other_user_recipe_returns_403`.
+
+**¿Cómo funciona la tabla de precios editable (Excel-style)?**
+En lugar de modales para agregar/editar precios, la página `prices.html` muestra una tabla donde cada celda es un `<input>` o `<select>` editable directamente. El guardado automático ocurre cuando el foco sale de la fila (`onfocusout`). La fila vacía al final crea un nuevo precio al completar el campo de ingrediente. El indicador €/kg se recalcula en tiempo real con cada tecla.

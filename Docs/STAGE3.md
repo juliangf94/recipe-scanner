@@ -124,27 +124,29 @@ flowchart TD
     end
 
     subgraph Backend["Backend — Flask API"]
-        API["flask_restx Namespaces /api/v1/\nauth · recipes · ingredients · scan\nSwagger UI → /api/docs"]
+        API["flask_restx Namespaces /api/v1/\nauth · recipes · ingredients · scan\ncosts · stores · brands\nSwagger UI → /api/docs"]
     end
 
     subgraph Services["Services"]
-        Facade["Facade\n(business logic)"]
+        Facade["Facade\n(business logic — facade.py)"]
     end
 
     subgraph Persistence["Persistence — Repository Pattern"]
         Repo["BaseRepository\n(ABC interface)"]
-        Mem["InMemoryStorage\n(Phase 1 — dicts)"]
-        DB["DbStorage\n(Phase 2 — SQLAlchemy)"]
+        Mem["InMemoryStorage\n(tests only)"]
+        DB["DbStorage\n(producción — SQLAlchemy)"]
     end
 
     subgraph External["External Services"]
-        Groq["Groq API\nQwen 3.6-27b"]
+        Groq["Groq API\nllama-3.3-70b-versatile"]
         OFF["Open Food Facts API"]
+        DeepL["DeepL / MyMemory\n(traducciones EN/ES/FR)"]
+        Storage["Supabase Storage\n(fotos recetas + avatares)"]
     end
 
     subgraph Database["Database"]
-        SQLite["SQLite (dev)"]
-        PG["PostgreSQL (prod)"]
+        SQLite["SQLite (dev local)"]
+        PG["Supabase PostgreSQL (prod)"]
     end
 
     Browser -->|HTTP| FE
@@ -153,6 +155,8 @@ flowchart TD
     Facade --> Repo
     Facade -->|PDF text + prompt| Groq
     Facade -->|ingredient name| OFF
+    Facade -->|text batch| DeepL
+    Facade -->|file bytes| Storage
     Repo --> Mem
     Repo --> DB
     DB --> SQLite
@@ -177,15 +181,19 @@ flowchart TD
 
 | Componente | Archivo | Responsabilidad |
 |---|---|---|
-| Application Factory | `app/__init__.py` | Crea e inicializa la app Flask con flask_restx y JWTManager |
+| Application Factory | `app/__init__.py` | Crea e inicializa la app Flask con flask_restx, JWTManager y SQLAlchemy |
 | Config | `backend/config.py` | Configuración por entornos (dev/test/prod) |
-| Auth Namespace | `api/v1/auth.py` | Endpoints de registro y login (flask_restx) |
-| Recipes Namespace | `api/v1/recipes.py` | CRUD de recetas (flask_restx) |
-| Ingredients Namespace | `api/v1/ingredients.py` | Gestión de ingredientes y precios |
-| Scan Namespace | `api/v1/scan.py` | Subida y procesamiento de PDFs |
-| Facade | `services/facade.py` | Punto de entrada único para la lógica de negocio |
-| Repository (ABC) + InMemoryStorage | `persistence/repository.py` | Interfaz abstracta + implementación en RAM (fase 1) |
-| DbStorage | `persistence/db_storage.py` | Implementación SQLAlchemy (Sesión 8) |
+| Auth Namespace | `api/v1/auth.py` | Register, Login, Refresh, GET/PUT/DELETE /me, POST /me/avatar |
+| Recipes Namespace | `api/v1/recipes.py` | CRUD de recetas + imágenes + cook log |
+| Ingredients Namespace | `api/v1/ingredients.py` | CRUD ingredientes con secciones y preferred store/brand |
+| Scan Namespace | `api/v1/scan.py` | Subida PDF → Groq → receta con detección de duplicados |
+| Costs Namespace | `api/v1/costs.py` | GET /cost, CRUD /prices, OFF price, manual price override |
+| Stores Namespace | `api/v1/stores.py` | CRUD tiendas del usuario |
+| Brands Namespace | `api/v1/brands.py` | CRUD marcas del usuario |
+| Facade | `services/facade.py` | Punto de entrada único para toda la lógica de negocio |
+| Storage | `app/storage.py` | Wrapper Supabase Storage para fotos persistentes |
+| Repository (ABC) + InMemoryStorage | `persistence/repository.py` | Interfaz abstracta + implementación en RAM (tests) |
+| DbStorage | `persistence/db_storage.py` | Implementación SQLAlchemy para producción |
 | Security | `utils/security.py` | Hash y verificación de contraseñas (bcrypt) |
 
 ### Domain Models (SQLAlchemy db.Model)
@@ -341,13 +349,17 @@ classDiagram
     }
 
     class RecipeScannerFacade {
-        -InMemoryStorage _users
-        -InMemoryStorage _recipes
-        -InMemoryStorage _ingredients
-        -InMemoryStorage _steps
+        -DbStorage _users
+        -DbStorage _recipes
+        -DbStorage _ingredients
+        -DbStorage _steps
+        -DbStorage _custom_prices
+        -DbStorage _stores
+        -DbStorage _brands
         +register_user(first_name, last_name, email, password)
         +get_user_by_email(email)
         +get_user_by_id(user_id)
+        +update_user(user_id, kwargs)
         +create_recipe(user_id, title, ...)
         +get_recipe(recipe_id)
         +get_recipes_by_user(user_id)
@@ -355,6 +367,14 @@ classDiagram
         +delete_recipe(recipe_id)
         +add_ingredient(recipe_id, name, quantity, unit)
         +get_ingredients_by_recipe(recipe_id)
+        +scan_pdf(user_id, file_bytes, filename, force)
+        +get_recipe_cost(recipe_id, user_id)
+        +create_custom_price(user_id, ingredient_name, ...)
+        +get_custom_prices(user_id)
+        +update_custom_price(price_id, ...)
+        +create_store(user_id, name)
+        +create_brand(user_id, name)
+        +log_cook(recipe_id, user_id)
     }
 
     User "1" --> "0..*" Recipe : owns
@@ -364,7 +384,8 @@ classDiagram
 
     InMemoryStorage --|> BaseRepository : implements
     DbStorage --|> BaseRepository : implements
-    Facade --> BaseRepository : uses
+    RecipeScannerFacade --> DbStorage : uses (production)
+    RecipeScannerFacade --> InMemoryStorage : uses (tests only)
 ```
 
 ---
@@ -451,29 +472,27 @@ sequenceDiagram
 
 ### External APIs
 
-#### Groq API (Qwen 3.6-27b)
+#### Groq API (LLaMA 3.3-70b)
 
 - **URL base:** `https://api.groq.com/openai/v1/chat/completions`
 - **Auth:** `Authorization: Bearer <GROQ_API_KEY>`
 - **Por qué:** inferencia ultrarrápida con hardware LPU especializado. Groq ofrece
-  acceso gratuito (free tier). Qwen 3.6-27b es open-source de Alibaba — sin
-  dependencia de proveedor propietario. Migrado de LLaMA 3.3-70b en junio 2026
-  cuando Groq deprecó ese modelo (email de deprecación recibido 2026-06-28).
+  acceso gratuito (free tier). El modelo actual es `llama-3.3-70b-versatile` (Meta, open-source).
 - **Uso en el proyecto:** se le envía el texto extraído del PDF y se le pide que
   devuelva un JSON estructurado con título, ingredientes (nombre, cantidad, unidad)
-  y pasos ordenados. También devuelve traducciones EN/ES/FR de los campos de texto.
+  y pasos ordenados. Las traducciones EN/ES/FR se hacen por separado (DeepL / MyMemory).
 
 **Ejemplo de request:**
 ```json
 {
-  "model": "qwen/qwen3.6-27b",
+  "model": "llama-3.3-70b-versatile",
   "messages": [
     {
       "role": "user",
       "content": "Extract the recipe from this text and return JSON with: title, ingredients (name, quantity, unit), steps (order, description).\n\nText: ..."
     }
   ],
-  "response_format": { "type": "json_object" }
+  "temperature": 0.1
 }
 ```
 
@@ -545,6 +564,7 @@ Formato: JSON
 | GET | `/auth/me` | Ver perfil del usuario autenticado | Yes |
 | PUT | `/auth/me` | Actualizar nombre, email o contraseña | Yes |
 | DELETE | `/auth/me` | Eliminar cuenta y todos sus datos | Yes |
+| POST | `/auth/me/avatar` | Subir foto de perfil (JPG/PNG/WebP) | Yes |
 
 **POST /auth/register**
 ```
@@ -573,12 +593,14 @@ Input:
 
 Output 200:
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "3f8a1c2d-...",
     "first_name": "Julian",
     "last_name": "Gonzalez",
-    "email": "julian@example.com"
+    "email": "julian@example.com",
+    "avatar_url": null
   }
 }
 
@@ -639,22 +661,31 @@ Output 404:
 |---|---|---|---|
 | POST | `/scan` | Subir PDF y extraer receta | Yes |
 
-**POST /scan**
+**POST /scan** (también acepta `?force=true` para omitir detección de duplicados)
 ```
 Input: multipart/form-data
   file: <PDF file>
 
 Output 201:
 {
-  "message": "Recipe extracted successfully",
-  "recipe_id": 5
+  "recipe": {
+    "id": "3f8a1c2d-...",
+    "title": "Tarta de manzana",
+    "category": "Desserts",
+    ...
+  },
+  "ingredients": [...],
+  "steps": [...]
 }
 
 Output 400:
-{ "error": "Invalid file type. Only PDF allowed." }
+{ "error": "No file provided" }
+
+Output 409 (duplicado detectado):
+{ "error_code": "duplicate", "existing_id": "...", "title": "Tarta de manzana" }
 
 Output 422:
-{ "error": "Could not extract recipe from PDF" }
+{ "error_code": "no_text" | "groq_failed" }
 ```
 
 ---
