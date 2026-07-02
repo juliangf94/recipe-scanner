@@ -314,8 +314,8 @@ class RecipeScannerFacade:
             try:
                 res = requests.get(
                     'https://api.mymemory.translated.net/get',
-                    params={'q': text[:500], 'langpair': langpair},
-                    timeout=5
+                    params={'q': text[:500], 'langpair': langpair, 'de': 'chuliangf94@gmail.com'},
+                    timeout=4
                 )
                 if res.ok:
                     data = res.json()
@@ -331,7 +331,7 @@ class RecipeScannerFacade:
         try:
             with ThreadPoolExecutor(max_workers=6) as executor:
                 future_map = {executor.submit(_translate_one, t): i for i, t in enumerate(texts)}
-                for future in as_completed(future_map, timeout=22):
+                for future in as_completed(future_map, timeout=18):
                     idx = future_map[future]
                     try:
                         results[idx] = future.result()
@@ -342,7 +342,8 @@ class RecipeScannerFacade:
         return results
 
     def _translate_recipe(self, recipe, ingredients, steps):
-        """Populate *_en / *_es / *_fr columns on recipe, ingredients, and steps."""
+        """Populate *_en / *_es / *_fr columns on recipe, ingredients, and steps.
+        All three language batches run in parallel to stay within Render's 30s limit."""
         ing_names  = [i.name for i in ingredients]
         step_descs = [s.description for s in steps]
         meta       = [recipe.title, recipe.description or '']
@@ -352,11 +353,32 @@ class RecipeScannerFacade:
         source_lang = self._detect_source_lang(' '.join(sample_parts))
         logging.info('Detected source language for "%s": %s', recipe.title, source_lang)
 
+        lang_results = {}
+
+        def _batch_for_lang(lang_col):
+            lang, col = lang_col
+            translated, provider = self._translate_batch(all_texts, lang, source_lang=source_lang)
+            return col, translated, provider
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(_batch_for_lang, lc): lc
+                for lc in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]
+            }
+            for future in as_completed(futures, timeout=25):
+                try:
+                    col, translated, provider = future.result()
+                    lang_results[col] = (translated, provider)
+                except Exception as exc:
+                    logging.error('Translation batch failed: %s', exc)
+
         used_provider = 'none'
         all_failed = True
 
-        for lang, col in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]:
-            translated, provider = self._translate_batch(all_texts, lang, source_lang=source_lang)
+        for col in ['en', 'es', 'fr']:
+            if col not in lang_results:
+                continue
+            translated, provider = lang_results[col]
 
             if provider in ('deepl', 'mymemory', 'libretranslate', 'original'):
                 all_failed = False
@@ -369,7 +391,6 @@ class RecipeScannerFacade:
             offset = 2
             for ing in ingredients:
                 setattr(ing, f'name_{col}', translated[offset]); offset += 1
-
             for step in steps:
                 setattr(step, f'description_{col}', translated[offset]); offset += 1
 
@@ -433,6 +454,7 @@ class RecipeScannerFacade:
             )
             steps.append(step)
 
+        self._translate_recipe(recipe, ingredients, steps)
         return (recipe, ingredients, steps), None
 
     def _extract_pdf_text(self, file_bytes):
