@@ -48,25 +48,27 @@ FALLBACK_PRICES = {
     'almendra': 20.00, 'almond': 20.00,
 }
 
-GROQ_PROMPT = """You are a recipe extraction assistant. \
-Extract the recipe from the following text and return ONLY a valid JSON \
-object with this exact structure, no explanation, no markdown:
+GROQ_PROMPT = """You are a recipe extraction assistant.
 
-{
-  "title": "recipe name",
-  "description": "brief description",
-  "servings": 4,
-  "prep_time_min": 30,
-  "category": "MUST be exactly one of: Desserts, Cake, Main Course, Meat, Pasta, Chicken, Fish, Seafood, Soup, Salad, Breakfast, Rice, Bread, Bakery, Vegan, Vegetarian, Appetizer, Drink, Sandwich, Snack",
-  "ingredients": [
-    {"name": "ingredient name", "quantity": "200", "unit": "g"}
-  ],
-  "steps": [
-    {"order_num": 1, "description": "step description"}
-  ]
-}
+Read the recipe text below and extract the information into a JSON object.
+Return ONLY the JSON object — no markdown, no explanation, no extra text.
 
-Use empty string for missing text fields, 0 for missing numbers.
+JSON fields:
+- "title": the recipe name (string)
+- "description": a short description (string, can be empty)
+- "servings": number of servings (integer, 0 if not mentioned)
+- "prep_time_min": preparation time in minutes (integer, 0 if not mentioned)
+- "category": pick ONE from this list that best fits, or empty string if none fit:
+  Desserts, Cake, Main Course, Meat, Pasta, Chicken, Fish, Seafood, Soup,
+  Salad, Breakfast, Rice, Bread, Bakery, Vegan, Vegetarian, Appetizer,
+  Drink, Sandwich, Snack
+- "ingredients": array of objects, each with:
+    "name" (string), "quantity" (string number), "unit" (string e.g. g, kg, ml, cup)
+- "steps": array of objects, each with:
+    "order_num" (integer starting at 1), "description" (string)
+
+IMPORTANT: Extract real values from the recipe text. Do NOT use placeholder text.
+
 Recipe text:
 """
 
@@ -396,10 +398,12 @@ class RecipeScannerFacade:
     def _call_groq(self, text):
         client = Groq(api_key=os.environ.get('GROQ_API_KEY'))
         try:
+            logging.info('PDF text sent to Groq (first 300 chars): %s', text[:300])
             response = client.chat.completions.create(
                 model='qwen/qwen3.6-27b',
                 messages=[{'role': 'user', 'content': GROQ_PROMPT + text}],
-                temperature=0.1
+                temperature=0.1,
+                response_format={'type': 'json_object'}
             )
             content = response.choices[0].message.content.strip()
             logging.info('Groq raw response (first 200 chars): %s', content[:200])
