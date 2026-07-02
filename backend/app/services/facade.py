@@ -405,11 +405,13 @@ class RecipeScannerFacade:
         try:
             logging.info('PDF text sent to Groq (first 300 chars): %s', text[:300])
             response = client.chat.completions.create(
-                model='llama-3.3-70b-versatile',
+                model='qwen/qwen3.6-27b',
                 messages=[{'role': 'user', 'content': GROQ_PROMPT + text}],
                 temperature=0.1,
             )
             content = response.choices[0].message.content.strip()
+            # Strip <think>…</think> blocks produced by Qwen3 reasoning mode
+            content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
             logging.info('Groq raw response (first 200 chars): %s', content[:200])
 
             # Extract the first balanced {...} block — handles extra text/markdown after the JSON
