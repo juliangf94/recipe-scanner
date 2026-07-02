@@ -329,6 +329,11 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   cursor: pointer;
   color: var(--text-light);
   font-size: 1rem;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .checkbox-row {
@@ -357,7 +362,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   text-align: right;
   font-size: 1rem;
   margin-top: 0.3rem;
-  color: var(--orange);
+  color: #b45309;
 }
 
 /* ── Buttons ────────────────────────────────────────────── */
@@ -411,6 +416,8 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   font-size: 1rem;
   color: var(--text-muted);
 }
+.auth-footer a { color: #b45309; }
+.auth-page .logo-text span { color: #b45309; }
 
 /* ── Dashboard header ──────────────────────────────────── */
 .page-header {
