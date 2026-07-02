@@ -1108,10 +1108,12 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 }
 .prices-inline-table .ppkg-cell {
   font-weight: 600;
-  color: var(--orange);
+  color: #b45309;
   white-space: nowrap;
   text-align: right;
 }
+
+#prices-table-wrap { min-height: 260px; }
 .prices-inline-table .new-price-row {
   background: rgba(247, 167, 38, 0.04);
 }

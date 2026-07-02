@@ -16,7 +16,8 @@ if (user) {
 function setAvatarDisplay(avatarUrl, initials) {
   const el = document.getElementById('user-avatar');
   if (avatarUrl) {
-    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    const _avSrc = supabaseThumb(resolveImgUrl(avatarUrl), 96, 80);
+    el.innerHTML = `<img src="${_avSrc}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   } else {
     el.innerHTML = `<span id="avatar-initials">${initials}</span>`;
   }
@@ -309,10 +310,10 @@ function buildPriceRow(p) {
   return `
     <tr class="price-row" data-id="${p.id}" onfocusout="handleRowFocusOut(event,'${p.id}')">
       <td class="cell-name">${tIng(p.ingredient_name)}</td>
-      <td><select class="cell-sel store-cell" onchange="updateCalc(this)">${storeOptions(p.store_id)}</select></td>
-      <td><select class="cell-sel brand-cell" onchange="updateCalc(this)">${brandOptions(p.brand_id, p.ingredient_name)}</select></td>
+      <td><select class="cell-sel store-cell" aria-label="${t('label_store')}" onchange="updateCalc(this)">${storeOptions(p.store_id)}</select></td>
+      <td><select class="cell-sel brand-cell" aria-label="${t('manage_brands')}" onchange="updateCalc(this)">${brandOptions(p.brand_id, p.ingredient_name)}</select></td>
       <td><input class="cell-inp qty-cell" type="text" inputmode="decimal" value="${p.bought_qty || ''}" placeholder="—" oninput="updateCalc(this)"></td>
-      <td><select class="cell-sel unit-cell" onchange="updateCalc(this)">${unitOptions(p.bought_unit || 'g')}</select></td>
+      <td><select class="cell-sel unit-cell" aria-label="${t('label_unit_req')}" onchange="updateCalc(this)">${unitOptions(p.bought_unit || 'g')}</select></td>
       <td><input class="cell-inp price-cell" type="text" inputmode="decimal" value="${priceVal}" placeholder="—" oninput="updateCalc(this)"></td>
       <td class="ppkg-cell">${ppkg != null ? '€' + ppkg.toFixed(2) : '—'}</td>
       <td><button class="btn btn-danger btn-sm" onclick="deletePrice('${p.id}','${p.ingredient_name.replace(/'/g, "\\'")}')">${t('btn_del_price')}</button></td>
@@ -324,10 +325,10 @@ function buildNewRow() {
     <tr class="price-row new-price-row" data-id="new" onfocusout="handleRowFocusOut(event,'new')">
       <td><input class="cell-inp ing-cell" type="text" placeholder="${t('ph_price_ing')}"
            oninput="refreshNewRowBrands(this)"></td>
-      <td><select class="cell-sel store-cell" onchange="updateCalc(this)">${storeOptions(null)}</select></td>
-      <td><select class="cell-sel brand-cell" onchange="updateCalc(this)">${brandOptions(null, '')}</select></td>
+      <td><select class="cell-sel store-cell" aria-label="${t('label_store')}" onchange="updateCalc(this)">${storeOptions(null)}</select></td>
+      <td><select class="cell-sel brand-cell" aria-label="${t('manage_brands')}" onchange="updateCalc(this)">${brandOptions(null, '')}</select></td>
       <td><input class="cell-inp qty-cell" type="text" inputmode="decimal" placeholder="—" oninput="updateCalc(this)"></td>
-      <td><select class="cell-sel unit-cell" onchange="updateCalc(this)">${unitOptions('g')}</select></td>
+      <td><select class="cell-sel unit-cell" aria-label="${t('label_unit_req')}" onchange="updateCalc(this)">${unitOptions('g')}</select></td>
       <td><input class="cell-inp price-cell" type="text" inputmode="decimal" placeholder="—" oninput="updateCalc(this)"></td>
       <td class="ppkg-cell">—</td>
       <td></td>
