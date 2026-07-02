@@ -405,7 +405,7 @@ class RecipeScannerFacade:
         try:
             logging.info('PDF text sent to Groq (first 300 chars): %s', text[:300])
             response = client.chat.completions.create(
-                model='qwen/qwen3.6-27b',
+                model='llama-3.3-70b-versatile',
                 messages=[{'role': 'user', 'content': GROQ_PROMPT + text}],
                 temperature=0.1,
             )
