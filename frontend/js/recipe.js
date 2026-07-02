@@ -583,15 +583,21 @@ async function saveNewStep() {
   const err = document.getElementById('step-add-error');
   if (!desc) { err.textContent = t('err_step_empty'); err.style.display = ''; return; }
   err.style.display = 'none';
-  const orderNum = isNaN(numVal) || numVal < 1 ? currentSteps.length + 1 : numVal;
-  const res = await apiFetch(`/recipes/${recipeId}/steps`, {
-    method: 'POST', body: JSON.stringify({ description: desc, order_num: orderNum })
-  });
-  if (!res || !res.ok) { err.textContent = t('err_save'); err.style.display = ''; return; }
-  currentSteps = [...currentSteps, res.data];
-  currentSteps.sort((a, b) => a.order_num - b.order_num);
-  closeAddStepModal();
-  document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+  const btn = document.querySelector('#step-add-modal .btn-orange');
+  btn.disabled = true;
+  try {
+    const orderNum = isNaN(numVal) || numVal < 1 ? currentSteps.length + 1 : numVal;
+    const res = await apiFetch(`/recipes/${recipeId}/steps`, {
+      method: 'POST', body: JSON.stringify({ description: desc, order_num: orderNum })
+    });
+    if (!res || !res.ok) { err.textContent = t('err_save'); err.style.display = ''; return; }
+    currentSteps = [...currentSteps, res.data];
+    currentSteps.sort((a, b) => a.order_num - b.order_num);
+    closeAddStepModal();
+    document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function openEditStepModal(stepId) {
@@ -614,16 +620,22 @@ async function saveEditStep() {
   const err = document.getElementById('step-edit-error');
   if (!desc) { err.textContent = t('err_step_empty'); err.style.display = ''; return; }
   err.style.display = 'none';
-  const body = { description: desc };
-  if (!isNaN(numVal) && numVal >= 1) body.order_num = numVal;
-  const res = await apiFetch(`/recipes/${recipeId}/steps/${stepId}`, {
-    method: 'PUT', body: JSON.stringify(body)
-  });
-  if (!res || !res.ok) { err.textContent = t('err_save'); err.style.display = ''; return; }
-  currentSteps = currentSteps.map(s => s.id === stepId ? res.data : s);
-  currentSteps.sort((a, b) => a.order_num - b.order_num);
-  closeEditStepModal();
-  document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+  const btn = document.querySelector('#step-edit-modal .btn-orange');
+  btn.disabled = true;
+  try {
+    const body = { description: desc };
+    if (!isNaN(numVal) && numVal >= 1) body.order_num = numVal;
+    const res = await apiFetch(`/recipes/${recipeId}/steps/${stepId}`, {
+      method: 'PUT', body: JSON.stringify(body)
+    });
+    if (!res || !res.ok) { err.textContent = t('err_save'); err.style.display = ''; return; }
+    currentSteps = currentSteps.map(s => s.id === stepId ? res.data : s);
+    currentSteps.sort((a, b) => a.order_num - b.order_num);
+    closeEditStepModal();
+    document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function deleteStep(stepId) {
@@ -1090,25 +1102,31 @@ async function addIngredient() {
     return;
   }
 
-  const section = document.getElementById('ing-section')?.value || '';
-  const res = await apiFetch(`/recipes/${recipeId}/ingredients`, {
-    method: 'POST',
-    body: JSON.stringify({ name, quantity, unit, section })
-  });
+  const btn = document.querySelector('#ing-modal .btn-orange');
+  btn.disabled = true;
+  try {
+    const section = document.getElementById('ing-section')?.value || '';
+    const res = await apiFetch(`/recipes/${recipeId}/ingredients`, {
+      method: 'POST',
+      body: JSON.stringify({ name, quantity, unit, section })
+    });
 
-  if (!res || !res.ok) {
-    const el = document.getElementById('ing-error');
-    el.textContent = res?.data?.error || t('err_add_ing');
-    el.style.display = '';
-    return;
-  }
+    if (!res || !res.ok) {
+      const el = document.getElementById('ing-error');
+      el.textContent = res?.data?.error || t('err_add_ing');
+      el.style.display = '';
+      return;
+    }
 
-  closeIngModal();
-  const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
-  if (ingRes && ingRes.ok) {
-    setIngredients(ingRes.data);
-    document.getElementById('ing-count').textContent =
-      ingRes.data.length === 1 ? t('ing_1') : tf('ing_n', { n: ingRes.data.length });
+    closeIngModal();
+    const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
+    if (ingRes && ingRes.ok) {
+      setIngredients(ingRes.data);
+      document.getElementById('ing-count').textContent =
+        ingRes.data.length === 1 ? t('ing_1') : tf('ing_n', { n: ingRes.data.length });
+    }
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -1143,21 +1161,27 @@ async function saveEditIng() {
     return;
   }
 
-  const res = await apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ name, quantity, unit })
-  });
+  const btn = document.querySelector('#ing-edit-modal .btn-orange');
+  btn.disabled = true;
+  try {
+    const res = await apiFetch(`/recipes/${recipeId}/ingredients/${ingId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, quantity, unit })
+    });
 
-  if (!res || !res.ok) {
-    const el = document.getElementById('ing-edit-error');
-    el.textContent = res?.data?.error || t('err_save');
-    el.style.display = '';
-    return;
+    if (!res || !res.ok) {
+      const el = document.getElementById('ing-edit-error');
+      el.textContent = res?.data?.error || t('err_save');
+      el.style.display = '';
+      return;
+    }
+
+    closeEditIngModal();
+    const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
+    if (ingRes && ingRes.ok) setIngredients(ingRes.data);
+  } finally {
+    btn.disabled = false;
   }
-
-  closeEditIngModal();
-  const ingRes = await apiFetch(`/recipes/${recipeId}/ingredients`);
-  if (ingRes && ingRes.ok) setIngredients(ingRes.data);
 }
 
 function deleteIngredient(ingId) {
