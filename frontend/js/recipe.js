@@ -269,6 +269,7 @@ function renderIngredientsTable(ingredients) {
       <tr class="section-header-row">
         <td colspan="7">
           <div class="section-header-cell">
+            <span class="section-drag-handle" title="${t('section_drag')}">⠿</span>
             <span class="section-title" onclick="renameSection('${sec.replace(/'/g, "\\'")}', this)">${sec || t('section_no_section')}</span>
             <button class="btn-add-section-ing" onclick="promptAddSection()" title="${t('section_add')}">+ ${t('section_add')}</button>
           </div>
@@ -859,6 +860,18 @@ function deleteRecipe() {
 
 // ── Sortable drag & drop ──────────────────────────────────────────────────────
 function initSortable() {
+  const table = document.getElementById('ing-table');
+  if (table) {
+    new Sortable(table, {
+      animation: 150,
+      handle: '.section-drag-handle',
+      draggable: '.section-body',
+      ghostClass: 'section-body-ghost',
+      chosenClass: 'section-body-chosen',
+      onEnd: saveSectionOrder,
+    });
+  }
+
   document.querySelectorAll('#ing-table .section-body').forEach(tbody => {
     new Sortable(tbody, {
       group: 'ingredients',
@@ -870,6 +883,22 @@ function initSortable() {
       chosenClass: 'ing-row-chosen',
       onEnd: saveIngredientOrder,
     });
+  });
+}
+
+async function saveSectionOrder() {
+  const updates = [];
+  let order = 0;
+  document.querySelectorAll('#ing-table .section-body').forEach(tbody => {
+    const section = tbody.dataset.section || '';
+    tbody.querySelectorAll('.ing-row').forEach(row => {
+      updates.push({ id: row.dataset.ingId, section, order_num: order++ });
+    });
+  });
+  if (updates.length === 0) return;
+  await apiFetch(`/recipes/${recipeId}/ingredients/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ updates })
   });
 }
 

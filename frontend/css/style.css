@@ -791,6 +791,19 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   user-select: none;
 }
 
+.section-drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 1rem;
+  margin-right: 0.4rem;
+  user-select: none;
+  opacity: 0.6;
+}
+.section-drag-handle:hover { opacity: 1; }
+
+.section-body-ghost { opacity: 0.35; }
+.section-body-chosen > tr { background: #FFF7ED; }
+
 .translate-done-badge {
   display: inline-flex;
   align-items: center;
