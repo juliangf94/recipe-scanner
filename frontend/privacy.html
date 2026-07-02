@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+  <title>RecipeScanner — Privacy Policy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body { background: var(--bg-light); }
+    .legal-wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+    .legal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .legal-back {
+      font-size: 0.9rem;
+      color: var(--orange);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .legal-back:hover { text-decoration: underline; }
+    .legal-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2.5rem;
+    }
+    .legal-card h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin: 0 0 0.25rem;
+      color: var(--text);
+    }
+    .legal-date {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      display: block;
+    }
+    .legal-card h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 1.75rem 0 0.5rem;
+    }
+    .legal-card p, .legal-card li {
+      font-size: 0.92rem;
+      color: #444;
+      line-height: 1.7;
+      margin: 0 0 0.5rem;
+    }
+    .legal-card ul { padding-left: 1.25rem; margin: 0 0 0.5rem; }
+    .lang-fixed-legal {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="lang-fixed-legal">
+    <div class="lang-toggle">
+      <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+      <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+    </div>
+  </div>
+
+  <div class="legal-wrap">
+    <div class="legal-header">
+      <a href="register.html" class="legal-back">← <span data-i18n="legal_back">Back to registration</span></a>
+      <a href="index.html" class="logo">
+        <div class="logo-icon">🍴</div>
+        <span class="logo-text">Recipe<span>Scanner</span></span>
+      </a>
+    </div>
+
+    <div class="legal-card">
+      <h1 data-i18n="privacy_title">Privacy Policy</h1>
+      <span class="legal-date" data-i18n="legal_date">Last updated: July 2026</span>
+
+      <p data-i18n="privacy_intro">RecipeScanner is committed to protecting your personal data. This policy explains what data we collect and how we use it.</p>
+
+      <h2 data-i18n="privacy_h1">1. Data we collect</h2>
+      <p data-i18n="privacy_p1">When you create an account we collect:</p>
+      <ul>
+        <li data-i18n="privacy_li1">First and last name</li>
+        <li data-i18n="privacy_li2">Email address</li>
+        <li data-i18n="privacy_li3">Password (stored as a bcrypt hash — never in plain text)</li>
+        <li data-i18n="privacy_li4">Profile photo (optional)</li>
+        <li data-i18n="privacy_li5">Recipes, ingredients and prices you create</li>
+      </ul>
+
+      <h2 data-i18n="privacy_h2">2. How we use your data</h2>
+      <p data-i18n="privacy_p2">Your data is used exclusively to provide the RecipeScanner service: authentication, recipe storage, and cost calculation. We do not sell, share, or use your data for advertising purposes.</p>
+
+      <h2 data-i18n="privacy_h3">3. Data storage</h2>
+      <p data-i18n="privacy_p3">Your data is stored in a PostgreSQL database hosted by Supabase (EU West — Paris). All connections use TLS encryption.</p>
+
+      <h2 data-i18n="privacy_h4">4. Third-party services</h2>
+      <p data-i18n="privacy_p4">Recipe PDF content is sent to Groq (AI service) for text extraction. Ingredient names may be sent to Open Food Facts to retrieve price estimates. No personally identifiable information is included in these requests.</p>
+
+      <h2 data-i18n="privacy_h5">5. Your rights</h2>
+      <p data-i18n="privacy_p5">You can delete your account at any time from Account Settings. This permanently removes all your data from our database.</p>
+
+      <h2 data-i18n="privacy_h6">6. Cookies</h2>
+      <p data-i18n="privacy_p6">RecipeScanner does not use tracking cookies. Authentication tokens are stored in your browser's localStorage.</p>
+
+      <h2 data-i18n="privacy_h7">7. Contact</h2>
+      <p data-i18n="privacy_p7">For any questions regarding your personal data, contact: chuliangf94@gmail.com</p>
+    </div>
+  </div>
+
+  <script src="js/i18n.js?v=21"></script>
+  <script src="js/api.js"></script>
+</body>
+</html>
