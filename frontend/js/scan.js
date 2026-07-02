@@ -128,7 +128,7 @@ async function scanPdf() {
   if (!res || !res.ok) {
     const el = document.getElementById('upload-error');
     const code = res?.data?.error_code;
-    el.textContent = code ? t(code) || t('err_scan') : t('err_scan');
+    el.textContent = code ? t('err_' + code) || t('err_scan') : t('err_scan');
     el.style.display = '';
     return;
   }
