@@ -120,7 +120,12 @@ async function scanPdf() {
   const formData = new FormData();
   formData.append('file', selectedFile);
 
-  const res = await apiUpload('/scan/', formData);
+  let res;
+  try {
+    res = await apiUpload('/scan/', formData);
+  } catch (_) {
+    res = null;
+  }
 
   document.getElementById('scanning').style.display = 'none';
   document.getElementById('scan-btn').style.display = '';

@@ -390,8 +390,6 @@ class RecipeScannerFacade:
             )
             steps.append(step)
 
-        self._translate_recipe(recipe, ingredients, steps)
-
         return (recipe, ingredients, steps), None
 
     def _extract_pdf_text(self, file_bytes):
