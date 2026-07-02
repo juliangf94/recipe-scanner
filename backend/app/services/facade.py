@@ -542,9 +542,16 @@ class RecipeScannerFacade:
     def get_brand_by_id(self, brand_id):
         return self._brands.get_by_id(brand_id)
 
-    def create_brand(self, user_id, name):
-        brand = Brand(user_id=user_id, name=name.strip())
+    def create_brand(self, user_id, name, ingredient_name=None):
+        brand = Brand(user_id=user_id, name=name.strip(), ingredient_name=ingredient_name)
         return self._brands.save(brand)
+
+    def update_brand_ingredient(self, brand_id, user_id, ingredient_name):
+        brand = self._brands.get_by_id(brand_id)
+        if not brand or brand.user_id != user_id:
+            return None
+        brand.ingredient_name = ingredient_name
+        return self._brands.update(brand)
 
     def delete_brand(self, brand_id, user_id):
         brand = self._brands.get_by_id(brand_id)

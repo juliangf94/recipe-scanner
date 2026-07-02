@@ -6,6 +6,7 @@ const TRANSLATIONS = {
     nav_scan: 'Scan Recipe',
     nav_prices: 'My Prices',
     nav_account: 'Account Settings',
+    nav_profile: 'Profile',
     nav_signout: 'Sign out',
 
     // Login
@@ -215,6 +216,9 @@ const TRANSLATIONS = {
     manage_brands: 'Manage brands',
     brands_title: 'My Brands',
     label_new_brand: 'New brand name',
+    label_brand_ing: 'For ingredient (optional)',
+    ph_brand_ing: 'e.g. eggs, butter…',
+    brand_for: 'for {ing}',
     btn_add_brand: '+ Add brand',
     no_brands: 'No brands yet.',
     err_brand_create: 'Error creating brand.',
@@ -327,6 +331,7 @@ const TRANSLATIONS = {
     nav_scan: 'Escanear',
     nav_prices: 'Mis precios',
     nav_account: 'Ajustes de cuenta',
+    nav_profile: 'Perfil',
     nav_signout: 'Cerrar sesión',
 
     // Login
@@ -536,6 +541,9 @@ const TRANSLATIONS = {
     manage_brands: 'Gestionar marcas',
     brands_title: 'Mis Marcas',
     label_new_brand: 'Nombre de la nueva marca',
+    label_brand_ing: 'Para ingrediente (opcional)',
+    ph_brand_ing: 'ej. huevos, mantequilla…',
+    brand_for: 'para {ing}',
     btn_add_brand: '+ Agregar marca',
     no_brands: 'No hay marcas aún.',
     err_brand_create: 'Error al crear la marca.',
@@ -648,6 +656,7 @@ const TRANSLATIONS = {
     nav_scan: 'Scanner',
     nav_prices: 'Mes prix',
     nav_account: 'Paramètres du compte',
+    nav_profile: 'Profil',
     nav_signout: 'Se déconnecter',
 
     // Login
@@ -857,6 +866,9 @@ const TRANSLATIONS = {
     manage_brands: 'Gérer les marques',
     brands_title: 'Mes marques',
     label_new_brand: 'Nom de la nouvelle marque',
+    label_brand_ing: 'Pour ingrédient (optionnel)',
+    ph_brand_ing: 'ex. œufs, beurre…',
+    brand_for: 'pour {ing}',
     btn_add_brand: '+ Ajouter une marque',
     no_brands: 'Pas encore de marques.',
     err_brand_create: 'Erreur lors de la création de la marque.',

@@ -57,9 +57,33 @@ function storeOptions(selectedId) {
   ).join('');
 }
 
-function brandOptions(selectedId) {
+// Normalize: lowercase, no accents — mirrors backend _norm()
+function normIng(s) {
+  return (s || '').toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function stripPlural(s) {
+  if (s.endsWith('es') && s.length > 4) return s.slice(0, -2);
+  if (s.endsWith('s') && s.length > 3) return s.slice(0, -1);
+  return s;
+}
+
+function brandMatchesIngredient(brand, ingName) {
+  if (!brand.ingredient_name) return true;  // generic → always show
+  const bn = normIng(brand.ingredient_name);
+  const ing = normIng(ingName);
+  if (!ing) return true;  // row has no ingredient yet → show all
+  if (bn === ing) return true;
+  if ((ing + ' ').startsWith(bn + ' ') || (bn + ' ').startsWith(ing + ' ')) return true;
+  if (stripPlural(bn) === stripPlural(ing)) return true;
+  return false;
+}
+
+function brandOptions(selectedId, ingName) {
+  const visible = allBrands.filter(b => brandMatchesIngredient(b, ingName));
   const blank = `<option value="">${t('no_brand')}</option>`;
-  return blank + allBrands.map(b =>
+  return blank + visible.map(b =>
     `<option value="${b.id}"${b.id === selectedId ? ' selected' : ''}>${b.name}</option>`
   ).join('');
 }
@@ -150,15 +174,53 @@ function renderBrandsList() {
     return;
   }
   el.innerHTML = allBrands.map(b => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border);">
-      <span>${b.name}</span>
+    <div id="brow-${b.id}" style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+      <span class="brand-name-area" style="flex:1;display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;">
+        <span style="font-weight:500;">${b.name}</span>
+        ${b.ingredient_name ? `<span style="font-size:0.78rem;color:var(--text-muted);">(${tf('brand_for', { ing: b.ingredient_name })})</span>` : ''}
+        <button onclick="startEditBrandIng('${b.id}')" style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:var(--text-muted);padding:0;" title="${t('ph_brand_ing')}">✏️</button>
+      </span>
       <button class="btn btn-danger btn-sm" onclick="deleteBrand('${b.id}','${b.name.replace(/'/g, '\\\'')}')">${t('btn_del_price')}</button>
     </div>`).join('');
+}
+
+function startEditBrandIng(brandId) {
+  const row = document.getElementById('brow-' + brandId);
+  if (!row) return;
+  const area = row.querySelector('.brand-name-area');
+  const brand = allBrands.find(b => b.id === brandId);
+  const safeName = brand ? brand.name : '';
+  const current = brand ? (brand.ingredient_name || '') : '';
+  area.innerHTML = `
+    <span style="font-weight:500;">${safeName}</span>
+    <input id="bing-input-${brandId}" type="text" value="${current}"
+      placeholder="${t('ph_brand_ing')}"
+      style="font-size:0.82rem;padding:0.15rem 0.3rem;width:130px;border:1px solid var(--border);border-radius:4px;"
+      onkeydown="if(event.key==='Enter')saveBrandIng('${brandId}');if(event.key==='Escape')renderBrandsList()">
+    <button onclick="saveBrandIng('${brandId}')" style="background:none;border:none;cursor:pointer;color:green;font-size:1rem;padding:0 0.15rem;" title="Guardar">✓</button>
+    <button onclick="renderBrandsList()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:0 0.15rem;" title="Cancelar">✕</button>`;
+  document.getElementById('bing-input-' + brandId)?.focus();
+}
+
+async function saveBrandIng(brandId) {
+  const input = document.getElementById('bing-input-' + brandId);
+  const ingName = (input?.value || '').trim().toLowerCase() || null;
+  const res = await apiFetch(`/brands/${brandId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ingredient_name: ingName })
+  });
+  if (res && res.ok) {
+    const idx = allBrands.findIndex(b => b.id === brandId);
+    if (idx !== -1) allBrands[idx] = res.data;
+    renderBrandsList();
+    applySortAndRender();
+  }
 }
 
 function openBrandsModal() {
   document.getElementById('brands-error').style.display = 'none';
   document.getElementById('new-brand-name').value = '';
+  if (document.getElementById('new-brand-ing')) document.getElementById('new-brand-ing').value = '';
   renderBrandsList();
   document.getElementById('brands-modal').classList.add('open');
 }
@@ -169,12 +231,13 @@ function closeBrandsModal() {
 
 async function createBrand() {
   const name = document.getElementById('new-brand-name').value.trim();
+  const ingName = (document.getElementById('new-brand-ing')?.value || '').trim().toLowerCase() || null;
   const errEl = document.getElementById('brands-error');
   errEl.style.display = 'none';
   if (!name) return;
   const res = await apiFetch('/brands', {
     method: 'POST',
-    body: JSON.stringify({ name })
+    body: JSON.stringify({ name, ingredient_name: ingName })
   });
   if (!res || !res.ok) {
     errEl.textContent = t('err_brand_create');
@@ -182,6 +245,7 @@ async function createBrand() {
     return;
   }
   document.getElementById('new-brand-name').value = '';
+  if (document.getElementById('new-brand-ing')) document.getElementById('new-brand-ing').value = '';
   if (!allBrands.find(b => b.id === res.data.id)) {
     allBrands.push(res.data);
   }
@@ -246,7 +310,7 @@ function buildPriceRow(p) {
     <tr class="price-row" data-id="${p.id}" onfocusout="handleRowFocusOut(event,'${p.id}')">
       <td class="cell-name">${tIng(p.ingredient_name)}</td>
       <td><select class="cell-sel store-cell" onchange="updateCalc(this)">${storeOptions(p.store_id)}</select></td>
-      <td><select class="cell-sel brand-cell" onchange="updateCalc(this)">${brandOptions(p.brand_id)}</select></td>
+      <td><select class="cell-sel brand-cell" onchange="updateCalc(this)">${brandOptions(p.brand_id, p.ingredient_name)}</select></td>
       <td><input class="cell-inp qty-cell" type="text" inputmode="decimal" value="${p.bought_qty || ''}" placeholder="—" oninput="updateCalc(this)"></td>
       <td><select class="cell-sel unit-cell" onchange="updateCalc(this)">${unitOptions(p.bought_unit || 'g')}</select></td>
       <td><input class="cell-inp price-cell" type="text" inputmode="decimal" value="${priceVal}" placeholder="—" oninput="updateCalc(this)"></td>
@@ -258,15 +322,25 @@ function buildPriceRow(p) {
 function buildNewRow() {
   return `
     <tr class="price-row new-price-row" data-id="new" onfocusout="handleRowFocusOut(event,'new')">
-      <td><input class="cell-inp ing-cell" type="text" placeholder="${t('ph_price_ing')}"></td>
+      <td><input class="cell-inp ing-cell" type="text" placeholder="${t('ph_price_ing')}"
+           oninput="refreshNewRowBrands(this)"></td>
       <td><select class="cell-sel store-cell" onchange="updateCalc(this)">${storeOptions(null)}</select></td>
-      <td><select class="cell-sel brand-cell" onchange="updateCalc(this)">${brandOptions(null)}</select></td>
+      <td><select class="cell-sel brand-cell" onchange="updateCalc(this)">${brandOptions(null, '')}</select></td>
       <td><input class="cell-inp qty-cell" type="text" inputmode="decimal" placeholder="—" oninput="updateCalc(this)"></td>
       <td><select class="cell-sel unit-cell" onchange="updateCalc(this)">${unitOptions('g')}</select></td>
       <td><input class="cell-inp price-cell" type="text" inputmode="decimal" placeholder="—" oninput="updateCalc(this)"></td>
       <td class="ppkg-cell">—</td>
       <td></td>
     </tr>`;
+}
+
+function refreshNewRowBrands(ingInput) {
+  const row = ingInput.closest('tr');
+  const sel = row.querySelector('.brand-cell');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = brandOptions(current, ingInput.value).replace('<select', '').replace('</select>', '');
+  sel.value = current;  // preserve selection if still visible
 }
 
 function renderTable(prices) {
