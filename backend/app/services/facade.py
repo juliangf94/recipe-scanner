@@ -298,7 +298,7 @@ class RecipeScannerFacade:
                 res = requests.post(
                     'https://libretranslate.de/translate',
                     json={'q': text, 'source': 'auto', 'target': lt_lang},
-                    timeout=10
+                    timeout=3
                 )
                 if res.ok:
                     translated.append(res.json().get('translatedText', text))

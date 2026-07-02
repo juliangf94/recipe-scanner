@@ -164,7 +164,11 @@ function buildRecipeHeaderHtml(recipe) {
         <div class="detail-actions" style="margin-top:1.2rem;">
           <button class="btn btn-edit btn-sm" onclick="openEditModal()">${t('btn_edit')}</button>
           <button class="btn btn-danger btn-sm" onclick="deleteRecipe()">${t('btn_delete')}</button>
+          ${recipe.translation_status !== 'done'
+            ? `<button class="btn btn-outline btn-sm" id="translate-btn" onclick="translateRecipe()">${t('btn_translate')}</button>`
+            : ''}
         </div>
+        <div id="translate-status" style="display:none;font-size:0.85rem;margin-top:0.5rem;"></div>
       </div>
       ${photoHtml}
     </div>`;
@@ -835,6 +839,49 @@ function deleteRecipe() {
       window.location.href = 'dashboard.html';
     }
   );
+}
+
+// ── Translate ────────────────────────────────────────────────────────────────
+async function translateRecipe() {
+  const btn = document.getElementById('translate-btn');
+  const status = document.getElementById('translate-status');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = t('btn_translating');
+  status.style.display = 'none';
+
+  let res;
+  try {
+    res = await apiFetch(`/recipes/${recipeId}/translate`, { method: 'POST' });
+  } catch (_) {
+    res = null;
+  }
+
+  if (!res || !res.ok) {
+    btn.disabled = false;
+    btn.textContent = t('btn_translate');
+    status.textContent = t('translate_fail');
+    status.style.display = '';
+    return;
+  }
+
+  currentRecipe.translation_status = 'done';
+  btn.remove();
+  status.textContent = t('translate_done');
+  status.style.display = '';
+
+  const [ingRes, stepRes] = await Promise.all([
+    apiFetch(`/recipes/${recipeId}/ingredients`),
+    apiFetch(`/recipes/${recipeId}/steps`)
+  ]);
+  if (ingRes?.ok) {
+    currentIngredients = ingRes.data;
+    document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
+  }
+  if (stepRes?.ok) {
+    currentSteps = stepRes.data;
+    document.getElementById('steps-section').innerHTML = renderSteps(currentSteps);
+  }
 }
 
 // ── Ingredients ───────────────────────────────────────────────────────────────

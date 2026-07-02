@@ -31,9 +31,6 @@ class IngredientList(Resource):
         if not facade.get_recipe(recipe_id):
             return {'error': 'Recipe not found'}, 404
         ingredients = facade.get_ingredients_by_recipe(recipe_id)
-        for ing in ingredients:
-            if not ing.name_en or not ing.name_es or not ing.name_fr:
-                facade._translate_ingredient(ing)
         return [{'id': i.id, 'name': i.name,
                  'name_en': i.name_en or '', 'name_es': i.name_es or '', 'name_fr': i.name_fr or '',
                  'quantity': i.quantity, 'unit': i.unit, 'recipe_id': i.recipe_id,

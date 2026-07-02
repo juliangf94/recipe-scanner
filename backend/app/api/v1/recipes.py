@@ -88,7 +88,8 @@ class RecipeDetail(Resource):
                 'description_en': recipe.description_en or '', 'description_es': recipe.description_es or '', 'description_fr': recipe.description_fr or '',
                 'servings': recipe.servings,
                 'prep_time_min': recipe.prep_time_min, 'category': recipe.category,
-                'user_id': recipe.user_id, 'image_url': recipe.image_url}, 200
+                'user_id': recipe.user_id, 'image_url': recipe.image_url,
+                'translation_status': recipe.translation_status or 'pending'}, 200
 
     @jwt_required()
     @api.expect(recipe_update_model)
@@ -123,6 +124,26 @@ class RecipeDetail(Resource):
         return '', 204
 
 
+@api.route('/<string:recipe_id>/translate')
+class RecipeTranslate(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Recipe translated')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Recipe not found')
+    def post(self, recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        ingredients = facade.get_ingredients_by_recipe(recipe_id)
+        steps = facade.get_steps_by_recipe(recipe_id)
+        facade._translate_recipe(recipe, ingredients, steps)
+        return {'translation_status': recipe.translation_status or 'done'}, 200
+
+
 @api.route('/<string:recipe_id>/cook')
 class RecipeCook(Resource):
 
@@ -153,9 +174,6 @@ class RecipeSteps(Resource):
             return {'error': 'Recipe not found'}, 404
         steps = facade.get_steps_by_recipe(recipe_id)
         steps_sorted = sorted(steps, key=lambda s: s.order_num)
-        for step in steps_sorted:
-            if not step.description_en or not step.description_es or not step.description_fr:
-                facade._translate_step(step)
         return [{'id': s.id, 'order_num': s.order_num,
                  'description': s.description,
                  'description_en': s.description_en or '',
