@@ -854,7 +854,7 @@ function openEditModal() {
   document.getElementById('e-desc').value     = localDesc;
   document.getElementById('e-servings').value = currentRecipe.servings || 0;
   document.getElementById('e-prep').value     = currentRecipe.prep_time_min || 0;
-  document.getElementById('e-category').value = normalizeCatToCanonical(currentRecipe.category);
+  fillCategorySelect('e-category', normalizeCatToCanonical(currentRecipe.category));
 
   // Show which language is being edited
   document.getElementById('e-lang-badge').textContent = lang.toUpperCase();

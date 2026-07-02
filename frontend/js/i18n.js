@@ -1172,17 +1172,21 @@ const CATEGORY_LIST = [
   'Sandwich', 'Seafood', 'Snack', 'Soup', 'Vegan', 'Vegetarian',
 ];
 
-function fillCategorySelect(id) {
+function fillCategorySelect(id, externalValue) {
   const sel = document.getElementById(id);
   if (!sel) return;
-  const current = sel.value;
+  const current = externalValue !== undefined ? externalValue : sel.value;
   const lang = getLang();
   const placeholder = lang === 'es' ? '— Sin categoría —' : lang === 'fr' ? '— Sans catégorie —' : '— No category —';
   const sorted = CATEGORY_LIST
     .map(c => ({ value: c, label: tCat(c) }))
     .sort((a, b) => a.label.localeCompare(b.label));
+  const unknownExtra = current && !CATEGORY_LIST.includes(current)
+    ? `<option value="${current}" selected>${current} (?)</option>`
+    : '';
   sel.innerHTML = `<option value="">${placeholder}</option>` +
-    sorted.map(o => `<option value="${o.value}"${o.value === current ? ' selected' : ''}>${o.label}</option>`).join('');
+    sorted.map(o => `<option value="${o.value}"${o.value === current ? ' selected' : ''}>${o.label}</option>`).join('') +
+    unknownExtra;
 }
 
 function normalizeCatToCanonical(raw) {
