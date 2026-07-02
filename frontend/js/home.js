@@ -12,8 +12,7 @@ if (user) {
 function setAvatarDisplay(avatarUrl, initials) {
   const el = document.getElementById('user-avatar');
   if (avatarUrl) {
-    const src = supabaseThumb(resolveImgUrl(avatarUrl), 96, 80);
-    el.innerHTML = `<img src="${src}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    el.innerHTML = `<img src="${resolveImgUrl(avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   } else {
     el.innerHTML = `<span id="avatar-initials">${initials}</span><div class="avatar-overlay">📷</div>`;
   }
