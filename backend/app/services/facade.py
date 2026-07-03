@@ -159,6 +159,8 @@ class RecipeScannerFacade:
         return self._recipes.update(recipe)
 
     def delete_recipe(self, recipe_id):
+        # SQLite does not enforce foreign key constraints by default, so we
+        # manually delete all related records before removing the recipe itself.
         db.session.query(PdfScan).filter(PdfScan.recipe_id == recipe_id).delete()
         db.session.query(CookLog).filter(CookLog.recipe_id == recipe_id).delete()
         for ing in self.get_ingredients_by_recipe(recipe_id):
@@ -406,6 +408,15 @@ class RecipeScannerFacade:
     # --- Scan (PDF + Groq) --- api/v1/scan.py ---
 
     def scan_pdf(self, user_id, file_bytes, filename, force=False):
+        """
+        Full PDF scan pipeline:
+        1. Extract text from PDF with PyMuPDF (fitz)
+        2. Send text to Groq API → structured JSON (title, ingredients, steps)
+        3. Check for duplicate title — return error code if found (unless force=True)
+        4. Save recipe, ingredients and steps to the database
+        5. Translate all fields to EN/ES/FR in parallel (DeepL + MyMemory fallback)
+        Returns (recipe, ingredients, steps) on success, or (None, error_code) on failure.
+        """
         text = self._extract_pdf_text(file_bytes)
         if not text.strip():
             return None, 'no_text'
@@ -678,6 +689,14 @@ class RecipeScannerFacade:
     # --- Costs (Open Food Facts + custom DB + manual) --- api/v1/costs.py ---
 
     def get_recipe_cost(self, recipe_id, user_id):
+        """
+        Calculate the estimated cost of a recipe per ingredient.
+        Price resolution order (highest to lowest priority):
+          1. Manual price set by the user on a specific ingredient
+          2. Custom DB price — store+brand > store > brand > cheapest
+          3. Cached Open Food Facts price (fetched on ingredient creation)
+          4. FALLBACK_PRICES dict (hardcoded EUR/kg averages)
+        """
         recipe = self.get_recipe(recipe_id)
         ingredients = self.get_ingredients_by_recipe(recipe_id)
         result = []

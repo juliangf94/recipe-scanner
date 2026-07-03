@@ -10,6 +10,12 @@ from app.extensions import db
 
 
 def create_app(config_name=None):
+    """
+    Application factory — builds and returns the configured Flask app.
+    Reads FLASK_ENV to select development / testing / production config.
+    Called by run.py for local dev, by gunicorn in production, and by
+    pytest fixtures for testing — each gets its own isolated app instance.
+    """
     if config_name is None:
         config_name = os.environ.get('FLASK_ENV', 'default')
 
@@ -41,7 +47,9 @@ def create_app(config_name=None):
     )
     # Initialize extensions here (Phase 8 — SQLAlchemy)
 
-    # Register namespaces here (Phases 4-6 — auth, recipes, scan)
+    # Namespaces are imported inside the factory to avoid circular imports:
+    # each namespace module imports the facade, which imports models,
+    # which need db — and db is only bound to the app after init_app() above.
     from app.api.v1.auth import api as auth_ns
     from app.api.v1.recipes import api as recipes_ns
     from app.api.v1.ingredients import api as ingredients_ns
@@ -58,6 +66,8 @@ def create_app(config_name=None):
     api.add_namespace(stores_ns, path='/api/v1/stores')
     api.add_namespace(brands_ns, path='/api/v1/brands')
 
+    # Health check — no auth required. Used by the frontend to warm up
+    # the Render free-tier backend before the first real request.
     @app.route('/api/v1/health')
     def health():
         return {'status': 'ok'}, 200

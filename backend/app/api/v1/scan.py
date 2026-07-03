@@ -12,8 +12,14 @@ class ScanPdf(Resource):
     @jwt_required()
     @api.response(201, 'Recipe extracted and saved')
     @api.response(400, 'No file or invalid file')
+    @api.response(409, 'Duplicate recipe detected')
     @api.response(500, 'Extraction failed')
     def post(self):
+        """
+        Extract a recipe from a PDF using Groq AI and save it to the database.
+        Accepts ?force=true to bypass duplicate detection and save anyway.
+        Returns the full recipe with ingredients and steps in three languages (EN/ES/FR).
+        """
         user_id = get_jwt_identity()
 
         if 'file' not in request.files:

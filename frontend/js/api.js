@@ -89,7 +89,9 @@ function requireAuth() {
 function removeToken() { clearTokens(); }
 
 // ── Silent token refresh ──────────────────────────────────────────────────────
-let _refreshPromise = null; // prevents parallel refresh calls
+// _refreshPromise acts as a singleton lock: if two requests trigger a refresh
+// at the same time, only one HTTP call is made and both callers await the same promise.
+let _refreshPromise = null;
 
 async function refreshAccessToken() {
   if (_refreshPromise) return _refreshPromise;
@@ -120,6 +122,14 @@ async function refreshAccessToken() {
 }
 
 // ── Main fetch wrapper ────────────────────────────────────────────────────────
+/**
+ * Central HTTP client for all API calls.
+ * - Attaches the JWT access token to every request automatically.
+ * - Proactively refreshes the token if it is about to expire (15-min window).
+ * - On a 401 response, attempts one silent refresh and retries the request.
+ * - Returns null for 204 No Content responses (e.g. DELETE).
+ * - Returns { ok, status, data } for all other responses.
+ */
 async function apiFetch(path, options = {}) {
   // Proactively refresh if access token is about to expire
   const access = getAccessToken();
