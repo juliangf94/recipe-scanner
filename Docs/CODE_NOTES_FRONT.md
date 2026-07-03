@@ -30,15 +30,15 @@ Backend (Flask)  ──► JSON únicamente  ◄──  Cualquier cliente
 
 ```
 frontend/
-├── index.html          ← Login
-├── register.html       ← Registro
-├── home.html           ← Resumen semanal de cocina y recetas top
-├── dashboard.html      ← Lista de recetas con filtros y búsqueda
-├── recipe.html         ← Detalle de receta, ingredientes, precios, pasos, galería de fotos
-├── scan.html           ← Escanear PDF con IA (con modal anti-duplicados)
-├── prices.html         ← Mis precios custom (tabla editable inline), tiendas, marcas
 ├── account.html        ← Ajustes de cuenta: nombre, email, contraseña, avatar
+├── dashboard.html      ← Lista de recetas con filtros y búsqueda
+├── home.html           ← Resumen semanal de cocina y recetas top
+├── index.html          ← Login
+├── prices.html         ← Mis precios custom (tabla editable inline), tiendas, marcas
 ├── privacy.html        ← Política de privacidad
+├── recipe.html         ← Detalle de receta, ingredientes, precios, pasos, galería de fotos
+├── register.html       ← Registro
+├── scan.html           ← Escanear PDF con IA (con modal anti-duplicados)
 ├── terms.html          ← Términos de uso
 ├── css/
 │   └── style.css       ← Estilos globales (dark/light, WCAG AA)
@@ -196,6 +196,56 @@ Al cambiar de idioma, `applyTranslations()` convierte `"Home"` → `"Inicio"` si
 ## `frontend/js/api.js`
 
 El módulo central que maneja todos los requests HTTP y el ciclo de vida de los tokens JWT.
+
+### Detección de entorno y URL base
+
+```javascript
+const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_URL = IS_LOCAL
+  ? 'http://localhost:5000/api/v1'
+  : 'https://recipe-scanner-kfnm.onrender.com/api/v1';
+```
+
+El frontend detecta automáticamente si está corriendo en local o en producción mirando el hostname del browser. Así no hay que cambiar ninguna URL al hacer deploy — el mismo código funciona en ambos entornos.
+
+### Warm-up ping a Render
+
+```javascript
+if (!IS_LOCAL) fetch(`${BASE_URL}/health`).catch(() => {});
+```
+
+Render (free tier) duerme el servidor después de inactividad. Esta línea dispara un request silencioso a `/health` apenas carga cualquier página — sin esperar la respuesta (`fire-and-forget`). Así el servidor ya está despierto cuando el usuario hace su primer request real. Solo se ejecuta en producción (`!IS_LOCAL`).
+
+### Resolución de URLs de imágenes
+
+```javascript
+function resolveImgUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('//')) return url;
+  return `${SERVER_URL}${url}`;
+}
+```
+
+Las imágenes pueden estar en dos lugares:
+- **Supabase Storage** → URL absoluta que empieza con `https://` — se devuelve tal cual
+- **Disco local del servidor** → ruta relativa como `/static/uploads/recipes/foto.jpg` — se le agrega la URL base del servidor
+
+Esto permite que el código del frontend sea el mismo sin importar dónde esté guardada la imagen.
+
+### Almacenamiento del usuario en localStorage
+
+```javascript
+function getUser() {
+  const u = localStorage.getItem('user');
+  return u ? JSON.parse(u) : null;
+}
+
+function setUser(user) {
+  localStorage.setItem('user', JSON.stringify(user));
+}
+```
+
+El objeto del usuario (nombre, email, avatar) se guarda en `localStorage` para mostrarlo en el sidebar sin hacer un request al servidor en cada página. Se actualiza cuando el usuario cambia su avatar o sus datos en la cuenta.
 
 ### Almacenamiento de tokens
 
@@ -358,6 +408,25 @@ Dos estrategias de refresh:
 - **Reactivo** — después del request, si el servidor devuelve 401 (el token puede haber expirado justo entre el chequeo y el envío)
 
 Todos los JS de la app usan `apiFetch()` en lugar de `fetch()` directamente. Así la lógica de tokens está en un solo lugar.
+
+### `apiUpload()` — subida de archivos
+
+```javascript
+async function apiUpload(path, formData) {
+  const token = getAccessToken();
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData });
+  ...
+}
+```
+
+Es una versión de `apiFetch()` especializada para subir archivos (imágenes de recetas, avatares). Las diferencias clave con `apiFetch()`:
+
+- **No agrega `Content-Type: application/json`** — cuando se envía un `FormData`, el browser establece automáticamente `Content-Type: multipart/form-data` con el `boundary` correcto. Si se forzara `application/json`, el servidor no podría leer el archivo.
+- **Siempre usa `POST`** — la subida de archivos es siempre una creación, nunca una edición parcial.
+- **No tiene refresh proactivo complejo** — si el token expiró, redirige al login directamente.
 
 ---
 
