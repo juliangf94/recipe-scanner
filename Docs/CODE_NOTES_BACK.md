@@ -278,6 +278,24 @@ Mismo patrón para el Namespace de recetas. Cada `add_namespace` registra todas 
 definidas con `@api.route(...)` dentro de ese archivo bajo el prefijo indicado.
 
 ```python
+@app.route('/api/v1/health')
+def health():
+    return {'status': 'ok'}, 200
+```
+
+Define un endpoint simple sin autenticación que devuelve `{"status": "ok"}` con código 200.
+
+**¿Para qué sirve?**
+Render (la plataforma donde corre el backend) tiene un plan gratuito que duerme el servidor después de un período de inactividad. Cuando el primer usuario hace una petición, el servidor tarda ~10 segundos en despertar.
+
+Para evitar esa espera, el frontend hace una petición a `/health` en segundo plano cada vez que se carga cualquier página, sin esperar la respuesta. Así el servidor ya está despierto cuando el usuario realmente lo necesita.
+
+```python
+# En frontend/js/api.js — se ejecuta al cargar la página
+if (!IS_LOCAL) fetch(`${BASE_URL}/health`).catch(() => {});
+```
+
+```python
     return app
 ```
 Retorna la instancia de Flask completamente configurada.
