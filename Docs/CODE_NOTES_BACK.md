@@ -184,12 +184,16 @@ Importa el diccionario `config` de `config.py`. Ese diccionario mapea strings
 como `'development'` a clases como `DevelopmentConfig`. Sin esta línea no podemos
 cargar la configuración correcta según el entorno.
 
+---
+
 ```python
 def create_app(config_name=None):
 ```
 Define la función factory.
 El parámetro `config_name` tiene valor por defecto `None`
 porque no queremos hardcodear el entorno aquí — lo vamos a leer del `.env`.
+
+---
 
 ```python
     if config_name is None:
@@ -199,6 +203,8 @@ Si nadie pasó un `config_name` explícito, intentamos leerlo de la variable de 
 Si tampoco está definida en el `.env`, usamos `'default'` que apunta a `DevelopmentConfig`.
 Esto permite que `run.py` no tenga el entorno hardcodeado — simplemente llama `create_app()` y la función lo resuelve sola.
 
+---
+
 ```python
     app = Flask(__name__)
 ```
@@ -206,12 +212,16 @@ Crea la instancia de Flask.
 - `__name__` es una variable especial de Python que contiene el nombre del módulo actual (`app`).
 - Flask lo usa para saber dónde buscar templates y archivos estáticos relativos a este paquete.
 
+---
+
 ```python
     app.config.from_object(config[config_name])
 ```
 - `config[config_name]` accede al diccionario y obtiene la clase correcta, por ejemplo `DevelopmentConfig`.
 - `app.config.from_object()` lee todos los atributos de esa clase (SECRET_KEY, JWT_SECRET_KEY, SQLALCHEMY_DATABASE_URI, etc.) y los carga en la configuración de Flask.
 - A partir de acá, cualquier parte del código puede leer `current_app.config['SECRET_KEY']` y obtener el valor correcto.
+
+---
 
 ```python
     JWTManager(app)
@@ -222,6 +232,8 @@ Inicializa flask_jwt_extended con la app de Flask. A partir de este momento:
 - Los errores 401 se manejan automáticamente
 
 No hace falta guardar la instancia en una variable — el efecto es el registro en la app.
+
+---
 
 ```python
     authorizations = {
@@ -240,6 +252,8 @@ Define el esquema de seguridad que Swagger UI mostrará en el botón **Authorize
 - La `description` es el texto que ve el usuario dentro del popup de Swagger cuando hace click en Authorize — le explica que tiene que escribir `Bearer <token>`.
 
 Sin este dict, Swagger UI no muestra el candado ni el botón Authorize — los endpoints protegidos con `@jwt_required()` no se pueden testear desde la UI.
+
+---
 
 ```python
     api = Api(
@@ -261,6 +275,8 @@ Inicializa flask_restx con la app y configura la UI de Swagger:
 
 A diferencia de JWTManager, **sí** guardamos la instancia en `api` porque la necesitamos inmediatamente para registrar los Namespaces.
 
+---
+
 ```python
     from app.api.v1.auth import api as auth_ns
     api.add_namespace(auth_ns, path='/api/v1/auth')
@@ -270,12 +286,16 @@ El import está dentro de la función (no en el top del archivo) para evitar **c
 `auth.py` importa `facade`, `facade` importa modelos, los modelos no importan `__init__.py`,
 pero si el import fuera al inicio del archivo podría haber conflictos de orden de carga.
 
+---
+
 ```python
     from app.api.v1.recipes import api as recipes_ns
     api.add_namespace(recipes_ns, path='/api/v1/recipes')
 ```
 Mismo patrón para el Namespace de recetas. Cada `add_namespace` registra todas las rutas
 definidas con `@api.route(...)` dentro de ese archivo bajo el prefijo indicado.
+
+---
 
 ```python
 @app.route('/api/v1/health')
@@ -295,12 +315,15 @@ Para evitar esa espera, el frontend hace una petición a `/health` en segundo pl
 if (!IS_LOCAL) fetch(`${BASE_URL}/health`).catch(() => {});
 ```
 
+---
+
 ```python
     return app
 ```
 Retorna la instancia de Flask completamente configurada.
 `run.py` va a recibir esta instancia y la va a usar para levantar el servidor.
 
+---
 ---
 
 ### ¿Qué es `FLASK_ENV`?
