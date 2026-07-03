@@ -237,6 +237,8 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 
 **Goal:** Strengthen the codebase: expand test suite, migrate AI model, add multilingual price matching, and secure GitHub uploads.
 
+**Decisiones técnicas:** ver `DEVLOG.md` → sección *"Decisiones técnicas documentadas"* (Decisiones 12–16: fuzzy matching, `_norm`, resolución de precio 4 casos, multilingüe, modelo Qwen)
+
 **Duration:** Week 9
 
 | Task | Priority | Status |
@@ -261,6 +263,8 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 ## Sprint 7 — Deploy ✅ COMPLETE
 
 **Goal:** Deploy backend y frontend a producción con Docker.
+
+**Decisiones técnicas:** ver `DEPLOY.md` (arquitectura completa Render + Netlify + Docker) y `DEVLOG.md` → sección *"Decisiones técnicas — Sprint 5 (Frontend)"* (Decisión 9: HTML estático vs Jinja2)
 
 **Duration:** Week 10
 
@@ -297,6 +301,8 @@ Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Se
 **Goal:** Reemplazar SQLite en producción por PostgreSQL con Supabase para persistencia real de datos.
 Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 
+**Decisiones técnicas:** ver `DEVLOG.md` → sección *"Decisiones técnicas — Sprint 8-9 (Supabase + UX)"* y `DEPLOY.md` → sección *"Supabase"*
+
 **Duration:** Week 11
 
 | Task | Priority | Status |
@@ -322,6 +328,8 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 ## Sprint 9 — UX mejorada + Traducciones ✅ COMPLETE
 
 **Goal:** Mejorar la experiencia de usuario con la tabla de precios inline y mejorar las traducciones automáticas.
+
+**Decisiones técnicas:** ver `DEVLOG.md` → sección *"Decisiones técnicas — Sprint 8-9 (Supabase + UX)"*
 
 **Duration:** Week 12
 
