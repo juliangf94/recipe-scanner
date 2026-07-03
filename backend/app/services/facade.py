@@ -159,14 +159,11 @@ class RecipeScannerFacade:
         return self._recipes.update(recipe)
 
     def delete_recipe(self, recipe_id):
-        # SQLite does not enforce foreign key constraints by default, so we
-        # manually delete all related records before removing the recipe itself.
+        # Bulk-delete all child records in one round-trip instead of N commits.
         db.session.query(PdfScan).filter(PdfScan.recipe_id == recipe_id).delete()
         db.session.query(CookLog).filter(CookLog.recipe_id == recipe_id).delete()
-        for ing in self.get_ingredients_by_recipe(recipe_id):
-            self._ingredients.delete(ing.id)
-        for step in self.get_steps_by_recipe(recipe_id):
-            self._steps.delete(step.id)
+        db.session.query(Ingredient).filter(Ingredient.recipe_id == recipe_id).delete()
+        db.session.query(Step).filter(Step.recipe_id == recipe_id).delete()
         db.session.commit()
         self._recipes.delete(recipe_id)
 
