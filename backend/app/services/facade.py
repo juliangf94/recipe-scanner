@@ -465,7 +465,10 @@ class RecipeScannerFacade:
             )
             steps.append(step)
 
-        self._translate_recipe(recipe, ingredients, steps)
+        try:
+            self._translate_recipe(recipe, ingredients, steps)
+        except Exception as e:
+            logging.error('Translation failed after saving recipe, returning without translations: %s', e)
         return (recipe, ingredients, steps), None
 
     def _extract_pdf_text(self, file_bytes):
