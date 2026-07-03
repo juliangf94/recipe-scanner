@@ -367,12 +367,15 @@ class RecipeScannerFacade:
                 executor.submit(_batch_for_lang, lc): lc
                 for lc in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]
             }
-            for future in as_completed(futures, timeout=25):
-                try:
-                    col, translated, provider = future.result()
-                    lang_results[col] = (translated, provider)
-                except Exception as exc:
-                    logging.error('Translation batch failed: %s', exc)
+            try:
+                for future in as_completed(futures, timeout=25):
+                    try:
+                        col, translated, provider = future.result()
+                        lang_results[col] = (translated, provider)
+                    except Exception as exc:
+                        logging.error('Translation batch failed: %s', exc)
+            except TimeoutError:
+                logging.warning('Translation timed out — recipe saved without translations')
 
         used_provider = 'none'
         all_failed = True
