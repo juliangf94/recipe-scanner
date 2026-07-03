@@ -226,11 +226,13 @@ function resolveImgUrl(url) {
 }
 ```
 
-Las imágenes pueden estar en dos lugares:
-- **Supabase Storage** → URL absoluta que empieza con `https://` — se devuelve tal cual
-- **Disco local del servidor** → ruta relativa como `/static/uploads/recipes/foto.jpg` — se le agrega la URL base del servidor
+En la app hay exactamente dos tipos de imágenes: **foto de perfil del usuario** y **fotos de recetas** (portada y galería). Ambas pasan por `resolveImgUrl()` antes de ponerse en un `<img src="...">`.
 
-Esto permite que el código del frontend sea el mismo sin importar dónde esté guardada la imagen.
+Esas imágenes pueden estar en dos lugares dependiendo del entorno:
+- **Supabase Storage** (producción) → URL absoluta que empieza con `https://` — se devuelve tal cual
+- **Disco local del servidor** (desarrollo local, cuando Supabase no está configurado) → ruta relativa como `/static/uploads/recipes/foto.jpg` — se le agrega la URL base del servidor para construir la URL completa: `https://recipe-scanner-kfnm.onrender.com/static/uploads/recipes/foto.jpg`
+
+Esto permite que el código del frontend sea el mismo sin importar dónde esté guardada la imagen, y si la URL del servidor cambia solo hay que actualizarla en un lugar.
 
 ### Almacenamiento del usuario en localStorage
 
