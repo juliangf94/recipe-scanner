@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍽️%3C/text%3E%3C/svg%3E">
+  <title>RecipeScanner — Recipe</title>
+  <link rel="preconnect" href="https://recipe-scanner-kfnm.onrender.com">
+  <link rel="preconnect" href="https://mqxnxdfrmdioqyzpmvaz.supabase.co" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="home.html" class="logo">
+        <div class="logo-icon">🍴</div>
+        <span class="logo-text">Recipe<span>Scanner</span></span>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="home.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span data-i18n="nav_home">Home</span>
+      </a>
+      <a href="dashboard.html" class="nav-item active">
+        <span class="nav-icon">📖</span>
+        <span data-i18n="nav_recipes">My Recipes</span>
+      </a>
+      <a href="scan.html" class="nav-item">
+        <span class="nav-icon">⚡</span>
+        <span data-i18n="nav_scan">Scan Recipe</span>
+      </a>
+      <a href="prices.html" class="nav-item">
+        <span class="nav-icon">🏷</span>
+        <span data-i18n="nav_prices">My Prices</span>
+      </a>
+      <a href="account.html" class="nav-item mobile-only-nav">
+        <span class="nav-icon">👤</span>
+        <span data-i18n="nav_profile">Profile</span>
+      </a>
+    </nav>
+    <div class="sidebar-lang">
+      <div class="lang-toggle">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+        <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar" id="user-avatar">
+        <span id="avatar-initials">?</span>
+  
+      </div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-firstname" id="user-firstname">…</span>
+        <span class="sidebar-user-lastname" id="user-lastname"></span>
+      </div>
+      <div class="user-menu-wrapper">
+        <button class="sidebar-user-menu" onclick="toggleUserMenu(event)" title="Menu">⋯</button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="account.html" class="user-dropdown-item">⚙️ <span data-i18n="nav_account">Account Settings</span></a>
+          <button class="user-dropdown-item user-dropdown-logout" onclick="logout()">⏻ <span data-i18n="nav_signout">Log out</span></button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="app-layout" id="main-content">
+    <div class="loading-center"><div class="spinner"></div></div>
+  
+    <footer class="app-footer">
+      <p data-i18n="footer_disclaimer">RecipeScanner no está afiliado ni patrocinado por ninguna de las marcas o supermercados mencionados en esta aplicación.</p>
+    </footer>
+</main>
+
+  <!-- Modal: edit recipe -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_edit_recipe">Edit recipe</h2>
+      <div id="edit-error" class="alert alert-error" style="display:none"></div>
+      <div class="form-group">
+        <label>
+          <span data-i18n="label_title_req">Title</span>
+          <span id="e-lang-badge" style="margin-left:0.4rem;font-size:0.72rem;font-weight:700;background:var(--orange);color:#fff;border-radius:4px;padding:1px 6px;vertical-align:middle;"></span>
+        </label>
+        <input type="text" id="e-title">
+        <p id="e-title-original" style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem;"></p>
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_desc">Description</label>
+        <textarea id="e-desc" rows="2"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="label_servings">Servings</label>
+          <input type="number" id="e-servings" min="0">
+        </div>
+        <div class="form-group">
+          <label data-i18n="label_prep">Prep time (min)</label>
+          <input type="number" id="e-prep" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_category">Category</label>
+        <select id="e-category" data-cat-select class="form-select"></select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeEditModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_save" onclick="saveRecipe()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: edit ingredient -->
+  <div class="modal-overlay" id="ing-edit-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_edit_ing">Edit ingredient</h2>
+      <div id="ing-edit-error" class="alert alert-error" style="display:none"></div>
+      <input type="hidden" id="ing-edit-id">
+      <div class="form-group">
+        <label data-i18n="label_name_req">Name *</label>
+        <input type="text" id="ing-edit-name" data-i18n-placeholder="ph_ing_name" placeholder="Flour">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="label_qty_req">Quantity *</label>
+          <input type="text" id="ing-edit-qty" placeholder="500">
+        </div>
+        <div class="form-group">
+          <label data-i18n="label_unit_req">Unit *</label>
+          <input type="text" id="ing-edit-unit" placeholder="g">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeEditIngModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_save" onclick="saveEditIng()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: add step -->
+  <div class="modal-overlay" id="step-add-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_add_step">Add step</h2>
+      <div id="step-add-error" class="alert alert-error" style="display:none"></div>
+      <div class="form-group" style="max-width:120px;">
+        <label data-i18n="label_step_num">Step #</label>
+        <input type="number" id="step-add-num" min="1">
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_step_desc_req">Description *</label>
+        <textarea id="step-add-desc" rows="4"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeAddStepModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_add" onclick="saveNewStep()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: edit step -->
+  <div class="modal-overlay" id="step-edit-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_edit_step">Edit step</h2>
+      <div id="step-edit-error" class="alert alert-error" style="display:none"></div>
+      <input type="hidden" id="step-edit-id">
+      <div class="form-group" style="max-width:120px;">
+        <label data-i18n="label_step_num">Step #</label>
+        <input type="number" id="step-edit-num" min="1">
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_step_desc_req">Description *</label>
+        <textarea id="step-edit-desc" rows="4"></textarea>
+        <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem;">Tip: <strong>**texto**</strong> → negrita</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeEditStepModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_save" onclick="saveEditStep()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: add ingredient -->
+  <div class="modal-overlay modal-overlay-transparent" id="ing-modal">
+    <div class="modal modal-floating">
+      <div class="modal-drag-handle">
+        <span data-i18n="modal_add_ing">Add ingredient</span>
+        <button class="modal-close-x" onclick="closeIngModal()">✕</button>
+      </div>
+      <div style="padding:1.2rem 1.5rem 1.5rem;">
+        <div id="ing-error" class="alert alert-error" style="display:none"></div>
+        <div class="form-group">
+          <label data-i18n="label_name_req">Name *</label>
+          <input type="text" id="ing-name" data-i18n-placeholder="ph_ing_name" placeholder="Flour">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="label_qty_req">Quantity *</label>
+            <input type="text" id="ing-qty" placeholder="500">
+          </div>
+          <div class="form-group">
+            <label data-i18n="label_unit_req">Unit *</label>
+            <input type="text" id="ing-unit" placeholder="g">
+          </div>
+        </div>
+        <div class="form-group" id="ing-section-group">
+          <label data-i18n="label_section">Section</label>
+          <select id="ing-section"></select>
+        </div>
+        <div class="modal-footer" style="padding:0;margin-top:1rem;">
+          <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeIngModal()">Cancel</button>
+          <button class="btn btn-orange" data-i18n="btn_add" onclick="addIngredient()">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: set ingredient price (manual override) -->
+  <div class="modal-overlay" id="price-modal">
+    <div class="modal" style="max-width:500px;">
+      <h2 data-i18n="modal_set_price">Set ingredient price</h2>
+      <p id="price-modal-ing-name" style="color:var(--text-muted);font-size:0.95rem;margin-bottom:0.75rem;font-weight:600;"></p>
+      <div id="price-error" class="alert alert-error" style="display:none"></div>
+
+      <!-- Entry mode toggle -->
+      <div class="price-mode-toggle" style="margin-bottom:1rem;">
+        <button class="mode-btn active" id="pm-mode-qty" onclick="setPriceMode('qty')" data-i18n="input_mode_qty">By amount</button>
+        <button class="mode-btn" id="pm-mode-kg" onclick="setPriceMode('kg')" data-i18n="input_mode_kg">Per kg</button>
+      </div>
+
+      <!-- By-amount fields -->
+      <div id="pm-qty-fields">
+        <div style="display:flex;gap:0.75rem;align-items:flex-end;">
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_qty">Quantity bought</label>
+            <input type="text" id="pm-bought-qty" inputmode="decimal" placeholder="500">
+          </div>
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_unit">Unit</label>
+            <select id="pm-bought-unit">
+              <option value="g">g</option>
+              <option value="kg">kg</option>
+              <option value="ml">ml</option>
+              <option value="l">l</option>
+              <option value="unidad">unidad</option>
+              <option value="pieza">pieza</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;margin:0;">
+            <label data-i18n="label_bought_price">Price paid (€)</label>
+            <input type="text" id="pm-bought-price" inputmode="decimal" placeholder="1.50">
+          </div>
+        </div>
+        <p id="pm-price-preview" class="price-preview-text" style="display:none;"></p>
+      </div>
+
+      <!-- Per-kg / per-unit field -->
+      <div id="pm-kg-field" style="display:none;">
+        <div class="form-group">
+          <label data-i18n="label_price_unit_req">Price per unit (€) *</label>
+          <div style="display:flex;gap:0.5rem;">
+            <input type="text" id="price-input" inputmode="decimal" placeholder="2.50" style="flex:1;">
+            <button class="btn btn-outline btn-sm" id="off-fetch-btn" onclick="fetchOffPrice()" data-i18n="btn_fetch_off" style="white-space:nowrap;">🌐 Fetch from OFF</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:0.6rem;">
+        <button class="btn btn-danger btn-sm" id="price-clear-btn" onclick="clearManualPrice()" data-i18n="btn_clear_price">Clear override</button>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closePriceModal()">Cancel</button>
+          <button class="btn btn-orange" data-i18n="btn_save_price" onclick="saveManualPrice()">Save price</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: upload recipe image -->
+  <input type="file" id="recipe-img-input" accept="image/*" multiple style="display:none" onchange="uploadRecipeImage(event)">
+
+  <!-- Modal: confirm delete -->
+  <div class="modal-overlay" id="confirm-delete-modal">
+    <div class="modal" style="max-width:400px;text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:0.75rem;">🗑️</div>
+      <h2 id="confirm-delete-title" style="margin-bottom:0.5rem;"></h2>
+      <p id="confirm-delete-desc" style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;"></p>
+      <div class="modal-footer" style="justify-content:center;gap:0.75rem;">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeConfirmDelete()">Cancel</button>
+        <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: prompt (section name) -->
+  <div class="modal-overlay" id="shared-prompt-modal">
+    <div class="modal" style="max-width:420px;">
+      <h2 id="shared-prompt-title" style="margin-bottom:1.2rem;"></h2>
+      <div class="form-group">
+        <input type="text" id="shared-prompt-input" style="width:100%;">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closePrompt()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn-orange" id="shared-prompt-confirm" data-i18n="btn_confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: alert -->
+  <div class="modal-overlay" id="shared-alert-modal">
+    <div class="modal" style="max-width:420px;text-align:center;">
+      <div style="font-size:2rem;margin-bottom:0.75rem;">💡</div>
+      <p id="shared-alert-message" style="color:var(--text-muted);font-size:0.95rem;margin-bottom:1.5rem;"></p>
+      <button class="btn btn-orange" onclick="closeAlert()" data-i18n="btn_ok">OK</button>
+    </div>
+  </div>
+
+  <!-- Modal: confirm (shared) -->
+  <div class="modal-overlay" id="shared-confirm-modal">
+    <div class="modal" style="max-width:400px;text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:0.75rem;">🗑️</div>
+      <h2 id="shared-confirm-title" style="margin-bottom:0.5rem;"></h2>
+      <p id="shared-confirm-desc" style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;"></p>
+      <div class="modal-footer" style="justify-content:center;gap:0.75rem;">
+        <button class="btn btn-outline" onclick="closeSharedConfirm()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn-danger" id="shared-confirm-btn" data-i18n="btn_delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+  <script src="js/i18n.js?v=22" defer></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/recipe.js?v=17" defer></script>
+</body>
+</html>

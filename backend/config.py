@@ -1,7 +1,10 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
+
+basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config:
@@ -10,11 +13,13 @@ class Config:
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'dev-jwt-key-not-for-production')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=15)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
 
 class DevelopmentConfig(Config):
     """Local development environment."""
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///instance/development.db'
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'instance', 'development.db')
 
 
 class TestingConfig(Config):
@@ -26,8 +31,13 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     """Production environment — all secrets loaded from environment variables."""
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'sqlite:////app/instance/production.db'
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 280,
+    }
 
 
 config = {

@@ -1,7 +1,7 @@
 # RecipeScanner — Stage 3: Technical Documentation
 
 Proyecto portfolio — Holberton School RNCP 5 DWWM  
-Fecha de entrega: finales de junio 2025
+Fecha de entrega: finales de junio 2026
 
 ---
 
@@ -119,32 +119,34 @@ Fecha de entrega: finales de junio 2025
 flowchart TD
     Browser["🌐 Client (Browser)"]
 
-    subgraph Frontend["Frontend — Flask / Jinja2"]
-        FE["Templates + Static (CSS/JS)"]
+    subgraph Frontend["Frontend — HTML/JS estático"]
+        FE["HTML + CSS + JS (sin servidor de plantillas)"]
     end
 
     subgraph Backend["Backend — Flask API"]
-        API["Blueprints /api/v1/\nauth · recipes · ingredients · scan"]
+        API["flask_restx Namespaces /api/v1/\nauth · recipes · ingredients · scan\ncosts · stores · brands\nSwagger UI → /api/docs"]
     end
 
     subgraph Services["Services"]
-        Facade["Facade\n(business logic)"]
+        Facade["Facade\n(business logic — facade.py)"]
     end
 
     subgraph Persistence["Persistence — Repository Pattern"]
         Repo["BaseRepository\n(ABC interface)"]
-        Mem["InMemoryStorage\n(Phase 1 — dicts)"]
-        DB["DbStorage\n(Phase 2 — SQLAlchemy)"]
+        Mem["InMemoryStorage\n(tests only)"]
+        DB["DbStorage\n(producción — SQLAlchemy)"]
     end
 
     subgraph External["External Services"]
-        Groq["Groq API\nLLaMA 3.3-70b"]
+        Groq["Groq API\nllama-3.3-70b-versatile"]
         OFF["Open Food Facts API"]
+        DeepL["DeepL / MyMemory\n(traducciones EN/ES/FR)"]
+        Storage["Supabase Storage\n(fotos recetas + avatares)"]
     end
 
     subgraph Database["Database"]
-        SQLite["SQLite (dev)"]
-        PG["PostgreSQL (prod)"]
+        SQLite["SQLite (dev local)"]
+        PG["Supabase PostgreSQL (prod)"]
     end
 
     Browser -->|HTTP| FE
@@ -153,6 +155,8 @@ flowchart TD
     Facade --> Repo
     Facade -->|PDF text + prompt| Groq
     Facade -->|ingredient name| OFF
+    Facade -->|text batch| DeepL
+    Facade -->|file bytes| Storage
     Repo --> Mem
     Repo --> DB
     DB --> SQLite
@@ -177,58 +181,95 @@ flowchart TD
 
 | Componente | Archivo | Responsabilidad |
 |---|---|---|
-| Application Factory | `app/__init__.py` | Crea e inicializa la app Flask |
-| Config | `backend/config.py` | Configuración por entornos |
-| Auth Blueprint | `api/v1/auth.py` | Endpoints de registro y login |
-| Recipes Blueprint | `api/v1/recipes.py` | CRUD de recetas |
-| Ingredients Blueprint | `api/v1/ingredients.py` | Consulta de ingredientes y precios |
-| Scan Blueprint | `api/v1/scan.py` | Subida y procesamiento de PDFs |
-| Facade | `services/facade.py` | Punto de entrada único para la lógica de negocio |
-| Repository (ABC) | `persistence/repository.py` | Interfaz abstracta de acceso a datos |
-| InMemoryStorage | `persistence/memory_storage.py` | Implementación en RAM (fase 1) |
-| DbStorage | `persistence/db_storage.py` | Implementación SQLAlchemy (fase 2) |
-| JWT Helper | `utils/jwt_helper.py` | Generación y verificación de tokens |
-| Security | `utils/security.py` | Hash y verificación de contraseñas |
+| Application Factory | `app/__init__.py` | Crea e inicializa la app Flask con flask_restx, JWTManager y SQLAlchemy |
+| Config | `backend/config.py` | Configuración por entornos (dev/test/prod) |
+| Auth Namespace | `api/v1/auth.py` | Register, Login, Refresh, GET/PUT/DELETE /me, POST /me/avatar |
+| Recipes Namespace | `api/v1/recipes.py` | CRUD de recetas + imágenes + cook log |
+| Ingredients Namespace | `api/v1/ingredients.py` | CRUD ingredientes con secciones y preferred store/brand |
+| Scan Namespace | `api/v1/scan.py` | Subida PDF → Groq → receta con detección de duplicados |
+| Costs Namespace | `api/v1/costs.py` | GET /cost, CRUD /prices, OFF price, manual price override |
+| Stores Namespace | `api/v1/stores.py` | CRUD tiendas del usuario |
+| Brands Namespace | `api/v1/brands.py` | CRUD marcas del usuario |
+| Facade | `services/facade.py` | Punto de entrada único para toda la lógica de negocio |
+| Storage | `app/storage.py` | Wrapper Supabase Storage para fotos persistentes |
+| Repository (ABC) + InMemoryStorage | `persistence/repository.py` | Interfaz abstracta + implementación en RAM (tests) |
+| DbStorage | `persistence/db_storage.py` | Implementación SQLAlchemy para producción |
+| Security | `utils/security.py` | Hash y verificación de contraseñas (bcrypt) |
 
-### Domain Models (Dataclasses)
+### Domain Models (SQLAlchemy db.Model)
 
 ```python
 User
-├── id: int
-├── username: str
-├── email: str
+├── id: str               # UUID generado automáticamente
+├── first_name: str
+├── last_name: str
+├── email: str            # identificador único de login
 ├── password_hash: str
-└── created_at: datetime
+└── avatar_url: str
 
 Recipe
-├── id: int
-├── user_id: int          # FK → User
+├── id: str               # UUID
+├── user_id: str          # FK → User
 ├── title: str
+├── title_en / title_es / title_fr: str  # traducciones IA
 ├── description: str
 ├── servings: int
 ├── prep_time_min: int
-└── created_at: datetime
+├── category: str
+└── image_url: str
 
 Ingredient
-├── id: int
-├── recipe_id: int        # FK → Recipe
+├── id: str               # UUID
+├── recipe_id: str        # FK → Recipe
 ├── name: str
-├── quantity: float
+├── name_en / name_es / name_fr: str  # traducciones IA
+├── quantity: str         # str: Groq puede retornar "al gusto"
 ├── unit: str
-└── off_product_id: str   # ID en Open Food Facts (puede ser None)
+├── off_product_id: str
+├── estimated_cost: float
+├── cost_is_manual: bool
+├── manual_price: float   # precio manual del usuario (sobrescribe OFF)
+├── price_source: str     # 'custom' | 'off' | 'fallback' | 'manual'
+├── section: str          # agrupación (carnes, lácteos, etc.)
+├── preferred_store_id: str  # FK → Store
+└── preferred_brand_id: str  # FK → Brand
 
 Step
-├── id: int
-├── recipe_id: int        # FK → Recipe
-├── order_num: int
-└── description: str
+├── id: str               # UUID
+├── recipe_id: str        # FK → Recipe
+├── order_num: int        # 'order' es keyword reservado en SQL
+├── description: str
+├── description_en / description_es / description_fr: str
+└── duration_min: int
 
 PdfScan
-├── id: int
-├── recipe_id: int        # FK → Recipe
+├── id: str               # UUID
+├── recipe_id: str        # FK → Recipe
 ├── filename: str
-├── status: str           # 'pending' | 'processing' | 'done' | 'error'
-└── scanned_at: datetime
+├── status: str           # 'pending' | 'done' | 'error'
+└── scanned_at: str
+
+CustomPrice
+├── id: str               # UUID
+├── user_id: str          # FK → User
+├── ingredient_name: str  # normalizado sin acentos (_norm)
+├── store_id: str         # FK → Store (opcional)
+├── brand_id: str         # FK → Brand (opcional)
+├── bought_qty: float
+├── bought_unit: str
+├── bought_price: float
+└── notes: str
+
+Store / Brand
+├── id: str               # UUID
+├── user_id: str          # FK → User
+└── name: str
+
+CookLog
+├── id: str               # UUID
+├── recipe_id: str        # FK → Recipe
+├── user_id: str          # FK → User
+└── cooked_at: str
 ```
 
 ### Class Diagram
@@ -236,45 +277,48 @@ PdfScan
 ```mermaid
 classDiagram
     class User {
-        +int id
-        +String username
+        +String id
+        +String first_name
+        +String last_name
         +String email
         +String password_hash
-        +DateTime created_at
     }
 
     class Recipe {
-        +int id
-        +int user_id
+        +String id
+        +String user_id
         +String title
         +String description
         +int servings
         +int prep_time_min
-        +DateTime created_at
+        +String category
     }
 
     class Ingredient {
-        +int id
-        +int recipe_id
+        +String id
+        +String recipe_id
         +String name
-        +float quantity
+        +String quantity
         +String unit
         +String off_product_id
+        +float estimated_cost
+        +bool cost_is_manual
     }
 
     class Step {
-        +int id
-        +int recipe_id
+        +String id
+        +String recipe_id
         +int order_num
         +String description
+        +int duration_min
     }
 
     class PdfScan {
-        +int id
-        +int recipe_id
+        +String id
+        +String recipe_id
         +String filename
         +String status
-        +DateTime scanned_at
+        +String scanned_at
     }
 
     class BaseRepository {
@@ -304,17 +348,33 @@ classDiagram
         +delete(id)
     }
 
-    class Facade {
-        -BaseRepository _repository
-        +register_user(username, email, password)
-        +login(email, password)
-        +get_recipes(user_id)
-        +get_recipe(id, user_id)
-        +create_recipe(data, user_id)
-        +update_recipe(id, data, user_id)
-        +delete_recipe(id, user_id)
-        +scan_pdf(file, user_id)
-        +get_ingredient_prices(recipe_id)
+    class RecipeScannerFacade {
+        -DbStorage _users
+        -DbStorage _recipes
+        -DbStorage _ingredients
+        -DbStorage _steps
+        -DbStorage _custom_prices
+        -DbStorage _stores
+        -DbStorage _brands
+        +register_user(first_name, last_name, email, password)
+        +get_user_by_email(email)
+        +get_user_by_id(user_id)
+        +update_user(user_id, kwargs)
+        +create_recipe(user_id, title, ...)
+        +get_recipe(recipe_id)
+        +get_recipes_by_user(user_id)
+        +update_recipe(recipe_id, kwargs)
+        +delete_recipe(recipe_id)
+        +add_ingredient(recipe_id, name, quantity, unit)
+        +get_ingredients_by_recipe(recipe_id)
+        +scan_pdf(user_id, file_bytes, filename, force)
+        +get_recipe_cost(recipe_id, user_id)
+        +create_custom_price(user_id, ingredient_name, ...)
+        +get_custom_prices(user_id)
+        +update_custom_price(price_id, ...)
+        +create_store(user_id, name)
+        +create_brand(user_id, name)
+        +log_cook(recipe_id, user_id)
     }
 
     User "1" --> "0..*" Recipe : owns
@@ -324,7 +384,8 @@ classDiagram
 
     InMemoryStorage --|> BaseRepository : implements
     DbStorage --|> BaseRepository : implements
-    Facade --> BaseRepository : uses
+    RecipeScannerFacade --> DbStorage : uses (production)
+    RecipeScannerFacade --> InMemoryStorage : uses (tests only)
 ```
 
 ---
@@ -415,12 +476,11 @@ sequenceDiagram
 
 - **URL base:** `https://api.groq.com/openai/v1/chat/completions`
 - **Auth:** `Authorization: Bearer <GROQ_API_KEY>`
-- **Por qué:** inferencia ultrarrápida con hardware LPU especializado. LLaMA 3.3-70b
-  es open-source de Meta — sin dependencia de proveedor propietario. Costo mínimo
-  frente a GPT-4 para el mismo caso de uso.
+- **Por qué:** inferencia ultrarrápida con hardware LPU especializado. Groq ofrece
+  acceso gratuito (free tier). El modelo actual es `llama-3.3-70b-versatile` (Meta, open-source).
 - **Uso en el proyecto:** se le envía el texto extraído del PDF y se le pide que
   devuelva un JSON estructurado con título, ingredientes (nombre, cantidad, unidad)
-  y pasos ordenados.
+  y pasos ordenados. Las traducciones EN/ES/FR se hacen por separado (DeepL / MyMemory).
 
 **Ejemplo de request:**
 ```json
@@ -432,7 +492,7 @@ sequenceDiagram
       "content": "Extract the recipe from this text and return JSON with: title, ingredients (name, quantity, unit), steps (order, description).\n\nText: ..."
     }
   ],
-  "response_format": { "type": "json_object" }
+  "temperature": 0.1
 }
 ```
 
@@ -499,13 +559,19 @@ Formato: JSON
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
 | POST | `/auth/register` | Registrar nuevo usuario | No |
-| POST | `/auth/login` | Login, retorna JWT | No |
+| POST | `/auth/login` | Login, retorna JWT + refresh token | No |
+| POST | `/auth/refresh` | Renovar access token con refresh token | Yes (refresh) |
+| GET | `/auth/me` | Ver perfil del usuario autenticado | Yes |
+| PUT | `/auth/me` | Actualizar nombre, email o contraseña | Yes |
+| DELETE | `/auth/me` | Eliminar cuenta y todos sus datos | Yes |
+| POST | `/auth/me/avatar` | Subir foto de perfil (JPG/PNG/WebP) | Yes |
 
 **POST /auth/register**
 ```
 Input:
 {
-  "username": "julian",
+  "first_name": "Julian",
+  "last_name": "Gonzalez",
   "email": "julian@example.com",
   "password": "securepassword123"
 }
@@ -513,7 +579,7 @@ Input:
 Output 201:
 {
   "message": "User created successfully",
-  "user_id": 1
+  "user_id": "3f8a1c2d-..."
 }
 
 Output 400:
@@ -527,8 +593,15 @@ Input:
 
 Output 200:
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": { "id": 1, "username": "julian", "email": "julian@example.com" }
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "3f8a1c2d-...",
+    "first_name": "Julian",
+    "last_name": "Gonzalez",
+    "email": "julian@example.com",
+    "avatar_url": null
+  }
 }
 
 Output 401:
@@ -547,40 +620,34 @@ Output 401:
 | PUT | `/recipes/<id>` | Editar una receta | Yes |
 | DELETE | `/recipes/<id>` | Eliminar una receta | Yes |
 
-**GET /recipes**
+**GET /recipes/**
 ```
 Output 200:
 [
   {
-    "id": 1,
+    "id": "3f8a1c2d-...",
     "title": "Tarta de manzana",
     "description": "Receta clásica francesa",
     "servings": 4,
     "prep_time_min": 45,
-    "created_at": "2025-05-10T14:30:00"
+    "category": "Postres",
+    "user_id": "a1b2c3d4-..."
   }
 ]
 ```
 
-**GET /recipes/<id>**
+**GET /recipes/<recipe_id>**
 ```
 Output 200:
 {
-  "id": 1,
+  "id": "3f8a1c2d-...",
   "title": "Tarta de manzana",
   "description": "Receta clásica francesa",
   "servings": 4,
   "prep_time_min": 45,
-  "ingredients": [
-    { "id": 1, "name": "harina", "quantity": 300.0, "unit": "g", "price": 0.45 }
-  ],
-  "steps": [
-    { "id": 1, "order_num": 1, "description": "Mezclar harina y mantequilla" }
-  ]
+  "category": "Postres",
+  "user_id": "a1b2c3d4-..."
 }
-
-Output 403:
-{ "error": "Access denied" }
 
 Output 404:
 { "error": "Recipe not found" }
@@ -594,22 +661,31 @@ Output 404:
 |---|---|---|---|
 | POST | `/scan` | Subir PDF y extraer receta | Yes |
 
-**POST /scan**
+**POST /scan** (también acepta `?force=true` para omitir detección de duplicados)
 ```
 Input: multipart/form-data
   file: <PDF file>
 
 Output 201:
 {
-  "message": "Recipe extracted successfully",
-  "recipe_id": 5
+  "recipe": {
+    "id": "3f8a1c2d-...",
+    "title": "Tarta de manzana",
+    "category": "Desserts",
+    ...
+  },
+  "ingredients": [...],
+  "steps": [...]
 }
 
 Output 400:
-{ "error": "Invalid file type. Only PDF allowed." }
+{ "error": "No file provided" }
+
+Output 409 (duplicado detectado):
+{ "error_code": "duplicate", "existing_id": "...", "title": "Tarta de manzana" }
 
 Output 422:
-{ "error": "Could not extract recipe from PDF" }
+{ "error_code": "no_text" | "groq_failed" }
 ```
 
 ---
@@ -618,22 +694,33 @@ Output 422:
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| GET | `/recipes/<id>/ingredients` | Listar ingredientes con precios OFF | Yes |
+| GET | `/recipes/<id>/ingredients` | Listar ingredientes de la receta | Yes |
+| POST | `/recipes/<id>/ingredients` | Añadir ingrediente a la receta | Yes |
+| PUT | `/recipes/<id>/ingredients/<ing_id>` | Editar ingrediente | Yes |
+| DELETE | `/recipes/<id>/ingredients/<ing_id>` | Eliminar ingrediente | Yes |
 
-**GET /recipes/<id>/ingredients**
-```
-Output 200:
-[
-  {
-    "id": 1,
-    "name": "harina",
-    "quantity": 300.0,
-    "unit": "g",
-    "off_product_id": "3017620422003",
-    "estimated_price": 0.45
-  }
-]
-```
+#### Costs & Custom Prices
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| GET | `/recipes/<id>/cost` | Calcular costo total de la receta | Yes |
+| GET | `/prices` | Listar precios personalizados del usuario | Yes |
+| POST | `/prices` | Crear precio personalizado | Yes |
+| PUT | `/prices/<price_id>` | Editar precio personalizado | Yes |
+| DELETE | `/prices/<price_id>` | Eliminar precio personalizado | Yes |
+| PUT | `/recipes/<id>/ingredients/<ing_id>/price` | Sobrescribir precio manualmente | Yes |
+| DELETE | `/recipes/<id>/ingredients/<ing_id>/price` | Eliminar override de precio manual | Yes |
+
+#### Stores & Brands
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| GET | `/stores` | Listar tiendas del usuario | Yes |
+| POST | `/stores` | Crear tienda | Yes |
+| DELETE | `/stores/<store_id>` | Eliminar tienda | Yes |
+| GET | `/brands` | Listar marcas del usuario | Yes |
+| POST | `/brands` | Crear marca | Yes |
+| DELETE | `/brands/<brand_id>` | Eliminar marca | Yes |
 
 ---
 
@@ -647,25 +734,21 @@ Output 200:
 ```
 main
   └── develop
-        ├── feature/auth
-        ├── feature/models
-        ├── feature/repository
-        ├── feature/facade
-        ├── feature/scan-pdf
-        └── feature/frontend
+        └── feature/sqlalchemy   ← solo para el swap a SQLAlchemy (Session 8)
 ```
 
 | Branch | Propósito |
 |---|---|
-| `main` | Código listo para producción. Solo recibe merges de `develop` tras revisión. |
-| `develop` | Rama de integración. Código estable pero en desarrollo activo. |
-| `feature/*` | Una rama por funcionalidad. Se crea desde `develop` y se mergea a `develop`. |
+| `main` | Código listo para producción. Solo recibe merges de `develop` al final de cada sprint. |
+| `develop` | Rama principal de desarrollo. Todo el trabajo del MVP va aquí directamente. |
+| `feature/sqlalchemy` | Única feature branch — aísla el swap de InMemoryStorage → SQLAlchemy (Session 8). Se crea desde `develop` y se mergea a `develop` una vez validado. |
 
 **Reglas:**
 - Nunca hacer commits directamente en `main`.
-- Cada feature branch cubre una fase del DEVLOG (Fase 2, Fase 3, etc.).
+- El trabajo diario va directamente a `develop` (proyecto solo, sin equipo que revisar en paralelo).
+- `feature/sqlalchemy` se crea únicamente en Session 8 para aislar el cambio de base de datos.
 - Commits con mensajes descriptivos: `feat: add User dataclass`, `fix: jwt expiration bug`.
-- Pull Request requerido antes de mergear a `develop`.
+- Merge a `main` solo al completar cada sprint con todos los tests pasando.
 
 **Convención de commits (Conventional Commits):**
 ```
@@ -686,7 +769,13 @@ __pycache__/
 instance/
 *.pyc
 .DS_Store
+backend/app/static/uploads/avatars/*
+backend/app/static/uploads/recipes/*
+!backend/app/static/uploads/avatars/.gitkeep
+!backend/app/static/uploads/recipes/.gitkeep
 ```
+
+Los directorios de uploads existen en el repo gracias a archivos `.gitkeep` pero los archivos subidos por los usuarios (JPEGs de avatars e imágenes de recetas) están excluidos. Esto previene que imágenes privadas de usuarios aparezcan en GitHub.
 
 ---
 
@@ -713,12 +802,11 @@ instance/
 **Pipeline de QA:**
 
 ```
-1. Desarrollador escribe código en feature branch
+1. Desarrollador escribe código en develop (o feature/sqlalchemy para Session 8)
 2. Corre tests localmente: pytest backend/
-3. Hace pull request a develop
-4. Revisión manual del código
-5. Merge a develop si tests pasan
-6. Merge a main solo cuando el feature está completo y validado
+3. Verifica con Postman los endpoints afectados
+4. Hace commit con mensaje Conventional Commits
+5. Merge a main solo cuando el sprint está completo y todos los tests pasan
 ```
 
 **Tests manuales para el flujo crítico:**
@@ -740,6 +828,6 @@ instance/
 | In-memory first | SQLAlchemy desde el inicio | Validar lógica sin complejidad de BD, desarrollo más rápido |
 | JWT | Sessions, OAuth | Stateless, escalable, estándar REST |
 | bcrypt | MD5, SHA-256 | Lento por diseño, incluye salt, resistente a fuerza bruta |
-| Groq + LLaMA 3.3-70b | OpenAI GPT-4 | Más rápido (LPU), open-source, menor costo |
+| Groq + Qwen 3.6-27b | OpenAI GPT-4 | Más rápido (LPU), open-source, tier gratuito, sin costo |
 | Open Food Facts | APIs de supermercados | Abierta, gratuita, sin acuerdo comercial, 3M+ productos |
-| Jinja2 | React, Vue | Un solo servidor, tiempo de desarrollo menor, sin API desacoplada |
+| Frontend HTML/JS estático | React, Vue, Jinja2 | Desacoplado del backend, mismo consumidor que app móvil futura |

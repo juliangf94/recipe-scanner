@@ -28,6 +28,9 @@ git checkout -b feature/nombre-del-feature
 
 **3. Verificar que funciona**
 ```bash
+# Activar el entorno virtual (siempre antes de correr cualquier cosa)
+source backend/venv/bin/activate
+
 # Correr el archivo directamente
 python backend/run.py
 
@@ -42,10 +45,10 @@ pytest backend/
 
 **5. Mergear a develop**
 ```bash
-git add <archivos específicos>
-git commit -m "feat: descripción del cambio"
+git add <specific files>
+git commit -m "feat: description of the change"
 git checkout develop
-git merge feature/nombre-del-feature
+git merge feature/feature-name
 ```
 
 ---
@@ -124,25 +127,21 @@ gitGraph
 
 | Sesión | Rama | Archivos | Objetivo |
 |---|---|---|---|
-| 1 | `feature/setup` | `app/__init__.py`, `run.py`, `.env`, `.gitignore`, `requirements.txt` | Flask corriendo en localhost:5000 |
-| 2 | `feature/models` | `models/user.py`, `recipe.py`, `ingredient.py`, `step.py`, `pdf_scan.py` | 5 dataclasses definidas |
-| 3 | `feature/repository` | `persistence/repository.py`, `memory_storage.py` | CRUD en memoria funcionando |
-| 4 | `feature/auth` | `utils/security.py`, `utils/jwt_helper.py`, `api/v1/auth.py` | Register + Login con JWT |
-| 5 | `feature/facade` | `services/facade.py`, `api/v1/recipes.py`, `api/v1/ingredients.py` | CRUD recetas validado |
-| 6 | `feature/scan` | `api/v1/scan.py` + Groq en facade | PDF → receta extraída |
-| 7 | `feature/off` | Open Food Facts en facade | Precios de ingredientes |
-| 8 | `feature/db` | `persistence/db_storage.py`, `config.py` actualizado | Swap a SQLAlchemy — backend completo |
-| 9 | `feature/frontend` | A decidir según tiempo disponible | Ver nota abajo |
+| 1 | `develop` | `app/__init__.py`, `run.py`, `.env`, `.gitignore`, `requirements.txt` | Flask corriendo en localhost:5000 |
+| 2 | `develop` | `models/user.py`, `recipe.py`, `ingredient.py`, `step.py`, `pdf_scan.py` | 5 dataclasses definidas |
+| 3 | `develop` | `persistence/repository.py` (BaseRepository + InMemoryStorage) | CRUD en memoria funcionando |
+| 4 | `develop` | `utils/security.py`, `api/v1/auth.py`, `app/__init__.py` (JWTManager + flask_restx) | Register + Login con JWT |
+| 5 | `develop` | `services/facade.py`, `api/v1/recipes.py`, `api/v1/ingredients.py` | CRUD recetas validado |
+| 6 | `develop` | `api/v1/scan.py` + Groq en facade | PDF → receta extraída |
+| 7 | `develop` | Open Food Facts en facade | Precios de ingredientes |
+| 8 | `feature/sqlalchemy` | `persistence/db_storage.py`, `config.py` actualizado | Swap a SQLAlchemy — backend completo |
+| 9 | `develop` | `frontend/` (HTML + JS estático) | Frontend desacoplado — HTML/CSS/JS puro consumiendo la API REST |
 
 > **Nota — Sesión 9 (Frontend):**
-> La decisión del frontend se toma al llegar a la Sesión 8.
-> Como el backend devuelve JSON puro en todos sus endpoints,
-> cualquier opción se puede conectar sin modificar una sola línea del backend.
->
-> | Tiempo disponible | Opción | Motivo |
-> |---|---|---|
-> | Poco tiempo | Jinja2 (server-side) | Un solo servidor, integrado en Flask, desarrollo rápido |
-> | Tiempo suficiente | React | UI moderna e impactante, ya conocido, mejor portfolio visual |
+> Decisión final: **HTML estático + JS puro** (Jinja2 descartado).
+> El frontend está completamente desacoplado del backend Flask — consume la API REST
+> igual que lo haría una app móvil React Native en el futuro.
+> Justificación completa en `CODE_NOTES_FRONT.md` (Decisión Arquitectural — Sesión 11).
 
 ---
 
@@ -150,7 +149,7 @@ gitGraph
 
 - **Código:** comentarios en inglés.
 - **Documentación:** DEVLOG en español.
-- **Archivos sensibles** (`.env`, `*.db`, `venv/`) nunca van a GitHub.
+- **Archivos sensibles** (`.env`, `*.db`, `venv/`, imágenes subidas por usuarios) nunca van a GitHub.
 - **Cada archivo nuevo** se documenta en DEVLOG con su explicación línea a línea.
 - **Cada decisión técnica** se justifica antes de implementarla.
 - **Un solo archivo por vez** — terminar y documentar antes de pasar al siguiente.

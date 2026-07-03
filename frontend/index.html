@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍽️%3C/text%3E%3C/svg%3E">
+  <title>RecipeScanner — Sign in</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+
+  <div class="lang-toggle lang-fixed-auth">
+    <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+    <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+  </div>
+
+  <main class="auth-card">
+    <a href="index.html" class="logo auth-logo">
+      <div class="logo-icon">🍴</div>
+      <span class="logo-text">Recipe<span>Scanner</span></span>
+    </a>
+
+    <h1 data-i18n="signin_title">Welcome back</h1>
+    <p class="subtitle" data-i18n="signin_sub">Sign in to access your saved recipes</p>
+
+    <div id="login-error" class="alert alert-error" style="display:none"></div>
+
+    <form onsubmit="handleLogin(event)" novalidate>
+      <div class="form-group">
+        <label for="login-email" data-i18n="label_email">Email</label>
+        <div class="input-wrap">
+          <span class="input-icon">✉</span>
+          <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="login-password" data-i18n="label_password">Password</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+          <button type="button" class="input-toggle" onclick="togglePwd('login-password', this)">👁</button>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-orange btn-full btn-lg" id="login-btn" data-i18n="btn_signin">
+        Sign in
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <span data-i18n="no_account">Don't have an account?</span>
+      <a href="register.html" data-i18n="link_signup">Sign up for free</a>
+    </div>
+  </main>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

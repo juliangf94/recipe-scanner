@@ -1,0 +1,73 @@
+{
+  "id": "rsc-env-dev",
+  "name": "RecipeScanner Dev",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "recipe_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "ingredient_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "scan_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "store_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "brand_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "store_id_to_delete",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "brand_id_to_delete",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "price_with_store_brand_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

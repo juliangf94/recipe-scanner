@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍽️%3C/text%3E%3C/svg%3E">
+  <title>RecipeScanner — My Recipes</title>
+  <link rel="preconnect" href="https://recipe-scanner-kfnm.onrender.com">
+  <link rel="preconnect" href="https://mqxnxdfrmdioqyzpmvaz.supabase.co" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="home.html" class="logo">
+        <div class="logo-icon">🍴</div>
+        <span class="logo-text">Recipe<span>Scanner</span></span>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="home.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span data-i18n="nav_home">Home</span>
+      </a>
+      <a href="dashboard.html" class="nav-item active">
+        <span class="nav-icon">📖</span>
+        <span data-i18n="nav_recipes">My Recipes</span>
+        <span class="nav-badge" id="recipe-badge">0</span>
+      </a>
+      <a href="scan.html" class="nav-item">
+        <span class="nav-icon">⚡</span>
+        <span data-i18n="nav_scan">Scan Recipe</span>
+      </a>
+      <a href="prices.html" class="nav-item">
+        <span class="nav-icon">🏷</span>
+        <span data-i18n="nav_prices">My Prices</span>
+      </a>
+      <a href="account.html" class="nav-item mobile-only-nav">
+        <span class="nav-icon">👤</span>
+        <span data-i18n="nav_profile">Profile</span>
+      </a>
+    </nav>
+    <div class="sidebar-lang">
+      <div class="lang-toggle">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+        <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar" id="user-avatar">
+        <span id="avatar-initials">?</span>
+  
+      </div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-firstname" id="user-firstname">…</span>
+        <span class="sidebar-user-lastname" id="user-lastname"></span>
+      </div>
+      <div class="user-menu-wrapper">
+        <button class="sidebar-user-menu" onclick="toggleUserMenu(event)" title="Menu">⋯</button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="account.html" class="user-dropdown-item">⚙️ <span data-i18n="nav_account">Account Settings</span></a>
+          <button class="user-dropdown-item user-dropdown-logout" onclick="logout()">⏻ <span data-i18n="nav_signout">Log out</span></button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="app-layout">
+    <div class="page-header">
+      <div>
+        <h1 id="greeting">Hello! 👋</h1>
+        <p class="sub" id="recipe-count-label">…</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <button class="btn btn-outline btn-sm" data-i18n="btn_manual" onclick="openCreateModal()">+ Manual</button>
+        <a href="scan.html" class="btn btn-orange" data-i18n="btn_scan_recipe">⚡ Scan a recipe</a>
+      </div>
+    </div>
+
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" data-i18n-placeholder="search_ph" placeholder="Search recipes…" oninput="filterRecipes()">
+    </div>
+
+    <div class="filter-sort-row">
+      <span class="filter-label" data-i18n="label_filters">Filtros</span>
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-pill active" data-cat="all" onclick="setCategory('all', this)" data-i18n="filter_all">All</button>
+      </div>
+      <label for="sort-select" class="sr-only" data-i18n="label_sort">Ordenar</label>
+      <select id="sort-select" class="sort-select" onchange="setSort(this.value)">
+        <option value="az"    data-i18n="sort_az">A → Z</option>
+        <option value="za"    data-i18n="sort_za">Z → A</option>
+        <option value="prep_asc"  data-i18n="sort_prep_asc">⏱ Min ↑</option>
+        <option value="prep_desc" data-i18n="sort_prep_desc">⏱ Min ↓</option>
+        <option value="srv_asc"   data-i18n="sort_srv_asc">🍽 Porc. ↑</option>
+        <option value="srv_desc"  data-i18n="sort_srv_desc">🍽 Porc. ↓</option>
+      </select>
+    </div>
+
+    <div id="recipes-container">
+      <div class="loading-center"><div class="spinner"></div></div>
+    </div>
+  
+    <footer class="app-footer">
+      <p data-i18n="footer_disclaimer">RecipeScanner no está afiliado ni patrocinado por ninguna de las marcas o supermercados mencionados en esta aplicación.</p>
+    </footer>
+</main>
+
+  <!-- Modal: create recipe manually -->
+  <div class="modal-overlay" id="create-modal">
+    <div class="modal">
+      <h2 data-i18n="modal_new_recipe">New recipe</h2>
+      <div id="create-error" class="alert alert-error" style="display:none"></div>
+      <div class="form-group">
+        <label data-i18n="label_title_req">Title *</label>
+        <input type="text" id="c-title" data-i18n-placeholder="ph_recipe_title" placeholder="Apple pie">
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_desc">Description</label>
+        <textarea id="c-desc" data-i18n-placeholder="ph_desc" placeholder="Short description…" rows="2"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="label_servings">Servings</label>
+          <input type="number" id="c-servings" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label data-i18n="label_prep">Prep time (min)</label>
+          <input type="number" id="c-prep" min="0" value="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_category">Category</label>
+        <select id="c-category" data-cat-select class="form-select"></select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-i18n="btn_cancel" onclick="closeCreateModal()">Cancel</button>
+        <button class="btn btn-orange" data-i18n="btn_create_recipe" onclick="createRecipe()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: confirm delete recipe -->
+  <div class="modal-overlay" id="dash-confirm-modal">
+    <div class="modal" style="max-width:400px;text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:0.75rem;">🗑️</div>
+      <h2 id="dash-confirm-title" style="margin-bottom:0.5rem;"></h2>
+      <p id="dash-confirm-desc" style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;"></p>
+      <div class="modal-footer" style="justify-content:center;gap:0.75rem;">
+        <button class="btn btn-outline" onclick="closeDashConfirm()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn-danger" id="dash-confirm-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/i18n.js?v=22" defer></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/dashboard.js?v=14" defer></script>
+</body>
+</html>

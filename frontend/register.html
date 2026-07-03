@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍽️%3C/text%3E%3C/svg%3E">
+  <title>RecipeScanner — Create account</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+
+  <div class="lang-toggle lang-fixed-auth">
+    <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+    <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+  </div>
+
+  <main class="auth-card">
+    <a href="index.html" class="logo auth-logo">
+      <div class="logo-icon">🍴</div>
+      <span class="logo-text">Recipe<span>Scanner</span></span>
+    </a>
+
+    <h1 data-i18n="signup_title">Create your account</h1>
+    <p class="subtitle" data-i18n="signup_sub">Start scanning recipes and tracking costs</p>
+
+<div id="register-error" class="alert alert-error" style="display:none"></div>
+
+    <form onsubmit="handleRegister(event)" novalidate>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="reg-first" data-i18n="label_firstname">First name</label>
+          <div class="input-wrap">
+            <span class="input-icon">👤</span>
+            <input type="text" id="reg-first" placeholder="" autocomplete="given-name">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="reg-last" data-i18n="label_lastname">Last name</label>
+          <div class="input-wrap">
+            <span class="input-icon">👤</span>
+            <input type="text" id="reg-last" placeholder="" autocomplete="family-name">
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="reg-email" data-i18n="label_email">Email</label>
+        <div class="input-wrap">
+          <span class="input-icon">✉</span>
+          <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="reg-password" data-i18n="label_password">Password</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password">
+          <button type="button" class="input-toggle" onclick="togglePwd('reg-password', this)">👁</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="reg-confirm" data-i18n="label_confirm">Confirm password</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="reg-confirm" placeholder="••••••••" autocomplete="new-password">
+          <button type="button" class="input-toggle" onclick="togglePwd('reg-confirm', this)">👁</button>
+        </div>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="reg-terms">
+        <label for="reg-terms" data-i18n-html="agree_terms_html">
+          I agree to the <a href="#" onclick="return false;">Terms of Service</a> and <a href="#" onclick="return false;">Privacy Policy</a>
+        </label>
+      </div>
+      <button type="submit" class="btn btn-orange btn-full btn-lg" id="register-btn" data-i18n="btn_create_account">
+        Create account
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <span data-i18n="have_account">Already have an account?</span>
+      <a href="index.html" data-i18n="link_signin">Sign in</a>
+    </div>
+  </main>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - uploads_dev:/app/app/static/uploads
+    env_file:
+      - ./backend/.env
+    environment:
+      - FLASK_ENV=development
+    restart: unless-stopped
+
+volumes:
+  uploads_dev:

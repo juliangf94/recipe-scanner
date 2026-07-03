@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍽️%3C/text%3E%3C/svg%3E">
+  <title>RecipeScanner — My Prices</title>
+  <link rel="preconnect" href="https://recipe-scanner-kfnm.onrender.com">
+  <link rel="preconnect" href="https://mqxnxdfrmdioqyzpmvaz.supabase.co" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="home.html" class="logo">
+        <div class="logo-icon">🍴</div>
+        <span class="logo-text">Recipe<span>Scanner</span></span>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="home.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span data-i18n="nav_home">Home</span>
+      </a>
+      <a href="dashboard.html" class="nav-item">
+        <span class="nav-icon">📖</span>
+        <span data-i18n="nav_recipes">My Recipes</span>
+      </a>
+      <a href="scan.html" class="nav-item">
+        <span class="nav-icon">⚡</span>
+        <span data-i18n="nav_scan">Scan Recipe</span>
+      </a>
+      <a href="prices.html" class="nav-item active">
+        <span class="nav-icon">🏷</span>
+        <span data-i18n="nav_prices">My Prices</span>
+      </a>
+      <a href="account.html" class="nav-item mobile-only-nav">
+        <span class="nav-icon">👤</span>
+        <span data-i18n="nav_profile">Profile</span>
+      </a>
+    </nav>
+    <div class="sidebar-lang">
+      <div class="lang-toggle">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="es" onclick="setLang('es')">ES</button>
+        <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar" id="user-avatar">
+        <span id="avatar-initials">?</span>
+  
+      </div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-firstname" id="user-firstname">…</span>
+        <span class="sidebar-user-lastname" id="user-lastname"></span>
+      </div>
+      <div class="user-menu-wrapper">
+        <button class="sidebar-user-menu" onclick="toggleUserMenu(event)" title="Menu">⋯</button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="account.html" class="user-dropdown-item">⚙️ <span data-i18n="nav_account">Account Settings</span></a>
+          <button class="user-dropdown-item user-dropdown-logout" onclick="logout()">⏻ <span data-i18n="nav_signout">Log out</span></button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="app-layout">
+    <div class="page-header">
+      <div>
+        <h1 data-i18n="prices_title">My Prices</h1>
+        <p class="sub" data-i18n="prices_sub">Set custom ingredient prices for accurate cost estimates</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="openStoresModal()" data-i18n="manage_stores">Manage stores</button>
+        <button class="btn btn-outline" onclick="openBrandsModal()" data-i18n="manage_brands">Manage brands</button>
+      </div>
+    </div>
+
+    <div id="prices-error" class="alert alert-error" style="display:none; margin-bottom:1rem;"></div>
+    <div id="prices-success" class="alert alert-success" style="display:none; margin-bottom:1rem;"></div>
+
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+      <label for="sort-select" style="font-size:0.85rem;color:var(--text-muted);white-space:nowrap;" data-i18n="sort_by">Sort by</label>
+      <select id="sort-select" onchange="applySortAndRender()" style="font-size:0.85rem;padding:0.3rem 0.6rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);">
+        <option value="name-asc"  data-i18n="sort_name_az">Name A→Z</option>
+        <option value="name-desc" data-i18n="sort_name_za">Name Z→A</option>
+        <option value="price-asc" data-i18n="sort_price_asc">Price low→high</option>
+        <option value="price-desc"data-i18n="sort_price_desc">Price high→low</option>
+        <option value="store"     data-i18n="sort_store">By store</option>
+        <option value="brand"     data-i18n="sort_brand">By brand</option>
+      </select>
+    </div>
+
+    <div class="section-card ing-table-wrap" id="prices-table-wrap">
+      <div class="loading-center"><div class="spinner"></div></div>
+    </div>
+  
+    <footer class="app-footer">
+      <p data-i18n="footer_disclaimer">RecipeScanner no está afiliado ni patrocinado por ninguna de las marcas o supermercados mencionados en esta aplicación.</p>
+    </footer>
+</main>
+
+  <!-- ─── Modal: manage stores ───────────────────────────────────────────── -->
+  <div class="modal-overlay" id="stores-modal">
+    <div class="modal">
+      <h2 data-i18n="stores_title">My Stores</h2>
+      <div id="stores-list" style="margin-bottom:1rem;min-height:2rem;"></div>
+      <div class="form-group" style="display:flex;gap:0.5rem;align-items:center;">
+        <input type="text" id="new-store-name" data-i18n-placeholder="label_new_store" placeholder="New store name" style="flex:1;">
+        <button class="btn btn-orange" onclick="createStore()" data-i18n="btn_add_store">+ Add store</button>
+      </div>
+      <div id="stores-error" class="alert alert-error" style="display:none;margin-top:0.5rem;"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeStoresModal()" data-i18n="btn_cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Modal: manage brands ────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="brands-modal">
+    <div class="modal">
+      <h2 data-i18n="brands_title">My Brands</h2>
+      <div id="brands-list" style="margin-bottom:1rem;min-height:2rem;"></div>
+      <div class="form-group" style="display:flex;flex-direction:column;gap:0.4rem;">
+        <input type="text" id="new-brand-name" data-i18n-placeholder="label_new_brand" placeholder="New brand name">
+        <input type="text" id="new-brand-ing" data-i18n-placeholder="ph_brand_ing" placeholder="For ingredient (optional)" style="font-size:0.85rem;">
+        <button class="btn btn-orange" onclick="createBrand()" data-i18n="btn_add_brand" style="align-self:flex-end;">+ Add brand</button>
+      </div>
+      <div id="brands-error" class="alert alert-error" style="display:none;margin-top:0.5rem;"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeBrandsModal()" data-i18n="btn_cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: confirm (shared) -->
+  <div class="modal-overlay" id="shared-confirm-modal">
+    <div class="modal" style="max-width:400px;text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:0.75rem;">🗑️</div>
+      <h2 id="shared-confirm-title" style="margin-bottom:0.5rem;"></h2>
+      <p id="shared-confirm-desc" style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;"></p>
+      <div class="modal-footer" style="justify-content:center;gap:0.75rem;">
+        <button class="btn btn-outline" onclick="closeSharedConfirm()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn-danger" id="shared-confirm-btn" data-i18n="btn_delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/i18n.js?v=22" defer></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/prices.js?v=7" defer></script>
+</body>
+</html>
