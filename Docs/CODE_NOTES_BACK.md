@@ -41,6 +41,15 @@ Flask solo incluye lo esencial:
 Todo lo demás (base de datos, autenticación, validación)
 se agrega según las necesidades del proyecto.
 
+**¿Por que no usar jina2?**
+1) **Conflicto con flask_restx** — los namespaces de la API y las rutas de vistas Jinja2 entraban en conflicto en el sistema de rutas de Flask.
+
+2) **Portabilidad para mobile** — una API REST pura puede ser consumida por cualquier cliente (browser, React Native, Flutter) sin cambiar el backend. Si usaras Jinja2 el backend quedaría acoplado al browser.
+
+Si en la presentación te preguntan sobre Jinja2, la respuesta es exactamente esa: 
+
+"Flask lo incluye, pero elegimos no usarlo porque queremos que el backend sea una API pura desacoplada del frontend, lo que lo hace compatible con una futura app móvil."
+
 **¿Por qué Flask y no Django o FastAPI?**
 
 | Framework | Por qué no lo elegimos |
@@ -48,6 +57,23 @@ se agrega según las necesidades del proyecto.
 | Django | Incluye ORM, admin, formularios, autenticación — todo preconfigurado. Para aprender es difícil saber qué hace qué. Curva de aprendizaje alta para un proyecto de 2 meses. |
 | FastAPI | Moderno y muy rápido, pero orientado a APIs puras. No integra Jinja2 de forma nativa, lo que complica el frontend server-side que queremos en la Sesión 9. |
 | Flask | Control total sobre cada decisión. Jinja2 integrado. Fácil de entender cada línea. Ideal para explicar al jury exactamente qué hace cada componente. |
+
+**ORM (Object-Relational Mapper)**
+Es una capa de código que te permite trabajar con la base de datos usando objetos Python en lugar de escribir SQL directamente.
+
+En vez de:
+
+```SQL
+SELECT * FROM users WHERE id = '123';
+```
+Escribís:
+```Python
+User.query.filter_by(id='123').first()
+```
+El ORM traduce ese código Python a SQL por vos. 
+En tu proyecto usás `SQLAlchemy` como ORM — definís la tabla users como una clase Python (class User(db.Model)), y SQLAlchemy se encarga de crear la tabla, hacer las queries y mapear los resultados de vuelta a objetos.
+
+---
 
 **¿Qué hace Flask en este proyecto?**
 1. Recibe las peticiones HTTP del browser.
@@ -57,13 +83,14 @@ se agrega según las necesidades del proyecto.
 
 ---
 
-Este archivo es el corazón de la aplicación. Al estar en `app/__init__.py`, Python
-lo ejecuta automáticamente cuando se importa el paquete `app`. Contiene la función
-`create_app()` que construye, configura y retorna la instancia de Flask.
+Este archivo es el corazón de la aplicación. Al estar en `app/__init__.py`, Python lo ejecuta automáticamente cuando se importa el paquete `app`.  
+
+Contiene la función `create_app()` que construye, configura y retorna la instancia de Flask.
 
 **¿Por qué aquí y no en otro archivo?**
 Cuando en `run.py` escribimos `from app import create_app`, Python busca esa función
-en `app/__init__.py`. Es el punto de entrada del paquete.
+en `app/__init__.py`. 
+Es el punto de entrada del paquete.
 
 **Lo que hace `create_app` paso a paso (estado actual — Sesión 5):**
 1. Crea la instancia de Flask
