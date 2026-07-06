@@ -2041,7 +2041,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
     padding-bottom: 4.5rem;
   }
 
-  .lang-fixed { top: 0.5rem; right: 0.75rem; }
+  .lang-fixed { display: flex; top: 0.5rem; right: 0.75rem; }
 
   .recipe-header-grid { padding: 1.25rem; }
   .recipe-header-grid h1 { font-size: 1.3rem; }
