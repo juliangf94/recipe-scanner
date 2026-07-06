@@ -132,6 +132,55 @@ class RecipeDetail(Resource):
         return '', 204
 
 
+@api.route('/<string:recipe_id>/full')
+class RecipeFull(Resource):
+
+    @jwt_required()
+    @api.response(200, 'Recipe with ingredients and steps')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Recipe not found')
+    def get(self, recipe_id):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        images = json.loads(recipe.images_json or '[]')
+        if recipe.image_url and recipe.image_url not in images:
+            images = [recipe.image_url] + images
+        ingredients = facade.get_ingredients_by_recipe(recipe_id)
+        steps = facade.get_steps_by_recipe(recipe_id)
+        return {
+            'recipe': {
+                'id': recipe.id,
+                'title': recipe.title,
+                'title_en': recipe.title_en or '', 'title_es': recipe.title_es or '', 'title_fr': recipe.title_fr or '',
+                'description': recipe.description,
+                'description_en': recipe.description_en or '', 'description_es': recipe.description_es or '', 'description_fr': recipe.description_fr or '',
+                'servings': recipe.servings, 'prep_time_min': recipe.prep_time_min,
+                'category': recipe.category, 'user_id': recipe.user_id,
+                'image_url': recipe.image_url, 'images': images,
+                'translation_status': recipe.translation_status or 'pending'
+            },
+            'ingredients': [
+                {'id': i.id, 'name': i.name,
+                 'name_en': i.name_en or '', 'name_es': i.name_es or '', 'name_fr': i.name_fr or '',
+                 'quantity': i.quantity, 'unit': i.unit,
+                 'order_num': i.order_num, 'section': i.section or '',
+                 'recipe_id': i.recipe_id}
+                for i in ingredients
+            ],
+            'steps': [
+                {'id': s.id, 'order_num': s.order_num,
+                 'description': s.description,
+                 'description_en': s.description_en or '', 'description_es': s.description_es or '', 'description_fr': s.description_fr or '',
+                 'recipe_id': s.recipe_id}
+                for s in steps
+            ]
+        }, 200
+
+
 @api.route('/<string:recipe_id>/translate')
 class RecipeTranslate(Resource):
 
