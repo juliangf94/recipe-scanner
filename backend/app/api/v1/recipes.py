@@ -197,7 +197,10 @@ class RecipeTranslate(Resource):
             return {'error': 'Forbidden'}, 403
         ingredients = facade.get_ingredients_by_recipe(recipe_id)
         steps = facade.get_steps_by_recipe(recipe_id)
-        facade._translate_recipe(recipe, ingredients, steps)
+        try:
+            facade._translate_recipe(recipe, ingredients, steps)
+        except Exception:
+            return {'error': 'Translation failed'}, 500
         return {'translation_status': recipe.translation_status or 'done'}, 200
 
 
