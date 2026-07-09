@@ -362,6 +362,7 @@ function renderIngRow(i, sections) {
 
   const storeSelect = allStores.length > 0
     ? `<select class="store-select-inline" data-ing-id="${i.id}" data-sel="store"
+           aria-label="Tienda para ${i.name}"
            onchange="changeIngredientStore('${i.id}', this.value)">
          ${buildStoreOptions(i.preferred_store_id || null)}
        </select>`
@@ -369,6 +370,7 @@ function renderIngRow(i, sections) {
 
   const brandSelectCell = allBrands.length > 0
     ? `<td class="col-brand"><select class="store-select-inline" data-ing-id="${i.id}" data-sel="brand"
+           aria-label="Marca para ${i.name}"
            onchange="changeIngredientBrand('${i.id}', this.value)">
          ${buildBrandOptions(i.preferred_brand_id || null, i.name)}
        </select></td>`
