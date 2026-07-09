@@ -1,4 +1,4 @@
-if (getToken()) window.location.href = 'dashboard.html';
+if (getToken()) window.location.href = 'home.html';
 
 function togglePwd(inputId, btn) {
   const input = document.getElementById(inputId);
@@ -42,7 +42,7 @@ async function handleLogin(event) {
 
   setTokens(res.data.access_token, res.data.refresh_token);
   setUser(res.data.user);
-  window.location.href = 'dashboard.html';
+  window.location.href = 'home.html';
 }
 
 // ── Register ──────────────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ async function handleRegister(event) {
   if (loginRes && loginRes.ok) {
     setTokens(loginRes.data.access_token, loginRes.data.refresh_token);
     setUser(loginRes.data.user);
-    window.location.href = 'dashboard.html';
+    window.location.href = 'home.html';
   } else {
     window.location.href = 'index.html';
   }
