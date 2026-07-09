@@ -274,10 +274,10 @@ nav {
 .stat-badge {
   border: 1px solid var(--accent);
   color: #fff;
-  font-size: 0.62rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.05em;
-  padding: 0.15rem 0.5rem;
+  padding: 0.25rem 0.75rem;
   border-radius: 4px;
 }
 .stat-sub {
@@ -296,20 +296,20 @@ nav {
 .source-item {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.7rem;
-  color: rgba(248,246,241,0.8);
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: rgba(248,246,241,0.9);
 }
 .source-num {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border: 1.5px solid var(--accent);
   border-radius: 50%;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.88rem;
   font-weight: 700;
   flex-shrink: 0;
 }
