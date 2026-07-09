@@ -338,8 +338,8 @@ section { padding: 5rem 2rem; }
 .section-sub {
   font-size: 1.05rem;
   color: var(--text-muted);
-  max-width: 520px;
   line-height: 1.65;
+  white-space: nowrap;
 }
 
 /* ── Features ────────────────────────────────────────────────────── */
