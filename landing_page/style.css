@@ -88,6 +88,18 @@ nav {
   letter-spacing: -0.01em;
 }
 .nav-logo span { color: var(--accent); }
+.nav-logo-tag {
+  font-style: normal;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(248,246,241,0.4);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 0.15rem 0.5rem;
+  border-radius: 100px;
+  margin-left: 0.25rem;
+}
 .nav-links {
   display: flex;
   align-items: center;
@@ -251,6 +263,41 @@ nav {
   letter-spacing: 0.04em;
   margin-top: 0.35rem;
 }
+
+/* ── Price sources tooltip ───────────────────────────────────────── */
+.price-stat { position: relative; cursor: default; }
+.price-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1E1B30;
+  border: 1px solid rgba(249,115,22,0.25);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  width: 220px;
+  z-index: 10;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.price-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(249,115,22,0.25);
+}
+.price-stat:hover .price-tooltip { display: block; }
+.price-tooltip-item {
+  font-size: 0.75rem;
+  color: rgba(248,246,241,0.8);
+  padding: 0.3rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  line-height: 1.4;
+}
+.price-tooltip-item:last-child { border-bottom: none; }
 
 /* ── Sections ────────────────────────────────────────────────────── */
 section { padding: 5rem 2rem; }
