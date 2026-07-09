@@ -6,10 +6,10 @@ function toggleTheme() {
   document.querySelector('.nav-theme').textContent = next === 'dark' ? '☀' : '🌙';
 }
 
-// Init theme from OS preference
-if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-  document.documentElement.setAttribute('data-theme', 'dark');
-  document.querySelector('.nav-theme').textContent = '☀';
-} else {
+// Dark mode by default; light only if user explicitly prefers it
+if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+  document.documentElement.setAttribute('data-theme', 'light');
   document.querySelector('.nav-theme').textContent = '🌙';
+} else {
+  document.querySelector('.nav-theme').textContent = '☀';
 }
