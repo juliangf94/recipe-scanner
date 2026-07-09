@@ -258,7 +258,7 @@ nav {
 }
 .hero-stat-num span { color: var(--accent); }
 .hero-stat-label {
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   color: var(--hero-muted);
   letter-spacing: 0.04em;
   margin-top: 0.35rem;
@@ -281,7 +281,7 @@ nav {
   border-radius: 4px;
 }
 .stat-sub {
-  font-size: 0.65rem;
+  font-size: 0.88rem;
   color: var(--hero-muted);
   margin-top: 0.45rem;
   letter-spacing: 0.02em;
