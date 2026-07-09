@@ -103,23 +103,21 @@ async function deleteRecipePhoto(imageUrl) {
 
 // ── Load page ─────────────────────────────────────────────────────────────────
 async function loadPage() {
-  const [recipeRes, ingRes, stepsRes, storesRes, brandsRes, pricesRes] = await Promise.all([
-    apiFetch(`/recipes/${recipeId}`),
-    apiFetch(`/recipes/${recipeId}/ingredients`),
-    apiFetch(`/recipes/${recipeId}/steps`),
+  const [fullRes, storesRes, brandsRes, pricesRes] = await Promise.all([
+    apiFetch(`/recipes/${recipeId}/full`),
     apiFetch('/stores'),
     apiFetch('/brands'),
     apiFetch('/prices')
   ]);
 
-  if (!recipeRes || !recipeRes.ok) {
+  if (!fullRes || !fullRes.ok) {
     window.location.href = 'dashboard.html';
     return;
   }
 
-  currentRecipe = recipeRes.data;
-  currentIngredients = ingRes && ingRes.ok ? ingRes.data : [];
-  currentSteps = stepsRes && stepsRes.ok ? stepsRes.data : [];
+  currentRecipe = fullRes.data.recipe;
+  currentIngredients = fullRes.data.ingredients || [];
+  currentSteps = fullRes.data.steps || [];
   allStores = storesRes && storesRes.ok ? storesRes.data : [];
   allBrands = brandsRes && brandsRes.ok ? brandsRes.data : [];
   allPrices = pricesRes && pricesRes.ok ? pricesRes.data : [];

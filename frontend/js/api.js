@@ -1,3 +1,5 @@
+// Detects whether the app is running locally or in production,
+// and sets the API base URL accordingly — no manual changes needed on deploy.
 const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const BASE_URL = IS_LOCAL
   ? 'http://localhost:5000/api/v1'
@@ -7,26 +9,36 @@ const SERVER_URL = BASE_URL.replace('/api/v1', '');
 // Wake up Render free-tier backend on page load (fire-and-forget, no error shown)
 if (!IS_LOCAL) fetch(`${BASE_URL}/health`).catch(() => {});
 
+// Returns the full URL for an image regardless of where it is stored.
+// Supabase images are already absolute URLs; local uploads are relative paths
+// that need the server's base URL prepended.
 function resolveImgUrl(url) {
   if (!url) return '';
   if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('//')) return url;
   return `${SERVER_URL}${url}`;
 }
 
+// Converts a Supabase Storage URL to a resized thumbnail via the Supabase
+// image transformation API. Used for recipe card thumbnails to reduce bandwidth.
 function supabaseThumb(url, width = 200, quality = 80) {
   if (!url || !url.includes('supabase.co/storage/v1/object/public/')) return url;
   return url.replace('/object/public/', '/render/image/public/') + `?width=${width}&quality=${quality}`;
 }
 
 // ── Token storage ─────────────────────────────────────────────────────────────
+// Tokens are stored in localStorage so they persist across page navigations
+// without needing the server to maintain session state (stateless JWT).
 function getAccessToken()  { return localStorage.getItem('access_token'); }
 function getRefreshToken() { return localStorage.getItem('refresh_token'); }
 
+// Writes tokens to localStorage. Passing null as refreshToken leaves the
+// existing refresh token untouched — used during silent refresh.
 function setTokens(accessToken, refreshToken) {
   localStorage.setItem('access_token', accessToken);
   if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
 }
 
+// Removes all auth data from localStorage, effectively logging the user out.
 function clearTokens() {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
@@ -43,6 +55,8 @@ function clearTokens() {
 })();
 
 // ── User storage ──────────────────────────────────────────────────────────────
+// The user object (name, email, avatar) is cached in localStorage so the
+// sidebar can display it instantly without an extra API request on every page.
 function getUser() {
   const u = localStorage.getItem('user');
   return u ? JSON.parse(u) : null;
@@ -53,6 +67,8 @@ function setUser(user) {
 }
 
 // ── JWT decode (no library needed — JWT payload is just base64) ───────────────
+// Decodes the middle segment of a JWT to read its payload without verifying
+// the signature (verification is the server's job, not the client's).
 function parseJwt(token) {
   try {
     const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -60,6 +76,9 @@ function parseJwt(token) {
   } catch { return null; }
 }
 
+// Returns true if the token has expired or will expire within 10 seconds.
+// The 10-second buffer avoids a race condition where the token is valid
+// during the check but expires before the server receives the request.
 function isTokenExpired(token) {
   const payload = parseJwt(token);
   if (!payload || !payload.exp) return true;
@@ -68,6 +87,9 @@ function isTokenExpired(token) {
 }
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
+// Called at the top of every protected page. Redirects to login if the user
+// has no valid session. If the access token is expired but a refresh token
+// exists, it lets the page load — the first apiFetch() will renew it silently.
 function requireAuth() {
   const access = getAccessToken();
   const refresh = getRefreshToken();
@@ -93,6 +115,8 @@ function removeToken() { clearTokens(); }
 // at the same time, only one HTTP call is made and both callers await the same promise.
 let _refreshPromise = null;
 
+// Sends the refresh token to the server to obtain a new access token.
+// If the refresh token is also expired, clears all tokens and redirects to login.
 async function refreshAccessToken() {
   if (_refreshPromise) return _refreshPromise;
 
@@ -168,6 +192,9 @@ async function apiFetch(path, options = {}) {
 }
 
 // ── File upload wrapper ───────────────────────────────────────────────────────
+// Separate from apiFetch because file uploads use multipart/form-data instead
+// of JSON. The Content-Type header must NOT be set manually — the browser sets
+// it automatically with the correct boundary when sending a FormData object.
 async function apiUpload(path, formData) {
   const access = getAccessToken();
   if (access && isTokenExpired(access)) await refreshAccessToken();
@@ -188,6 +215,8 @@ async function apiUpload(path, formData) {
 }
 
 // ── Custom prompt modal ───────────────────────────────────────────────────────
+// Replaces the browser's native prompt() with a styled modal that matches the
+// app's design. Accepts a callback that receives the user's input on confirm.
 function showPrompt(title, defaultValue, callback) {
   const modal = document.getElementById('shared-prompt-modal');
   const titleEl = document.getElementById('shared-prompt-title');
@@ -218,6 +247,7 @@ function closePrompt() {
 }
 
 // ── Custom alert modal ────────────────────────────────────────────────────────
+// Replaces the browser's native alert() with a styled modal.
 function showAlert(message) {
   const modal = document.getElementById('shared-alert-modal');
   const msgEl = document.getElementById('shared-alert-message');
@@ -232,6 +262,8 @@ function closeAlert() {
 }
 
 // ── Custom confirm modal (shared) ─────────────────────────────────────────────
+// Replaces the browser's native confirm() with a styled modal.
+// Executes the callback only if the user clicks the confirm button.
 function showConfirmModal(title, desc, callback) {
   const modal = document.getElementById('shared-confirm-modal');
   const titleEl = document.getElementById('shared-confirm-title');
@@ -254,6 +286,8 @@ function closeSharedConfirm() {
 }
 
 // ── Draggable modal ───────────────────────────────────────────────────────────
+// Makes a modal window draggable by its handle element. Tracks mouse position
+// as an offset from the modal's current translation to avoid jumps on drag start.
 function makeDraggable(overlayId) {
   const overlay = document.getElementById(overlayId);
   if (!overlay) return;
@@ -280,6 +314,7 @@ function makeDraggable(overlayId) {
 
   window.addEventListener('mouseup', () => { active = false; });
 
+  // Resets position when the modal is closed and reopened.
   overlay.addEventListener('modal-reset', () => {
     modal.style.transform = '';
     tx = 0; ty = 0;
@@ -287,6 +322,8 @@ function makeDraggable(overlayId) {
 }
 
 // ── User dropdown menu ────────────────────────────────────────────────────────
+// Toggles the user menu open/closed. The global click listener closes it
+// automatically when the user clicks anywhere else on the page.
 function toggleUserMenu(e) {
   e.stopPropagation();
   document.getElementById('user-dropdown').classList.toggle('open');

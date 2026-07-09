@@ -16,6 +16,9 @@ class DbStorage(BaseRepository):
     def get_by_attribute(self, attr_name, attr_value):
         return self.model.query.filter_by(**{attr_name: attr_value}).first()
 
+    def filter_by(self, **kwargs):
+        return self.model.query.filter_by(**kwargs).all()
+
     def save(self, obj):
         db.session.add(obj)
         db.session.commit()

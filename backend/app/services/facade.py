@@ -145,7 +145,7 @@ class RecipeScannerFacade:
         return self._recipes.get_by_id(recipe_id)
 
     def get_recipes_by_user(self, user_id):
-        return [r for r in self._recipes.get_all() if r.user_id == user_id]
+        return self._recipes.filter_by(user_id=user_id)
 
     def update_recipe(self, recipe_id, **kwargs):
         recipe = self._recipes.get_by_id(recipe_id)
@@ -159,14 +159,11 @@ class RecipeScannerFacade:
         return self._recipes.update(recipe)
 
     def delete_recipe(self, recipe_id):
-        # SQLite does not enforce foreign key constraints by default, so we
-        # manually delete all related records before removing the recipe itself.
+        # Bulk-delete all child records in one round-trip instead of N commits.
         db.session.query(PdfScan).filter(PdfScan.recipe_id == recipe_id).delete()
         db.session.query(CookLog).filter(CookLog.recipe_id == recipe_id).delete()
-        for ing in self.get_ingredients_by_recipe(recipe_id):
-            self._ingredients.delete(ing.id)
-        for step in self.get_steps_by_recipe(recipe_id):
-            self._steps.delete(step.id)
+        db.session.query(Ingredient).filter(Ingredient.recipe_id == recipe_id).delete()
+        db.session.query(Step).filter(Step.recipe_id == recipe_id).delete()
         db.session.commit()
         self._recipes.delete(recipe_id)
 
@@ -198,7 +195,7 @@ class RecipeScannerFacade:
         return self._ingredients.get_by_id(ingredient_id)
 
     def get_ingredients_by_recipe(self, recipe_id):
-        ings = [i for i in self._ingredients.get_all() if i.recipe_id == recipe_id]
+        ings = self._ingredients.filter_by(recipe_id=recipe_id)
         return sorted(ings, key=lambda i: (i.order_num or 0))
 
     def update_ingredient(self, ingredient_id, **kwargs):
@@ -233,7 +230,7 @@ class RecipeScannerFacade:
         return self._steps.save(step)
 
     def get_steps_by_recipe(self, recipe_id):
-        return [s for s in self._steps.get_all() if s.recipe_id == recipe_id]
+        return self._steps.filter_by(recipe_id=recipe_id)
 
     def update_step(self, step_id, **kwargs):
         step = self._steps.get_by_id(step_id)
@@ -367,12 +364,15 @@ class RecipeScannerFacade:
                 executor.submit(_batch_for_lang, lc): lc
                 for lc in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]
             }
-            for future in as_completed(futures, timeout=25):
-                try:
-                    col, translated, provider = future.result()
-                    lang_results[col] = (translated, provider)
-                except Exception as exc:
-                    logging.error('Translation batch failed: %s', exc)
+            try:
+                for future in as_completed(futures, timeout=25):
+                    try:
+                        col, translated, provider = future.result()
+                        lang_results[col] = (translated, provider)
+                    except Exception as exc:
+                        logging.error('Translation batch failed: %s', exc)
+            except TimeoutError:
+                logging.warning('Translation timed out — recipe saved without translations')
 
         used_provider = 'none'
         all_failed = True
@@ -465,7 +465,10 @@ class RecipeScannerFacade:
             )
             steps.append(step)
 
-        self._translate_recipe(recipe, ingredients, steps)
+        try:
+            self._translate_recipe(recipe, ingredients, steps)
+        except Exception as e:
+            logging.error('Translation failed after saving recipe, returning without translations: %s', e)
         return (recipe, ingredients, steps), None
 
     def _extract_pdf_text(self, file_bytes):
@@ -518,12 +521,12 @@ class RecipeScannerFacade:
     # --- Stores --- api/v1/stores.py ---
 
     def get_stores(self, user_id):
-        return [s for s in self._stores.get_all() if s.user_id == user_id]
+        return self._stores.filter_by(user_id=user_id)
 
     def get_store_by_name(self, user_id, name):
         name_lower = name.lower().strip()
-        for s in self._stores.get_all():
-            if s.user_id == user_id and s.name.lower() == name_lower:
+        for s in self._stores.filter_by(user_id=user_id):
+            if s.name.lower() == name_lower:
                 return s
         return None
 
@@ -541,12 +544,12 @@ class RecipeScannerFacade:
     # --- Brands --- api/v1/brands.py ---
 
     def get_brands(self, user_id):
-        return [b for b in self._brands.get_all() if b.user_id == user_id]
+        return self._brands.filter_by(user_id=user_id)
 
     def get_brand_by_name(self, user_id, name):
         name_lower = name.lower().strip()
-        for b in self._brands.get_all():
-            if b.user_id == user_id and b.name.lower() == name_lower:
+        for b in self._brands.filter_by(user_id=user_id):
+            if b.name.lower() == name_lower:
                 return b
         return None
 
@@ -574,7 +577,7 @@ class RecipeScannerFacade:
     # --- Custom Prices --- api/v1/costs.py ---
 
     def get_custom_prices(self, user_id):
-        return [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+        return self._custom_prices.filter_by(user_id=user_id)
 
     @staticmethod
     def _strip_plural(name):
@@ -593,7 +596,7 @@ class RecipeScannerFacade:
 
     def get_custom_prices_for_ingredient(self, user_id, ingredient_name):
         name_n = self._norm(ingredient_name)
-        all_user = [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+        all_user = self._custom_prices.filter_by(user_id=user_id)
 
         # 1. Exact match (accent-insensitive)
         exact = [cp for cp in all_user if self._norm(cp.ingredient_name) == name_n]

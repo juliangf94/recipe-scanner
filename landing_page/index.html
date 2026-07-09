@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecipeScanner — AI-Powered Recipe Management</title>
+  <meta name="description" content="Upload any recipe PDF and get a fully structured recipe with ingredients, steps, and cost estimates — in three languages. Powered by Llama 3.3.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Nav ──────────────────────────────────────────────────────────── -->
+  <nav>
+    <a href="#" class="nav-logo">🍴 Recipe<span>Scanner</span></a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="https://github.com/juliangf94/recipe-scanner" target="_blank" rel="noopener">GitHub</a></li>
+      <li><a href="https://recipes-scanner.netlify.app" target="_blank" rel="noopener" class="nav-cta">Open App →</a></li>
+    </ul>
+    <button class="nav-theme" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark/light mode">☀</button>
+  </nav>
+
+  <!-- ── Hero ─────────────────────────────────────────────────────────── -->
+  <section class="hero" id="home">
+    <div class="hero-content">
+      <div class="hero-eyebrow">⚡ Powered by Groq &amp; DeepL</div>
+      <h1>
+        Scan any recipe.<br>
+        Cook <em>smarter.</em>
+      </h1>
+      <p class="hero-sub">
+        Upload a PDF and get a fully structured recipe — ingredients, steps, prep time, and cost estimates — automatically translated into English, Spanish, and French.
+      </p>
+      <div class="hero-actions">
+        <a href="https://recipes-scanner.netlify.app" target="_blank" rel="noopener" class="btn-primary">
+          Open RecipeScanner →
+        </a>
+        <a href="https://www.youtube.com/YOUR_DEMO_VIDEO" target="_blank" rel="noopener" class="btn-secondary">
+          ▶ Watch demo
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-num">~30<span>s</span></div>
+          <div class="hero-stat-label">Avg. scan time</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num"><span>3</span></div>
+          <div class="hero-stat-label">Languages supported</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">73</div>
+          <div class="hero-stat-label">Automated tests</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num"><span>4</span></div>
+          <div class="hero-stat-label">Price sources</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Features ──────────────────────────────────────────────────────── -->
+  <section id="features">
+    <div class="container">
+      <div class="features-header">
+        <p class="section-label">Features</p>
+        <h2 class="section-title">Everything a home cook needs,<br>handled by AI.</h2>
+        <p class="section-sub">Three core features that turn a PDF file into a fully managed, costed, multilingual recipe.</p>
+      </div>
+      <div class="features-grid">
+
+        <!-- Feature 1 -->
+        <div class="feature-card">
+          <div class="feature-mockup mock-scan">
+            <div class="mock-scan-inner">
+              <div class="mock-pdf-icon">📄</div>
+              <div class="mock-pdf-label">recipe.pdf</div>
+            </div>
+            <div class="mock-scan-bar"></div>
+            <div class="mock-chips">
+              <div class="mock-chip">title ✓</div>
+              <div class="mock-chip">ingredients ✓</div>
+              <div class="mock-chip">steps ✓</div>
+              <div class="mock-chip">servings ✓</div>
+            </div>
+          </div>
+          <div class="feature-body">
+            <h3>Instant AI Extraction</h3>
+            <p>Upload any text-based recipe PDF. Llama 3.3 extracts the title, all ingredients with quantities and units, every preparation step, servings, and cooking time — structured and ready to use in seconds.</p>
+          </div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="feature-card">
+          <div class="feature-mockup mock-lang">
+            <div class="mock-lang-tabs">
+              <div class="mock-lang-tab">EN</div>
+              <div class="mock-lang-tab active">ES</div>
+              <div class="mock-lang-tab">FR</div>
+            </div>
+            <div class="mock-recipe-lines">
+              <div class="mock-line bold medium"></div>
+              <div class="mock-lang-ing">🥕 manteca blanda · harina · azúcar</div>
+              <div class="mock-line short"></div>
+              <div class="mock-line long"></div>
+              <div class="mock-line medium"></div>
+              <div class="mock-line short"></div>
+            </div>
+          </div>
+          <div class="feature-body">
+            <h3>Three Languages, Zero Effort</h3>
+            <p>Every recipe is automatically translated to English, Spanish, and French using DeepL. Ingredient names, steps, title, and description all switch instantly when you change the language — no manual input needed.</p>
+          </div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="feature-card">
+          <div class="feature-mockup mock-cost">
+            <div class="mock-cost-row">
+              <span class="mock-cost-name">all-purpose flour · 250 g</span>
+              <span class="mock-cost-price">€0.30</span>
+            </div>
+            <div class="mock-cost-row">
+              <span class="mock-cost-name">soft butter · 200 g</span>
+              <span class="mock-cost-price">€1.80</span>
+            </div>
+            <div class="mock-cost-row">
+              <span class="mock-cost-name">sugar · 150 g</span>
+              <span class="mock-cost-price">€0.15</span>
+            </div>
+            <div class="mock-cost-row">
+              <span class="mock-cost-name">shredded coconut · 100 g</span>
+              <span class="mock-cost-price">€0.55</span>
+            </div>
+            <div class="mock-cost-total">
+              <span class="mock-total-label">Total estimated cost</span>
+              <span class="mock-total-val">€3.42</span>
+            </div>
+          </div>
+          <div class="feature-body">
+            <h3>Know Your Recipe Cost</h3>
+            <p>The cost calculator resolves ingredient prices from four sources in priority order: your manual prices, custom store and brand entries, Open Food Facts, and smart per-kg fallbacks. Every recipe shows a total cost estimate at a glance.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── About ─────────────────────────────────────────────────────────── -->
+  <section id="about">
+    <div class="container">
+      <div class="about-grid">
+        <div class="about-story">
+          <p class="section-label">About the project</p>
+          <h2 class="section-title">Built out of a real problem.</h2>
+          <p>
+            I love baking cakes for my friends and family's birthdays. The problem was that every time someone asked me what a cake would cost, I had to sit down and manually research ingredient prices one by one — flour, butter, sugar, everything — just to give them a rough number.
+          </p>
+          <p>
+            That friction was the spark. I needed a tool that could take a recipe and instantly tell me the <strong>total cost</strong>, so I could focus on baking instead of spreadsheets.
+          </p>
+          <p>
+            But the use case grew from there. When I discover a new recipe I've never tried, it's useful to be able to scan it quickly, see the full ingredient list with quantities, get a cost estimate upfront, and even have it translated — all without retyping anything.
+          </p>
+          <p>
+            RecipeScanner solves all of that. You upload a PDF and it handles extraction, cost estimation, and translation automatically. This is my Portfolio Project for <strong>Holberton School</strong>, built over 2 months across 9 structured sprints — the project where I learned how to ship something real.
+          </p>
+          <p class="holberton-note">
+            Portfolio Project · <a href="https://www.holbertonschool.com" target="_blank" rel="noopener">Holberton School</a> · 2026
+          </p>
+        </div>
+        <div class="about-links">
+          <div class="about-dev-card">
+            <div class="about-dev-name">Julian Gonzalez</div>
+            <div class="about-dev-role">Full-Stack Developer · Holberton School</div>
+            <div class="about-social-links">
+              <a href="https://www.linkedin.com/in/YOUR_LINKEDIN" target="_blank" rel="noopener" class="about-social-link">
+                <span class="link-icon">💼</span> LinkedIn
+              </a>
+              <a href="https://github.com/juliangf94" target="_blank" rel="noopener" class="about-social-link">
+                <span class="link-icon">🐙</span> GitHub — juliangf94
+              </a>
+            </div>
+          </div>
+          <div class="repo-card">
+            <div class="repo-card-left">
+              <div class="repo-card-label">Open source</div>
+              <div class="repo-card-name">juliangf94 / recipe-scanner</div>
+            </div>
+            <a href="https://github.com/juliangf94/recipe-scanner" target="_blank" rel="noopener" class="repo-card-link">View repo →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ────────────────────────────────────────────────────────── -->
+  <footer>
+    <p>RecipeScanner · Built by <a href="https://github.com/juliangf94" target="_blank" rel="noopener">Julian Gonzalez</a> · Holberton School 2026</p>
+  </footer>
+
+  <script src="script.js"></script>
+
+</body>
+</html>
