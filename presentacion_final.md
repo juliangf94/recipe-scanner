@@ -54,7 +54,7 @@ Flujo a seguir durante la demo:
 | Frontend | HTML, CSS, Vanilla JS |
 | Backend | Python 3, Flask, Flask-RESTX |
 | Base de datos | SQLAlchemy + PostgreSQL (Supabase) |
-| IA — extracción | Groq API · Qwen 3.6-27b |
+| IA — extracción | Groq API · Llama 3.3-70b |
 | Traducción | DeepL API |
 | Precios externos | Open Food Facts API |
 | Storage de imágenes | Supabase Storage |
@@ -70,7 +70,7 @@ Flujo a seguir durante la demo:
 graph TD
     A["🌐 Browser\nNetlify (Static)"] -->|REST/JSON| B["🐍 Flask API\nRender"]
     B --> C[("🗄 PostgreSQL\nSupabase")]
-    B --> D["🤖 Groq API\nQwen 3.6-27b"]
+    B --> D["🤖 Groq API\nLlama 3.3-70b"]
     B --> E["🌍 DeepL API\nTraducción"]
     B --> F["🛒 Open Food Facts\nPrecios externos"]
     B --> G["📦 Supabase Storage\nImágenes"]
@@ -90,7 +90,7 @@ graph TD
 Usuario sube PDF
     → Frontend envía archivo al backend (multipart/form-data)
     → Backend extrae texto del PDF
-    → Llama a Groq API con el texto (Qwen 3.6-27b)
+    → Llama a Groq API con el texto (Llama 3.3-70b)
     → Groq devuelve JSON estructurado (título, ingredientes, pasos)
     → Backend guarda en PostgreSQL
     → Backend llama a DeepL para traducir a EN/ES/FR
@@ -215,7 +215,7 @@ async function apiFetch(path, options = {}) {
 }
 ```
 
-### Respuestas no deterministas de Qwen 3.6-27b
+### Respuestas no deterministas de Llama 3.3-70b
 El mismo PDF podía devolver estructuras JSON diferentes entre llamadas.
 Solución: prompt estructurado con JSON schema explícito + validación y
 retry automático si la respuesta no parsea correctamente.

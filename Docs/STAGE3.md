@@ -138,7 +138,7 @@ flowchart TD
     end
 
     subgraph External["External Services"]
-        Groq["Groq API\nQwen 3.6-27b"]
+        Groq["Groq API\nLlama 3.3-70b"]
         OFF["Open Food Facts API"]
         DeepL["DeepL / MyMemory\n(traducciones EN/ES/FR)"]
         Storage["Supabase Storage\n(fotos recetas + avatares)"]
@@ -475,12 +475,12 @@ sequenceDiagram
 
 ### External APIs
 
-#### Groq API (Qwen 3.6-27b)
+#### Groq API (Llama 3.3-70b)
 
 - **URL base:** `https://api.groq.com/openai/v1/chat/completions`
 - **Auth:** `Authorization: Bearer <GROQ_API_KEY>`
 - **Por qué:** inferencia ultrarrápida con hardware LPU especializado. Groq ofrece
-  acceso gratuito (free tier). El modelo actual es Qwen 3.6-27b (Alibaba, open-source).
+  acceso gratuito (free tier). El modelo actual es Llama 3.3-70b (Alibaba, open-source).
 - **Uso en el proyecto:** se le envía el texto extraído del PDF y se le pide que
   devuelva un JSON estructurado con título, ingredientes (nombre, cantidad, unidad)
   y pasos ordenados. Las traducciones EN/ES/FR se hacen por separado (DeepL / MyMemory).
@@ -488,7 +488,7 @@ sequenceDiagram
 **Ejemplo de request:**
 ```json
 {
-  "model": "qwen-qwq-32b",
+  "model": "llama-3.3-70b-versatile",
   "messages": [
     {
       "role": "user",
@@ -841,6 +841,6 @@ Los directorios de uploads existen en el repo gracias a archivos `.gitkeep` pero
 | In-memory first | SQLAlchemy desde el inicio | Validar lógica sin complejidad de BD, desarrollo más rápido |
 | JWT | Sessions, OAuth | Stateless, escalable, estándar REST |
 | bcrypt | MD5, SHA-256 | Lento por diseño, incluye salt, resistente a fuerza bruta |
-| Groq + Qwen 3.6-27b | OpenAI GPT-4 | Más rápido (LPU), open-source, tier gratuito, sin costo |
+| Groq + Llama 3.3-70b | OpenAI GPT-4 | Más rápido (LPU), open-source, tier gratuito, sin costo |
 | Open Food Facts | APIs de supermercados | Abierta, gratuita, sin acuerdo comercial, 3M+ productos |
 | Frontend HTML/JS estático | React, Vue, Jinja2 | Desacoplado del backend, mismo consumidor que app móvil futura |
