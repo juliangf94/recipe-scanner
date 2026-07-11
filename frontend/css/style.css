@@ -1008,6 +1008,21 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 }
 .section-header-cell:hover .btn-add-section-ing { opacity: 1; }
 
+.btn-section-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.section-header-cell:hover .btn-section-color { opacity: 1; }
+.btn-section-color[style*="background"] { opacity: 1; border-color: transparent; }
+
 .section-add-row td { padding: 0.4rem 1rem 0.6rem; border-bottom: none; }
 
 /* Move icon column */

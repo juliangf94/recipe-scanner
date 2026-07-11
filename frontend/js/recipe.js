@@ -309,15 +309,24 @@ function renderIngredientsTable(ingredients) {
       <th class="col-del"></th>
     </tr></thead>`;
 
+  const sectionMeta = (currentRecipe && currentRecipe.section_meta) || {};
+
   const tbodies = sections.map(sec => {
     const secAttr = sec.replace(/"/g, '&quot;');
     const group = ingredients.filter(i => (i.section || '') === sec);
+    const color = (sectionMeta[sec] && sectionMeta[sec].color) || '';
+    const cellStyle = color ? ` style="background:${color}18; border-left:3px solid ${color}; padding-left:calc(1.2rem - 3px);"` : '';
+    const swatchStyle = color ? ` style="background:${color}; border-color:transparent;"` : '';
+    const colorBtn = sec
+      ? `<button class="btn-section-color" title="Color de sección" onclick="openSectionColorPicker('${sec.replace(/'/g, "\\'")}', this)"${swatchStyle}></button>`
+      : '';
     const headerRow = `
       <tr class="section-header-row">
-        <td colspan="7">
+        <td colspan="7"${cellStyle}>
           <div class="section-header-cell">
             <span class="section-drag-handle" title="${t('section_drag')}">⠿</span>
             <span class="section-title" onclick="renameSection('${sec.replace(/'/g, "\\'")}', this)">${sec || t('section_no_section')}</span>
+            ${colorBtn}
             <button class="btn-add-section-ing" onclick="promptAddSection()" title="${t('section_add')}">+ ${t('section_add')}</button>
           </div>
         </td>
@@ -479,6 +488,35 @@ function renameSection(oldName) {
 
 function promptAddSection() {
   showAlert(t('section_move_hint'));
+}
+
+function openSectionColorPicker(sectionName, btn) {
+  const input = document.createElement('input');
+  input.type = 'color';
+  const currentColor = (currentRecipe.section_meta && currentRecipe.section_meta[sectionName] && currentRecipe.section_meta[sectionName].color) || '#f39c12';
+  input.value = currentColor;
+  input.style.position = 'fixed';
+  input.style.opacity = '0';
+  input.style.pointerEvents = 'none';
+  document.body.appendChild(input);
+  input.click();
+  input.addEventListener('change', async () => {
+    const color = input.value;
+    document.body.removeChild(input);
+    const res = await apiFetch(`/recipes/${recipeId}/sections/${encodeURIComponent(sectionName)}/color`, {
+      method: 'PATCH',
+      body: JSON.stringify({ color })
+    });
+    if (res && res.ok) {
+      if (!currentRecipe.section_meta) currentRecipe.section_meta = {};
+      if (!currentRecipe.section_meta[sectionName]) currentRecipe.section_meta[sectionName] = {};
+      currentRecipe.section_meta[sectionName].color = color;
+      setIngredients(currentIngredients);
+    }
+  });
+  input.addEventListener('cancel', () => {
+    if (document.body.contains(input)) document.body.removeChild(input);
+  });
 }
 
 function parseBold(text) {

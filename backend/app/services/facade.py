@@ -159,6 +159,18 @@ class RecipeScannerFacade:
                 setattr(recipe, key, value)
         return self._recipes.update(recipe)
 
+    def set_section_color(self, recipe_id, section_name, color):
+        import json as _json
+        recipe = self._recipes.get_by_id(recipe_id)
+        if not recipe:
+            return None
+        meta = _json.loads(recipe.section_meta or '{}')
+        if not meta.get(section_name):
+            meta[section_name] = {}
+        meta[section_name]['color'] = color
+        recipe.section_meta = _json.dumps(meta)
+        return self._recipes.update(recipe)
+
     def delete_recipe(self, recipe_id):
         # Bulk-delete all child records in one round-trip instead of N commits.
         db.session.query(PdfScan).filter(PdfScan.recipe_id == recipe_id).delete()

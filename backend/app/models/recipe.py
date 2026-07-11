@@ -24,3 +24,4 @@ class Recipe(db.Model):
     translation_provider = db.Column(db.String(20), default='none')
     translation_status = db.Column(db.String(20), default='none')
     images_json = db.Column(db.Text, default='[]')
+    section_meta = db.Column(db.Text, default='{}')

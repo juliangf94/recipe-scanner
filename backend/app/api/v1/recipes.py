@@ -161,7 +161,8 @@ class RecipeFull(Resource):
                 'servings': recipe.servings, 'prep_time_min': recipe.prep_time_min,
                 'category': recipe.category, 'user_id': recipe.user_id,
                 'image_url': recipe.image_url, 'images': images,
-                'translation_status': recipe.translation_status or 'pending'
+                'translation_status': recipe.translation_status or 'pending',
+                'section_meta': json.loads(recipe.section_meta or '{}')
             },
             'ingredients': [
                 {'id': i.id, 'name': i.name,
@@ -383,3 +384,30 @@ class RecipeImage(Resource):
         cover = recipe.image_url if recipe.image_url != image_url else new_cover
         facade.update_recipe(recipe_id, image_url=cover, images_json=json.dumps(images))
         return {'image_url': cover, 'images': images}, 200
+
+
+section_color_model = api.model('SectionColor', {
+    'color': fields.String(required=True, description='Hex color e.g. #f39c12')
+})
+
+
+@api.route('/<string:recipe_id>/sections/<string:section_name>/color')
+class RecipeSectionColor(Resource):
+
+    @jwt_required()
+    @api.expect(section_color_model, validate=True)
+    @api.response(200, 'Section color updated')
+    @api.response(403, 'Forbidden')
+    @api.response(404, 'Recipe not found')
+    def patch(self, recipe_id, section_name):
+        user_id = get_jwt_identity()
+        recipe = facade.get_recipe(recipe_id)
+        if not recipe:
+            return {'error': 'Recipe not found'}, 404
+        if recipe.user_id != user_id:
+            return {'error': 'Forbidden'}, 403
+        color = (api.payload.get('color') or '').strip()
+        if not color:
+            return {'error': 'color required'}, 400
+        facade.set_section_color(recipe_id, section_name, color)
+        return {'section': section_name, 'color': color}, 200
