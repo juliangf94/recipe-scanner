@@ -325,7 +325,7 @@ function renderIngredientsTable(ingredients) {
         <td colspan="7"${cellStyle}>
           <div class="section-header-cell">
             <span class="section-drag-handle" title="${t('section_drag')}">⠿</span>
-            <span class="section-title" onclick="renameSection('${sec.replace(/'/g, "\\'")}', this)">${sec || t('section_no_section')}</span>
+            <span class="section-title" onclick="renameSection('${sec.replace(/'/g, "\\'")}', this)">${tSection(sec) || t('section_no_section')}</span>
             ${colorBtn}
             <button class="btn-add-section-ing" onclick="promptAddSection()" title="${t('section_add')}">+ ${t('section_add')}</button>
           </div>
@@ -387,7 +387,7 @@ function renderIngRow(i, sections) {
 
   // Section picker options
   const sectionOpts = sections.map(s =>
-    `<option value="${s.replace(/"/g, '&quot;')}"${s === (i.section || '') ? ' selected' : ''}>${s || t('section_no_section')}</option>`
+    `<option value="${s.replace(/"/g, '&quot;')}"${s === (i.section || '') ? ' selected' : ''}>${tSection(s) || t('section_no_section')}</option>`
   ).join('');
 
   return `

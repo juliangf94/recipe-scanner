@@ -1354,3 +1354,71 @@ function tIng(name) {
   if (!entry) return name;
   return entry[lang] || name;
 }
+
+// ── Section name translation ──────────────────────────────────────────────────
+// Keys: any language variant (lowercase) → translations for the other two languages.
+// The key language is omitted — it returns the original string.
+const SECTION_MAP = {
+  // Spanish → EN / FR
+  'masa':           { en: 'Dough',        fr: 'Pâte' },
+  'relleno':        { en: 'Filling',      fr: 'Garniture' },
+  'decoracion':     { en: 'Decoration',   fr: 'Décoration' },
+  'decoración':     { en: 'Decoration',   fr: 'Décoration' },
+  'crema':          { en: 'Cream',        fr: 'Crème' },
+  'glaseado':       { en: 'Glaze',        fr: 'Glaçage' },
+  'cobertura':      { en: 'Topping',      fr: 'Nappage' },
+  'bizcocho':       { en: 'Sponge',       fr: 'Biscuit' },
+  'base':           { en: 'Base',         fr: 'Base' },
+  'almíbar':        { en: 'Syrup',        fr: 'Sirop' },
+  'almibar':        { en: 'Syrup',        fr: 'Sirop' },
+  'merengue':       { en: 'Meringue',     fr: 'Meringue' },
+  'ganache':        { en: 'Ganache',      fr: 'Ganache' },
+  'caramelo':       { en: 'Caramel',      fr: 'Caramel' },
+  'salsa':          { en: 'Sauce',        fr: 'Sauce' },
+  'masa de tarta':  { en: 'Pie crust',    fr: 'Pâte à tarte' },
+  'masa quebrada':  { en: 'Shortcrust',   fr: 'Pâte brisée' },
+  'masa hojaldrada':{ en: 'Puff pastry',  fr: 'Pâte feuilletée' },
+  'masa choux':     { en: 'Choux pastry', fr: 'Pâte à choux' },
+  // English → ES / FR
+  'dough':          { es: 'Masa',         fr: 'Pâte' },
+  'filling':        { es: 'Relleno',      fr: 'Garniture' },
+  'decoration':     { es: 'Decoración',   fr: 'Décoration' },
+  'cream':          { es: 'Crema',        fr: 'Crème' },
+  'glaze':          { es: 'Glaseado',     fr: 'Glaçage' },
+  'topping':        { es: 'Cobertura',    fr: 'Nappage' },
+  'sponge':         { es: 'Bizcocho',     fr: 'Biscuit' },
+  'base':           { es: 'Base',         fr: 'Base' },
+  'syrup':          { es: 'Almíbar',      fr: 'Sirop' },
+  'meringue':       { es: 'Merengue',     fr: 'Meringue' },
+  'ganache':        { es: 'Ganache',      fr: 'Ganache' },
+  'caramel':        { es: 'Caramelo',     fr: 'Caramel' },
+  'sauce':          { es: 'Salsa',        fr: 'Sauce' },
+  'pie crust':      { es: 'Masa de tarta',fr: 'Pâte à tarte' },
+  'shortcrust':     { es: 'Masa quebrada',fr: 'Pâte brisée' },
+  'puff pastry':    { es: 'Masa hojaldrada', fr: 'Pâte feuilletée' },
+  'choux pastry':   { es: 'Masa choux',   fr: 'Pâte à choux' },
+  // French → ES / EN
+  'pâte':           { es: 'Masa',         en: 'Dough' },
+  'garniture':      { es: 'Relleno',      en: 'Filling' },
+  'décoration':     { es: 'Decoración',   en: 'Decoration' },
+  'crème':          { es: 'Crema',        en: 'Cream' },
+  'glaçage':        { es: 'Glaseado',     en: 'Glaze' },
+  'nappage':        { es: 'Cobertura',    en: 'Topping' },
+  'biscuit':        { es: 'Bizcocho',     en: 'Sponge' },
+  'sirop':          { es: 'Almíbar',      en: 'Syrup' },
+  'meringue':       { es: 'Merengue',     en: 'Meringue' },
+  'caramel':        { es: 'Caramelo',     en: 'Caramel' },
+  'sauce':          { es: 'Salsa',        en: 'Sauce' },
+  'pâte à tarte':   { es: 'Masa de tarta',en: 'Pie crust' },
+  'pâte brisée':    { es: 'Masa quebrada',en: 'Shortcrust' },
+  'pâte feuilletée':{ es: 'Masa hojaldrada', en: 'Puff pastry' },
+  'pâte à choux':   { es: 'Masa choux',   en: 'Choux pastry' },
+};
+
+function tSection(sec) {
+  if (!sec) return sec;
+  const lang = getLang();
+  const entry = SECTION_MAP[sec.toLowerCase().trim()];
+  if (!entry) return sec;
+  return entry[lang] || sec;
+}
