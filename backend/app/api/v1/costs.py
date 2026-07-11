@@ -231,7 +231,8 @@ class PriceDetail(Resource):
             price_per_kg = cp.price_per_kg
         updated = facade.update_custom_price(price_id, price_per_kg,
                                               data.get('store_id') or None, brand_id,
-                                              bought_qty, bought_unit, bought_price)
+                                              bought_qty, bought_unit, bought_price,
+                                              ingredient_name=data.get('ingredient_name') or None)
         stores_map = {s.id: s.name for s in facade.get_stores(user_id)}
         brands_map = {b.id: b.name for b in facade.get_brands(user_id)}
         return {

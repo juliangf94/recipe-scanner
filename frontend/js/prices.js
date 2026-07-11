@@ -321,7 +321,7 @@ function buildPriceRow(p) {
   const priceVal = p.bought_price != null ? p.bought_price : (p.price_per_kg != null ? p.price_per_kg : '');
   return `
     <tr class="price-row" data-id="${p.id}" onfocusout="handleRowFocusOut(event,'${p.id}')">
-      <td class="cell-name">${tIng(p.ingredient_name)}</td>
+      <td><input class="cell-inp ing-cell" type="text" value="${p.ingredient_name}" oninput="updateCalc(this)"></td>
       <td><select class="cell-sel store-cell" aria-label="${t('label_store')}" onchange="updateCalc(this)">${storeOptions(p.store_id)}</select></td>
       <td><select class="cell-sel brand-cell" aria-label="${t('manage_brands')}" onchange="updateCalc(this)">${brandOptions(p.brand_id, p.ingredient_name)}</select></td>
       <td><input class="cell-inp qty-cell" type="text" inputmode="decimal" value="${p.bought_qty || ''}" placeholder="—" oninput="updateCalc(this)"></td>
@@ -407,6 +407,7 @@ function handleRowFocusOut(event, priceId) {
 }
 
 async function saveRowEdit(priceId, row) {
+  const name = row.querySelector('.ing-cell')?.value?.trim().toLowerCase();
   const storeId = row.querySelector('.store-cell')?.value || null;
   const brandId = row.querySelector('.brand-cell')?.value || null;
   const qty = parseFloat((row.querySelector('.qty-cell')?.value || '').replace(',', '.'));
@@ -417,6 +418,7 @@ async function saveRowEdit(priceId, row) {
   if (!hasPrice) return;
 
   let body = { store_id: storeId, brand_id: brandId };
+  if (name) body.ingredient_name = name;
   if (hasQty) {
     body.bought_qty = qty;
     body.bought_unit = unit;

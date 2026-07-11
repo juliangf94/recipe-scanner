@@ -659,11 +659,14 @@ class RecipeScannerFacade:
         return self._custom_prices.save(cp)
 
     def update_custom_price(self, price_id, price_per_kg,
-                             store_id=None, brand_id=None, bought_qty=None, bought_unit=None, bought_price=None):
+                             store_id=None, brand_id=None, bought_qty=None, bought_unit=None, bought_price=None,
+                             ingredient_name=None):
         cp = self._custom_prices.get_by_id(price_id)
         if not cp:
             return None
         cp.price_per_kg = price_per_kg
+        if ingredient_name:
+            cp.ingredient_name = ingredient_name
         if store_id is not None:
             cp.store_id = store_id
         cp.brand_id = brand_id  # always update (can be cleared to None)
