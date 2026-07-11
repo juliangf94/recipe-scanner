@@ -769,10 +769,15 @@ class RecipeScannerFacade:
                 qty = float(ing.quantity)
             except (ValueError, TypeError):
                 qty = 0.0
-            if source == 'manual':
-                estimated = round(qty * price_per_kg, 2)
+            _unit = (ing.unit or '').lower().strip()
+            _G = {'g', 'gr', 'gram', 'grams', 'gramo', 'gramos',
+                  'ml', 'milliliter', 'milliliters', 'millilitro', 'millilitros'}
+            _KG = {'kg', 'kilogram', 'kilograms', 'kilo', 'kilos',
+                   'l', 'liter', 'liters', 'litro', 'litros'}
+            if _unit in _G:
+                estimated = round((qty / 1000) * price_per_kg, 2)
             else:
-                estimated = round(qty * (price_per_kg / 1000), 2)
+                estimated = round(qty * price_per_kg, 2)
             total += estimated
             result.append({
                 'ing_id': ing.id,
