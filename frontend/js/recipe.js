@@ -315,7 +315,7 @@ function renderIngredientsTable(ingredients) {
     const secAttr = sec.replace(/"/g, '&quot;');
     const group = ingredients.filter(i => (i.section || '') === sec);
     const color = (sectionMeta[sec] && sectionMeta[sec].color) || '';
-    const cellStyle = color ? ` style="background:${color}18; border-left:3px solid ${color}; padding-left:calc(1.2rem - 3px);"` : '';
+    const cellStyle = color ? ` style="background:${color}4D; border-left:4px solid ${color}; padding-left:calc(1.2rem - 4px);"` : '';
     const swatchStyle = color ? ` style="background:${color}; border-color:transparent;"` : '';
     const colorBtn = sec
       ? `<button class="btn-section-color" title="Color de sección" onclick="openSectionColorPicker('${sec.replace(/'/g, "\\'")}', this)"${swatchStyle}></button>`

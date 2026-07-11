@@ -1009,19 +1009,22 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 .section-header-cell:hover .btn-add-section-ing { opacity: 1; }
 
 .btn-section-color {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 2px solid var(--border);
-  background: var(--bg-card);
+  border: 2px solid #b0b8c8;
+  background: #e2e8f0;
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.15s, border-color 0.15s;
+  transition: opacity 0.15s, border-color 0.15s, background 0.15s;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
 }
 .section-header-cell:hover .btn-section-color { opacity: 1; }
-.btn-section-color[style*="background"] { opacity: 1; border-color: transparent; }
+.btn-section-color[style*="background"] { opacity: 1; border-color: transparent; box-shadow: 0 0 0 2px rgba(0,0,0,0.15); }
+[data-theme="dark"] .btn-section-color { background: #3d4558; border-color: #5a6478; }
+[data-theme="dark"] .btn-section-color[style*="background"] { border-color: transparent; }
 
 .section-add-row td { padding: 0.4rem 1rem 0.6rem; border-bottom: none; }
 
@@ -2091,12 +2094,33 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 [data-theme="dark"] .user-dropdown,
 [data-theme="dark"] .input-wrap .input-icon,
 [data-theme="dark"] .search-bar input,
-[data-theme="dark"] .sort-select,
-[data-theme="dark"] .filter-pill,
 [data-theme="dark"] .method-btn,
 [data-theme="dark"] .browse-btn,
 [data-theme="dark"] .opt-pill,
 [data-theme="dark"] .home-quick-btn { background: var(--card-bg); }
+
+/* Filter pills and sort select — need visible border in dark mode */
+[data-theme="dark"] .sort-select {
+  background: #252a38;
+  border-color: #3d4558;
+  color: var(--text);
+}
+[data-theme="dark"] .filter-pill {
+  background: #252a38;
+  border-color: #3d4558;
+  color: var(--text-muted);
+}
+[data-theme="dark"] .filter-pill:hover {
+  border-color: var(--orange);
+  color: var(--orange);
+  background: #2d2410;
+}
+[data-theme="dark"] .filter-pill.active {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+[data-theme="dark"] .filter-pill.active .pill-count { color: #fff; }
 
 [data-theme="dark"] .auth-page { background: var(--bg); }
 [data-theme="dark"] .btn-outline { background: var(--card-bg); color: var(--text); }
