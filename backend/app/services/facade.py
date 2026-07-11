@@ -183,12 +183,17 @@ class RecipeScannerFacade:
     # --- Ingredients --- api/v1/ingredients.py ---
 
     def _translate_ingredient(self, ingredient):
-        """Translate a single ingredient name to EN/ES/FR and persist."""
+        """Translate a single ingredient name to EN/ES/FR and persist.
+        Source language column is copied directly to avoid dialect substitution."""
         name = ingredient.name
         source_lang = self._detect_source_lang(name)
+        source_col = (source_lang or '')[:2].lower()
         for lang, col in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]:
-            translated, _ = self._translate_batch([name], lang, source_lang=source_lang)
-            setattr(ingredient, f'name_{col}', translated[0] or name)
+            if col == source_col:
+                setattr(ingredient, f'name_{col}', name)
+            else:
+                translated, _ = self._translate_batch([name], lang, source_lang=source_lang)
+                setattr(ingredient, f'name_{col}', translated[0] or name)
         self._ingredients.update(ingredient)
 
     def add_ingredient(self, recipe_id, name, quantity, unit, skip_translate=False, section=''):
@@ -230,12 +235,17 @@ class RecipeScannerFacade:
     # --- Steps --- api/v1/scan.py ---
 
     def _translate_step(self, step):
-        """Translate a single step description to EN/ES/FR and persist."""
+        """Translate a single step description to EN/ES/FR and persist.
+        Source language column is copied directly to avoid dialect substitution."""
         desc = step.description
         source_lang = self._detect_source_lang(desc)
+        source_col = (source_lang or '')[:2].lower()
         for lang, col in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]:
-            translated, _ = self._translate_batch([desc], lang, source_lang=source_lang)
-            setattr(step, f'description_{col}', translated[0] or desc)
+            if col == source_col:
+                setattr(step, f'description_{col}', desc)
+            else:
+                translated, _ = self._translate_batch([desc], lang, source_lang=source_lang)
+                setattr(step, f'description_{col}', translated[0] or desc)
         self._steps.update(step)
 
     def add_step(self, recipe_id, order_num, description):
@@ -355,7 +365,9 @@ class RecipeScannerFacade:
 
     def _translate_recipe(self, recipe, ingredients, steps):
         """Populate *_en / *_es / *_fr columns on recipe, ingredients, and steps.
-        All three language batches run in parallel to stay within Render's 30s limit."""
+        The source language is never sent to DeepL — originals are copied directly
+        to avoid dialect substitution (e.g. Argentine Spanish → Spain Spanish).
+        The two remaining languages are translated in parallel."""
         ing_names  = [i.name for i in ingredients]
         step_descs = [s.description for s in steps]
         meta       = [recipe.title, recipe.description or '']
@@ -364,6 +376,12 @@ class RecipeScannerFacade:
         sample_parts = [recipe.title] + [i.name for i in ingredients[:6]]
         source_lang = self._detect_source_lang(' '.join(sample_parts))
         logging.info('Detected source language for "%s": %s', recipe.title, source_lang)
+
+        source_col = (source_lang or '')[:2].lower()  # 'es', 'en', 'fr', or ''
+        translate_pairs = [
+            lc for lc in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]
+            if lc[1] != source_col
+        ]
 
         lang_results = {}
 
@@ -375,7 +393,7 @@ class RecipeScannerFacade:
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {
                 executor.submit(_batch_for_lang, lc): lc
-                for lc in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]
+                for lc in translate_pairs
             }
             try:
                 for future in as_completed(futures, timeout=25):
@@ -388,17 +406,27 @@ class RecipeScannerFacade:
                 logging.warning('Translation timed out — recipe saved without translations')
 
         used_provider = 'none'
-        all_failed = True
+        all_failed = not bool(translate_pairs)
 
         for col in ['en', 'es', 'fr']:
+            if col == source_col:
+                # Source language: copy originals directly, no DeepL involved
+                setattr(recipe, f'title_{col}', recipe.title)
+                setattr(recipe, f'description_{col}', recipe.description or '')
+                for ing in ingredients:
+                    setattr(ing, f'name_{col}', ing.name)
+                for step in steps:
+                    setattr(step, f'description_{col}', step.description)
+                all_failed = False
+                continue
+
             if col not in lang_results:
                 continue
             translated, provider = lang_results[col]
 
-            if provider in ('deepl', 'mymemory', 'libretranslate', 'original'):
+            if provider in ('deepl', 'mymemory', 'libretranslate'):
                 all_failed = False
-                if provider not in ('original', 'none'):
-                    used_provider = provider
+                used_provider = provider
 
             setattr(recipe, f'title_{col}', translated[0] or recipe.title)
             setattr(recipe, f'description_{col}', translated[1] or recipe.description or '')
