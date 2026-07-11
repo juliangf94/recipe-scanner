@@ -2097,7 +2097,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 [data-theme="dark"] .method-btn,
 [data-theme="dark"] .browse-btn,
 [data-theme="dark"] .opt-pill,
-[data-theme="dark"] .home-quick-btn { background: var(--card-bg); }
+[data-theme="dark"] .home-quick-btn { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.25); }
 
 /* Filter pills and sort select — need visible border in dark mode */
 [data-theme="dark"] .sort-select {
@@ -2136,6 +2136,13 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 /* Lang toggle active pill */
 [data-theme="dark"] .lang-btn.active { background: #2d3748; color: var(--text); }
 [data-theme="dark"] .lang-btn { color: var(--text-muted); }
+
+/* Sidebar nav active item — orange-light bg looks odd on dark sidebar */
+[data-theme="dark"] .nav-item.active { background: rgba(247,167,38,0.18); color: var(--orange); }
+[data-theme="dark"] .nav-item:hover { background: #252a38; color: var(--text); }
+
+/* Category badges on recipe cards — white bg with light text = invisible */
+[data-theme="dark"] .card-banner .cat-badge { background: rgba(0,0,0,0.55); color: #e2e8f0; }
 
 /* Theme toggle button */
 .theme-toggle {
