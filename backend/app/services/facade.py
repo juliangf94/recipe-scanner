@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import threading
 import requests
 import unicodedata
 import uuid
@@ -467,10 +468,17 @@ class RecipeScannerFacade:
             )
             steps.append(step)
 
-        try:
-            self._translate_recipe(recipe, ingredients, steps)
-        except Exception as e:
-            logging.error('Translation failed after saving recipe, returning without translations: %s', e)
+        from flask import current_app
+        app = current_app._get_current_object()
+
+        def _translate_bg():
+            with app.app_context():
+                try:
+                    self._translate_recipe(recipe, ingredients, steps)
+                except Exception as e:
+                    logging.error('Background translation failed: %s', e)
+
+        threading.Thread(target=_translate_bg, daemon=True).start()
         return (recipe, ingredients, steps), None
 
     def _extract_pdf_text(self, file_bytes):
