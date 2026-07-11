@@ -33,6 +33,7 @@ price_model = api.model('Price', {
 })
 
 price_update_model = api.model('PriceUpdate', {
+    'ingredient_name': fields.String(description='Ingredient name'),
     'store_id': fields.String(description='Store ID'),
     'brand_id': fields.String(description='Brand ID'),
     'price_per_kg': fields.Float(description='Direct price per kg/unit'),
