@@ -981,3 +981,84 @@ def get_week_cooked_recipe_ids(user_id): → qué recetas cocinó esta semana
 - [x] `prices.js` — tabla inline editable (reemplaza modales)
 - [x] `scan.js` — botón X para cerrar éxito del scan + modal anti-duplicados
 - [x] `__init__.py` — safe `ALTER TABLE` idempotente para columnas nuevas
+
+---
+
+## Decisiones técnicas — Fase 11 (UX avanzada + Correcciones técnicas)
+
+### Decisión 19 — Background threading para traducción
+
+**Problema:** `_translate_recipe()` tardaba 5–15 segundos y Render tiene límite de 30s por request HTTP. Cuando la traducción superaba el límite, la conexión se cortaba y el usuario veía un error aunque la receta se había creado correctamente.
+
+**Solución:** Lanzar `_translate_recipe()` en un hilo daemon separado. La respuesta HTTP se retorna inmediatamente con la receta creada. La traducción completa los campos `title_en`, `title_fr`, etc. en segundo plano.
+
+**Detalle técnico:** Se usa `current_app._get_current_object()` para capturar la instancia de la app Flask antes de entrar al hilo, ya que dentro del hilo el contexto de aplicación no existe automáticamente. El hilo se marca como `daemon=True` para que no bloquee el cierre del servidor.
+
+---
+
+### Decisión 20 — Fix de cálculo de costo — normalización de unidades
+
+**Bug:** Un ingrediente de 500g con precio €10.49/kg mostraba €5.245,00 en lugar de €5,25.
+
+**Causa:** El sistema multiplicaba `quantity × price_per_kg` directamente sin convertir gramos a kilogramos.
+
+**Solución:** Detectar la unidad del ingrediente (`g`, `gr`, `gram`, `ml`, `millilitro`, etc.) y aplicar `qty / 1000` antes de la multiplicación. Unidades ya en kg/l se usan directamente.
+
+---
+
+### Decisión 21 — section_meta como columna TEXT en lugar de tabla separada
+
+**Alternativa descartada:** Crear una tabla `SectionMeta(id, recipe_id, section_name, key, value)`.
+
+**Razón:** Las secciones son dinámicas (el usuario las crea y renombra), la cantidad es pequeña (típicamente 2–5 por receta), y los datos son poco relacionales. Una columna JSON embebida en `Recipe` es suficiente y evita un JOIN extra en cada carga de receta.
+
+**Implementación:** `section_meta TEXT DEFAULT '{}'` en el modelo Recipe. Se deserializa con `json.loads()` en cada acceso. El método `set_section_color(recipe_id, section_name, color)` en facade actualiza la clave correspondiente.
+
+---
+
+### Decisión 22 — Modo oscuro con archivo separado `theme.js`
+
+**Alternativa descartada:** Usar solo `@media (prefers-color-scheme: dark)` en CSS.
+
+**Razón:** La media query responde a la preferencia del sistema operativo pero no permite que el usuario elija independientemente. Con `theme.js` y `localStorage`, el usuario puede forzar un tema distinto al del sistema.
+
+**Implementación:** `theme.js` se carga de forma síncrona en `<head>` (antes de otros scripts) para evitar el flash de tema incorrecto (FOUC). Lee `localStorage.getItem('rs-theme')` y aplica el atributo `data-theme` en `<html>` antes de que el navegador pinte la página. El CSS usa el selector `[data-theme="dark"]` con variables CSS personalizadas.
+
+---
+
+### Decisión 23 — Fix de dialecto — no enviar idioma fuente a DeepL
+
+**Problema:** DeepL, al recibir `source_lang=ES`, "normalizaba" el texto al español estándar (España), reemplazando vocabulario argentino (manteca → mantequilla, palta → aguacate, etc.).
+
+**Solución:** Para el idioma detectado como fuente, copiar el texto original directamente a las columnas `*_es`/`*_en`/`*_fr` sin enviarlo a DeepL. Solo se traduce a los otros dos idiomas.
+
+**Alcance:** Afecta `_translate_recipe()`, `_translate_ingredient()`, y `_translate_step()`.
+
+---
+
+### Decisión 24 — Traducción de secciones en frontend con diccionario estático
+
+**Alternativa descartada:** Guardar traducciones de nombres de sección en la DB (columnas `section_name_en`, `section_name_fr` en `section_meta`), lo que requeriría llamadas a DeepL durante la traducción.
+
+**Razón:** El vocabulario de secciones culinarias es pequeño y predecible (masa, relleno, decoración, crema, glaseado, etc.). Un diccionario estático cubre el 95% de los casos sin costo de API.
+
+**Implementación:** `SECTION_MAP` en `i18n.js` con ~20 términos en los tres idiomas. La función `tSection(sec)` busca el nombre (case-insensitive) y retorna la traducción para el idioma activo. Si no encuentra el término, retorna el original sin cambios. La DB nunca se modifica — solo cambia el display.
+
+---
+
+### Fase 11 — UX avanzada + Correcciones técnicas ✅
+
+#### Objetivos
+- Corregir bugs críticos de cálculo y traducción
+- Agregar features de UX: modo oscuro, colores de sección, cierre de modales con Escape
+- Mejorar la robustez del sistema de traducción
+
+#### Tareas completadas
+- [x] Background threading para traducción en `scan_pdf` — desacopla la respuesta HTTP de DeepL
+- [x] Fix de cálculo de costo para unidades de masa/volumen (g, ml → dividir qty/1000 antes de × price_per_kg)
+- [x] Color por sección de ingredientes — columna `section_meta TEXT` en Recipe, endpoint `PATCH /recipes/<id>/sections/<name>/color`, picker nativo `<input type="color">` en frontend
+- [x] Modo oscuro completo — `theme.js`, variables CSS (`--bg`, `--card-bg`, `--text`, `--border`), toggle persistido en `localStorage` clave `rs-theme`
+- [x] Ajustes de layout — sidebar: 260px → 220px, grid de receta: `3fr 2fr` → `5fr 2fr`
+- [x] Escape para cerrar modales — listener `keydown` en `prices.js` y `recipe.js`
+- [x] Fix de dialecto en traducción — texto fuente copiado directamente sin pasar por DeepL, evita que español argentino sea "traducido" a español de España
+- [x] Diccionario de secciones multilingüe — `SECTION_MAP` + `tSection()` en `i18n.js`, traduce nombres de secciones en tiempo real sin modificar la DB

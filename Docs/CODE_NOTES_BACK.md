@@ -2788,6 +2788,39 @@ recipe, ingredients, steps = result
 ```
 -   Retornar una tupla es más simple que crear un objeto contenedor o un diccionario para este caso.
 
+### Background threading para la traducción
+
+Problema original: `_translate_recipe()` tardaba 5–15 segundos y Render tiene límite de 30s por request.
+La conexión se cortaba antes de retornar, y el usuario veía un error aunque la receta se creó correctamente.
+
+Solución: lanzar `_translate_recipe()` en un hilo daemon separado.
+
+```python
+from flask import current_app
+
+app = current_app._get_current_object()
+
+def _translate_bg():
+    with app.app_context():
+        try:
+            self._translate_recipe(recipe, ingredients, steps)
+        except Exception as e:
+            logging.error('Background translation failed: %s', e)
+
+threading.Thread(target=_translate_bg, daemon=True).start()
+return (recipe, ingredients, steps), None  # se retorna inmediatamente
+```
+
+Por qué `current_app._get_current_object()`:
+- `current_app` es un proxy de Flask que solo funciona dentro de un request context.
+- En un hilo separado, ese contexto no existe automáticamente.
+- `_get_current_object()` extrae la instancia real de la app antes de entrar al hilo,
+  y luego `with app.app_context()` recrea el contexto dentro del hilo.
+
+Por qué `daemon=True`:
+- Un hilo no-daemon bloquea el cierre del servidor hasta que termina.
+- Con `daemon=True`, el hilo se destruye automáticamente si el servidor se apaga.
+
 ---
 
 ### Funciones auxiliares
@@ -3663,6 +3696,31 @@ def get_recipe_cost(self, recipe_id, user_id):
 -   `currency: 'EUR'` — explícito para que la UI pueda mostrar el símbolo correcto
 -   `note` — en inglés, transparencia de que son estimaciones y no precios reales
 
+### Fix de cálculo de costo — normalización de unidades
+
+Bug: 500g de manteca con precio €10.49/kg mostraba €5.245,00 en lugar de €5,25.
+
+Causa: el cálculo multiplicaba `quantity × price_per_kg` directamente, sin convertir gramos a kilogramos.
+
+Solución: detectar la unidad y aplicar el factor de conversión correcto:
+
+```python
+_unit = (ing.unit or '').lower().strip()
+_G = {'g', 'gr', 'gram', 'grams', 'gramo', 'gramos',
+      'ml', 'milliliter', 'milliliters', 'millilitro', 'millilitros'}
+_KG = {'kg', 'kilogram', 'kilograms', 'kilo', 'kilos',
+       'l', 'liter', 'liters', 'litro', 'litros'}
+
+if _unit in _G:
+    estimated = round((qty / 1000) * price_per_kg, 2)  # g → kg
+elif _unit in _KG:
+    estimated = round(qty * price_per_kg, 2)            # ya en kg
+else:
+    estimated = round(qty * price_per_kg, 2)            # unidades/piezas
+```
+
+Ejemplo después del fix: 500g × €10.49/kg = (500/1000) × 10.49 = **€5,25**
+
 ---
 
 ### `_get_ingredient_price(name, user_id)` — método privado
@@ -4410,6 +4468,10 @@ class Recipe(db.Model):
     servings = db.Column(db.Integer, default=0)
     prep_time_min = db.Column(db.Integer, default=0)
     category = db.Column(db.String(100), default='')
+    section_meta = db.Column(db.Text, default='{}')
+    # JSON con metadata por sección: {"masa": {"color": "#f39c12"}, "relleno": {...}}
+    # Acceso: json.loads(recipe.section_meta or '{}')
+    # Actualización: facade.set_section_color(recipe_id, section_name, color)
 ```
 
 ### Lógica
@@ -4428,6 +4490,28 @@ class Recipe(db.Model):
 ```
 -   `db.Text` — para textos largos sin límite fijo (descripciones de recetas pueden ser extensas)
 -   `db.String(n)` — para textos cortos con longitud máxima conocida
+
+#### `section_meta` — metadata de secciones en JSON
+
+```python
+section_meta = db.Column(db.Text, default='{}')
+```
+
+-   `db.Text` sin límite de longitud — el JSON puede crecer a medida que el usuario agrega secciones
+-   `default='{}'` — cadena JSON de objeto vacío; equivalente a `json.loads('{}')` = `{}`
+-   Acceso desde Python: `json.loads(recipe.section_meta or '{}')`
+-   Actualización: `facade.set_section_color(recipe_id, section_name, color)`
+
+#### `set_section_color(recipe_id, section_name, color)`
+
+Actualiza el color de una sección específica dentro de `section_meta`.
+
+1. Carga la receta por ID.
+2. Deserializa `section_meta` con `json.loads()`.
+3. Escribe `meta[section_name]['color'] = color`.
+4. Serializa de vuelta con `json.dumps()` y guarda.
+
+Llamado por: `PATCH /api/v1/recipes/<id>/sections/<name>/color`
 
 ---
 
@@ -6339,4 +6423,50 @@ pytest tests/ -v
 ```
 
 66 tests — 0 fallos. La suite cubre modelos, repositorios e integración de API, incluyendo edge cases de 403/404/400, conversión de unidades, precios duplicados, y el endpoint de costos completo. El test `test_get_other_user_recipe_returns_403` fue el que detectó el bug de seguridad real documentado al inicio de esta sesión.
+
+---
+
+# Sprint 9 · Traducciones — `services/facade.py`
+
+> Las traducciones se introdujeron en Sprint 9. Esta sección documenta los métodos
+> `_translate_recipe`, `_translate_ingredient` y `_translate_step` del facade.
+
+## `_translate_recipe`, `_translate_ingredient`, `_translate_step`
+
+Estos tres métodos traducen el contenido de una receta a los tres idiomas soportados
+(inglés, español, francés) usando DeepL como proveedor principal y MyMemory como fallback.
+
+### Fix de dialecto — preservar idioma fuente
+
+Problema: DeepL, al recibir texto en español argentino con `source_lang='ES'`, lo "normalizaba"
+al español estándar de España, reemplazando términos como:
+- manteca → mantequilla
+- palta → aguacate
+- galletitas → galletas
+
+Solución: para el idioma detectado como fuente, copiar el texto original directamente a las
+columnas `*_es`/`*_en`/`*_fr` sin enviarlo a DeepL. Solo se traducen los otros dos idiomas.
+
+```python
+source_col = (source_lang or '')[:2].lower()  # 'es', 'en', 'fr', o ''
+
+# Filtrar el idioma fuente de la lista a traducir
+translate_pairs = [
+    lc for lc in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]
+    if lc[1] != source_col
+]
+
+# En el loop de resultados:
+if col == source_col:
+    setattr(recipe, f'title_{col}', recipe.title)          # texto original intacto
+    setattr(recipe, f'description_{col}', recipe.description or '')
+    for ing in ingredients:
+        setattr(ing, f'name_{col}', ing.name)              # nombre original
+    for step in steps:
+        setattr(step, f'description_{col}', step.description)
+    continue  # no pasar por DeepL
+```
+
+Alcance: el mismo cambio se aplica en `_translate_ingredient()` y `_translate_step()`
+para cuando se agrega/edita un ingrediente o paso individual.
 

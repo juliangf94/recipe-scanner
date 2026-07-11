@@ -138,7 +138,7 @@ flowchart TD
     end
 
     subgraph External["External Services"]
-        Groq["Groq API\nllama-3.3-70b-versatile"]
+        Groq["Groq API\nQwen 3.6-27b"]
         OFF["Open Food Facts API"]
         DeepL["DeepL / MyMemory\n(traducciones EN/ES/FR)"]
         Storage["Supabase Storage\n(fotos recetas + avatares)"]
@@ -216,7 +216,8 @@ Recipe
 ├── servings: int
 ├── prep_time_min: int
 ├── category: str
-└── image_url: str
+├── image_url: str
+└── section_meta: str     # TEXT, JSON con metadata por sección (color, etc.). Default: '{}'
 
 Ingredient
 ├── id: str               # UUID
@@ -375,6 +376,7 @@ classDiagram
         +create_store(user_id, name)
         +create_brand(user_id, name)
         +log_cook(recipe_id, user_id)
+        +set_section_color(recipe_id: str, section_name: str, color: str) Recipe
     }
 
     User "1" --> "0..*" Recipe : owns
@@ -436,6 +438,7 @@ sequenceDiagram
     G-->>Fa: JSON (title, ingredients, steps)
     Fa->>R: save(recipe + ingredients + steps)
     R-->>Fa: recipe
+    Note over Fa: _translate_recipe() corre en hilo daemon separado (async)
     Fa-->>A: recipe_id
     A-->>F: 201 Created {recipe_id}
     F-->>B: redirect → /recipes/{id}
@@ -472,12 +475,12 @@ sequenceDiagram
 
 ### External APIs
 
-#### Groq API (LLaMA 3.3-70b)
+#### Groq API (Qwen 3.6-27b)
 
 - **URL base:** `https://api.groq.com/openai/v1/chat/completions`
 - **Auth:** `Authorization: Bearer <GROQ_API_KEY>`
 - **Por qué:** inferencia ultrarrápida con hardware LPU especializado. Groq ofrece
-  acceso gratuito (free tier). El modelo actual es `llama-3.3-70b-versatile` (Meta, open-source).
+  acceso gratuito (free tier). El modelo actual es Qwen 3.6-27b (Alibaba, open-source).
 - **Uso en el proyecto:** se le envía el texto extraído del PDF y se le pide que
   devuelva un JSON estructurado con título, ingredientes (nombre, cantidad, unidad)
   y pasos ordenados. Las traducciones EN/ES/FR se hacen por separado (DeepL / MyMemory).
@@ -485,7 +488,7 @@ sequenceDiagram
 **Ejemplo de request:**
 ```json
 {
-  "model": "llama-3.3-70b-versatile",
+  "model": "qwen-qwq-32b",
   "messages": [
     {
       "role": "user",
@@ -619,6 +622,16 @@ Output 401:
 | GET | `/recipes/<id>` | Ver detalle de una receta | Yes |
 | PUT | `/recipes/<id>` | Editar una receta | Yes |
 | DELETE | `/recipes/<id>` | Eliminar una receta | Yes |
+| PATCH | `/recipes/<recipe_id>/sections/<section_name>/color` | Actualiza el color de una sección de ingredientes | Yes |
+
+**PATCH /recipes/\<recipe_id\>/sections/\<section_name\>/color**
+```
+Body:
+{ "color": "#f39c12" }
+
+Response 200:
+{ "section": "masa", "color": "#f39c12" }
+```
 
 **GET /recipes/**
 ```

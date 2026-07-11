@@ -21,6 +21,8 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 - Secure per-user data isolation — users can only access their own data
 - Static HTML + JS frontend, fully decoupled from the backend API
 - Containerized with Docker (multi-stage build: dev + production with gunicorn)
+- Modo oscuro completo con toggle y persistencia en localStorage
+- Color personalizable por sección de ingredientes
 
 ---
 

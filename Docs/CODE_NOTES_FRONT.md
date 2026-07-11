@@ -43,6 +43,7 @@ frontend/
 ├── css/
 │   └── style.css       ← Estilos globales (dark/light, WCAG AA)
 └── js/
+    ├── theme.js        ← Toggle de modo oscuro — aplica `data-theme` en `<html>` y persiste en `localStorage`
     ├── i18n.js         ← Sistema de traducción (EN/ES/FR) — se carga primero
     ├── api.js          ← Tokens JWT + fetch wrapper con auto-refresh — se carga segundo
     ├── auth.js         ← Login, registro, localStorage
@@ -155,6 +156,26 @@ function tCat(category) {
 Las categorías se guardan en la DB en el idioma en que el usuario las ingresó. `tCat()` las traduce al idioma activo. Si no hay traducción definida, devuelve el valor original sin modificar.
 
 **Problema que resuelve:** Si hay recetas con `"Postres"` (ES) y `"Desserts"` (EN), ambas deben aparecer bajo el mismo filtro. El dashboard usa `tCat()` para deduplicar los pills de categoría por label traducido.
+
+### `tSection(sec: string): string`
+Traduce nombres de secciones culinarias al idioma activo usando el diccionario estático `SECTION_MAP`.
+
+**Por qué existe**: Los nombres de sección (masa, relleno, decoración, etc.) se guardan en la DB en el idioma original del usuario. Para mostrarlos traducidos sin modificar la DB ni llamar a una API, se usa un diccionario de ~20 términos comunes en pastelería.
+
+**Comportamiento**:
+- Busca `sec.toLowerCase().trim()` en `SECTION_MAP`.
+- Si encuentra entrada, retorna `entry[lang]` para el idioma activo.
+- Si no encuentra o `entry[lang]` no existe, retorna el string original sin cambios (nunca rompe el display).
+
+**Ejemplo**:
+```js
+// Usuario en idioma EN, sección guardada en DB como "masa"
+tSection('masa')  // → 'Dough'
+tSection('masa')  // → 'Pâte' (si lang = 'fr')
+tSection('relleno especial') // → 'relleno especial' (no está en diccionario)
+```
+
+**Términos incluidos**: masa, relleno, decoración, crema, glaseado, cobertura, bizcocho, base, almíbar, merengue, ganache, caramelo, salsa, masa de tarta, masa quebrada, masa hojaldrada, masa choux — con equivalentes en EN y FR.
 
 ### `titleCase(str)` — normalización de categorías
 
@@ -650,6 +671,16 @@ async function changeIngredientStore(ingId, storeId) {
 
 Cada fila de la tabla tiene su propio `<select>` con las tiendas del usuario. Al cambiar la tienda, se actualiza `preferred_store_id` en el backend y se recalcula el costo. El backend usa ese `preferred_store_id` en `_resolve_price` para buscar el precio de esa tienda primero.
 
+#### Cierre de modales con Escape
+Un único listener `keydown` en el documento cierra cualquiera de los 7 modales de la página si está abierto:
+- `edit-modal` (editar receta)
+- `price-modal` (precio de ingrediente)
+- `step-add-modal` / `step-edit-modal` (pasos)
+- `ing-modal` / `ing-edit-modal` (ingredientes)
+- `confirm-delete-modal` (confirmación de eliminación)
+
+El listener verifica `classList.contains('open')` antes de llamar a la función de cierre correspondiente, por lo que es seguro que corra aunque ningún modal esté abierto.
+
 ---
 
 ## `frontend/js/prices.js`
@@ -785,6 +816,16 @@ function sortedPrices(prices) {
 
 `[...prices]` crea una copia superficial — `Array.sort()` muta el original, lo que causaría re-renders incorrectos. `localeCompare()` respeta acentos y caracteres especiales (ñ, é).
 
+#### Cierre de modales con Escape
+```js
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('stores-modal').classList.contains('open')) closeStoresModal();
+  if (document.getElementById('brands-modal').classList.contains('open')) closeBrandsModal();
+});
+```
+Cierra el modal activo al presionar Escape. Complementa el cierre por click fuera del modal (click-outside) que ya existía.
+
 ---
 
 ## `frontend/js/i18n.js` — sistema de internacionalización completo
@@ -808,6 +849,49 @@ document.addEventListener('langchange', () => {
 ```
 
 Esto permite que el cambio de idioma actualice hasta los elementos generados dinámicamente por JavaScript (que no tienen `data-i18n` porque no existen en el HTML inicial).
+
+---
+
+## `frontend/js/theme.js` — Modo oscuro
+
+**Ubicación**: `frontend/js/theme.js`  
+**Cuándo se carga**: En el `<head>` de cada página HTML, de forma **síncrona** y **antes** de otros scripts. Esto es intencional: si se cargara después, el navegador pintaría la página con el tema por defecto antes de aplicar el guardado, causando un flash de tema incorrecto (FOUC — Flash of Unstyled Content).
+
+#### Clave de `localStorage`
+```
+rs-theme → 'light' | 'dark'
+```
+
+#### Función `applyTheme(theme)`
+Aplica el tema al documento:
+1. Establece `document.documentElement.setAttribute('data-theme', theme)` — el selector `[data-theme="dark"]` en `style.css` activa todas las variables oscuras.
+2. Actualiza el texto/title de todos los botones `.theme-toggle` en la página (☀ / 🌙).
+
+#### Función `toggleTheme()` (global)
+Llamada por `onclick="toggleTheme()"` en el botón `.theme-toggle` del sidebar. Lee el tema actual de `data-theme`, lo invierte, lo guarda en `localStorage` y llama a `applyTheme()`.
+
+#### Variables CSS del modo oscuro
+Definidas en `style.css` bajo `[data-theme="dark"]`:
+
+| Variable | Valor claro | Valor oscuro |
+|---|---|---|
+| `--bg` | `#f8f9fa` | `#0f1117` |
+| `--sidebar-bg` | `#1a1f2e` | `#161922` |
+| `--card-bg` | `#ffffff` | `#1e2130` |
+| `--text` | `#1a1a2e` | `#e2e8f0` |
+| `--text-muted` | `#6c757d` | `#94a3b8` |
+| `--border` | `#e9ecef` | `#2d3748` |
+
+#### Inicialización
+Al cargar el script, lee `localStorage.getItem('rs-theme')` y aplica el tema guardado (o `'light'` por defecto) antes de que el DOM esté completo.
+
+---
+
+## `frontend/css/style.css` — Ajustes de layout
+
+#### Ajustes de layout (actualizados)
+- **Sidebar**: `--sidebar-width: 220px` (reducido desde 260px para dar más espacio al contenido)
+- **Grid de detalle de receta**: `.detail-grid { grid-template-columns: 5fr 2fr }` (antes `3fr 2fr`) — el panel de ingredientes es más ancho y el panel lateral más angosto
 
 ---
 

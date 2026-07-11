@@ -28,6 +28,8 @@ Solo project — Julian Gonzalez
 | Should Have | Edit and delete recipes |
 | Could Have | Recipe search by title |
 | Could Have | Total cost calculation per recipe |
+| Could Have | Modo oscuro completo ✅ |
+| Could Have | Color por sección de ingredientes ✅ |
 | Won't Have | Recipe sharing between users |
 | Won't Have | Import recipes from URL |
 | Won't Have | Ratings and comments |
@@ -372,3 +374,22 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 | API endpoints | Integration test | pytest + Flask test client |
 | External APIs | Mock | pytest + unittest.mock |
 | Full user flow | Manual | Browser |
+
+---
+
+## Sprint 10 — UX avanzada + Correcciones técnicas
+
+**Objetivo**: Corregir bugs críticos y agregar features de UX completadas fuera del plan original.
+
+| # | Tarea | Prioridad | Estado |
+|---|---|---|---|
+| 1 | Background threading para `_translate_recipe` en `scan_pdf` | Alta | ✅ Done |
+| 2 | Fix cálculo de costo: `qty / 1000` para unidades g/ml antes de `× price_per_kg` | Alta | ✅ Done |
+| 3 | `section_meta TEXT` en Recipe + `set_section_color()` en facade + endpoint `PATCH /recipes/<id>/sections/<name>/color` + `<input type="color">` en frontend | Media | ✅ Done |
+| 4 | Modo oscuro: `theme.js` + variables CSS `--bg/--card-bg/--text/--border` + toggle en sidebar + persistencia en `localStorage` clave `rs-theme` | Media | ✅ Done |
+| 5 | Layout: sidebar `260px → 220px`, grid receta `3fr 2fr → 5fr 2fr` | Baja | ✅ Done |
+| 6 | Escape para cerrar modales (`prices.js` y `recipe.js`) | Baja | ✅ Done |
+| 7 | Fix dialecto en traducción: copiar texto fuente directamente sin enviar a DeepL | Alta | ✅ Done |
+| 8 | `SECTION_MAP` + `tSection()` en `i18n.js` — traduce nombres de sección en tiempo real | Baja | ✅ Done |
+
+**Resultado**: Todos los items completados. App estable y lista para presentación.
