@@ -1279,3 +1279,20 @@ document.getElementById('ing-edit-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeEditIngModal();
 });
 
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const modals = [
+    { id: 'edit-modal',          close: closeEditModal },
+    { id: 'price-modal',         close: closePriceModal },
+    { id: 'step-add-modal',      close: closeAddStepModal },
+    { id: 'step-edit-modal',     close: closeEditStepModal },
+    { id: 'ing-modal',           close: closeIngModal },
+    { id: 'ing-edit-modal',      close: closeEditIngModal },
+    { id: 'confirm-delete-modal',close: closeConfirmDelete },
+  ];
+  modals.forEach(({ id, close }) => {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('open')) close();
+  });
+});
+

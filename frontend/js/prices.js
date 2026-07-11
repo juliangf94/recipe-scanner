@@ -535,6 +535,11 @@ document.getElementById('stores-modal').addEventListener('click', e => {
 document.getElementById('brands-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeBrandsModal();
 });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('stores-modal').classList.contains('open')) closeStoresModal();
+  if (document.getElementById('brands-modal').classList.contains('open')) closeBrandsModal();
+});
 
 document.addEventListener('langchange', () => {
   renderStoresList();
