@@ -419,9 +419,11 @@ class RecipeScannerFacade:
         """
         text = self._extract_pdf_text(file_bytes)
         if not text.strip():
-            return None, 'no_text'
+            logging.info('No text found in PDF, falling back to vision model')
+            data = self._call_groq_vision(file_bytes)
+        else:
+            data = self._call_groq(text)
 
-        data = self._call_groq(text)
         if data is None:
             return None, 'groq_failed'
 
@@ -478,6 +480,51 @@ class RecipeScannerFacade:
             text += page.get_text()
         doc.close()
         return text
+
+    def _pdf_to_images_b64(self, file_bytes, dpi=150):
+        """Render each PDF page as a PNG and return list of base64 strings."""
+        import base64
+        doc = fitz.open(stream=file_bytes, filetype='pdf')
+        images = []
+        mat = fitz.Matrix(dpi / 72, dpi / 72)
+        for page in doc:
+            pix = page.get_pixmap(matrix=mat)
+            images.append(base64.b64encode(pix.tobytes('png')).decode())
+        doc.close()
+        return images
+
+    def _call_groq_vision(self, file_bytes):
+        """Fallback for image-based PDFs: send page images to llama-4-scout."""
+        import base64
+        images = self._pdf_to_images_b64(file_bytes)
+        if not images:
+            return None
+        client = Groq(api_key=os.environ.get('GROQ_API_KEY'))
+        content = []
+        for b64 in images[:4]:  # max 4 pages
+            content.append({'type': 'image_url', 'image_url': {'url': f'data:image/png;base64,{b64}'}})
+        content.append({'type': 'text', 'text': GROQ_PROMPT + '\n(Extract from the images above.)'})
+        try:
+            response = client.chat.completions.create(
+                model='meta-llama/llama-4-scout-17b-16e-instruct',
+                messages=[{'role': 'user', 'content': content}],
+                temperature=0.1,
+            )
+            raw = response.choices[0].message.content.strip()
+            raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+            raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
+            logging.info('Groq vision response (first 300 chars): %s', raw[:300])
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                match = re.search(r'\{', raw)
+                if match:
+                    obj, _ = json.JSONDecoder().raw_decode(raw, match.start())
+                    return obj
+            return None
+        except Exception as e:
+            logging.error('Groq vision call failed: %s', e)
+            return None
 
     def _call_groq(self, text):
         client = Groq(api_key=os.environ.get('GROQ_API_KEY'))
