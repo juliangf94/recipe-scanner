@@ -811,22 +811,33 @@ class RecipeScannerFacade:
         result = []
         total = 0.0
 
+        _G = {'g', 'gr', 'gram', 'grams', 'gramo', 'gramos',
+              'ml', 'milliliter', 'milliliters', 'millilitro', 'millilitros'}
+        _KG = {'kg', 'kilogram', 'kilograms', 'kilo', 'kilos',
+               'l', 'liter', 'liters', 'litro', 'litros'}
+        _WEIGHT = _G | _KG
+
         for ing in ingredients:
-            price_per_kg, source, store_id = self._resolve_price(ing, user_id)
+            price_per_kg, source, store_id, bought_unit = self._resolve_price(ing, user_id)
             try:
                 qty = float(ing.quantity)
             except (ValueError, TypeError):
                 qty = 0.0
             _unit = (ing.unit or '').lower().strip()
-            _G = {'g', 'gr', 'gram', 'grams', 'gramo', 'gramos',
-                  'ml', 'milliliter', 'milliliters', 'millilitro', 'millilitros'}
-            _KG = {'kg', 'kilogram', 'kilograms', 'kilo', 'kilos',
-                   'l', 'liter', 'liters', 'litro', 'litros'}
             if _unit in _G:
                 estimated = round((qty / 1000) * price_per_kg, 2)
             else:
                 estimated = round(qty * price_per_kg, 2)
             total += estimated
+
+            # True when recipe uses a piece unit but price was stored per weight unit
+            price_bought_unit = (bought_unit or '').lower().strip()
+            unit_warning = (
+                _unit not in _WEIGHT
+                and source not in ('manual',)
+                and price_bought_unit in _WEIGHT
+            )
+
             result.append({
                 'ing_id': ing.id,
                 'name': ing.name,
@@ -838,6 +849,7 @@ class RecipeScannerFacade:
                 'price_per_kg': price_per_kg,
                 'estimated_price': estimated,
                 'source': source,
+                'unit_warning': unit_warning,
                 'active_store_id': store_id,
                 'preferred_store_id': ing.preferred_store_id,
                 'preferred_brand_id': getattr(ing, 'preferred_brand_id', None)
@@ -852,10 +864,10 @@ class RecipeScannerFacade:
         }
 
     def _resolve_price(self, ing, user_id=None):
-        """Returns (price_per_kg, source, store_id)."""
+        """Returns (price_per_kg, source, store_id, bought_unit)."""
         # 1. Manual override
         if ing.manual_price is not None:
-            return ing.manual_price, 'manual', None
+            return ing.manual_price, 'manual', None, None
 
         name_lower = ing.name.lower().strip()
 
@@ -887,33 +899,33 @@ class RecipeScannerFacade:
                              and c.brand_id == ing.preferred_brand_id]
                     if match:
                         best = min(match, key=lambda c: c.price_per_kg)
-                        return best.price_per_kg, 'custom', best.store_id
+                        return best.price_per_kg, 'custom', best.store_id, best.bought_unit
 
                 if has_store:
                     at_store = [c for c in customs if c.store_id == ing.preferred_store_id]
                     if at_store:
                         best = min(at_store, key=lambda c: c.price_per_kg)
-                        return best.price_per_kg, 'custom', best.store_id
+                        return best.price_per_kg, 'custom', best.store_id, best.bought_unit
 
                 if has_brand:
                     at_brand = [c for c in customs if c.brand_id == ing.preferred_brand_id]
                     if at_brand:
                         best = min(at_brand, key=lambda c: c.price_per_kg)
-                        return best.price_per_kg, 'custom', best.store_id
+                        return best.price_per_kg, 'custom', best.store_id, best.bought_unit
 
                 best = min(customs, key=lambda c: c.price_per_kg)
-                return best.price_per_kg, 'custom', best.store_id
+                return best.price_per_kg, 'custom', best.store_id, best.bought_unit
 
         # 3. Cached OFF price
         if ing.price_source == 'off' and ing.estimated_cost and ing.estimated_cost > 0:
-            return ing.estimated_cost, 'off', None
+            return ing.estimated_cost, 'off', None, None
 
         # 4. Local fallback dict
         for key, price in FALLBACK_PRICES.items():
             if key in name_lower:
-                return price, 'fallback', None
+                return price, 'fallback', None, None
 
-        return 5.00, 'fallback', None
+        return 5.00, 'fallback', None, None
 
     def fetch_and_cache_off_price(self, ing_id):
         """Calls OFF API, caches the result on the ingredient, returns (price, source) or None."""

@@ -701,12 +701,10 @@ async function loadCost() {
     document.getElementById('cost-footer').style.display = '';
     document.getElementById('cost-total').textContent = `€${c.total_estimated_cost.toFixed(2)}`;
 
-    const _PIECE_UNITS = new Set(['unidad', 'unidades', 'pieza', 'piezas', 'piece', 'pieces', 'pièce', 'pièces', 'pizca', 'pizcas', 'pinch', 'cda', 'cdas', 'tbsp', 'tsp', 'cucharada', 'cucharadas']);
-
     c.ingredients.forEach(i => {
       const src = i.source || 'fallback';
       const srcLabel = t(`src_${src}`);
-      const unitMismatch = src !== 'manual' && _PIECE_UNITS.has((i.unit || '').toLowerCase().trim());
+      const unitMismatch = !!i.unit_warning;
 
       // €/kg column (clickable)
       const pkgCell = document.querySelector(`[data-ing-id="${i.ing_id}"][data-col="pkg"]`);
