@@ -242,6 +242,25 @@ Render (free tier) duerme el servidor después de inactividad. Esta línea dispa
 
 ---
 
+### `_fetchWithTimeout()` — fetch con timeout vía AbortController
+
+```javascript
+function _fetchWithTimeout(url, opts = {}, ms = 25000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...opts, signal: ctrl.signal })
+    .finally(() => clearTimeout(timer));
+}
+```
+
+Cuando el backend en Render está en cold start, un `fetch()` sin timeout puede colgar indefinidamente, dejando al usuario con un spinner eterno. `_fetchWithTimeout` envuelve `fetch()` con un `AbortController`: si la respuesta no llega en `ms` milisegundos (por defecto 25 segundos), la señal aborta el request y `fetch()` lanza un `AbortError`.
+
+**Por qué 25 segundos:** Render tarda entre 10 y 20 segundos en despertar un servidor frío. 25 segundos da margen suficiente sin dejar al usuario esperando más de lo razonable. El warm-up ping a `/health` reduce la probabilidad de cold start, pero no lo garantiza.
+
+Todos los `fetch()` dentro de `apiFetch` fueron reemplazados por `_fetchWithTimeout`. Los llamadores (por ejemplo, `home.js`) capturan el `AbortError` con `try/catch` y muestran un mensaje de error traducido en lugar del spinner infinito.
+
+---
+
 ### Resolución de URLs de imágenes
 
 ```javascript
@@ -422,7 +441,7 @@ async function apiFetch(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const res = await _fetchWithTimeout(`${BASE_URL}${path}`, { ...options, headers });
 
   // 3. Si el servidor responde 401, intenta un refresh reactivo y reintenta
   if (res.status === 401) {
@@ -434,7 +453,7 @@ async function apiFetch(path, options = {}) {
     const retryHeaders = { 'Content-Type': 'application/json', ...options.headers };
     if (retryToken) retryHeaders['Authorization'] = `Bearer ${retryToken}`;
 
-    const retryRes = await fetch(`${BASE_URL}${path}`, { ...options, headers: retryHeaders });
+    const retryRes = await _fetchWithTimeout(`${BASE_URL}${path}`, { ...options, headers: retryHeaders });
     if (retryRes.status === 401) { clearTokens(); window.location.href = 'index.html'; return; }
     if (retryRes.status === 204) return null;
     return retryRes.json().then(data => ({ ok: retryRes.ok, status: retryRes.status, data }));
@@ -448,6 +467,8 @@ async function apiFetch(path, options = {}) {
 Dos estrategias de refresh:
 - **Proactivo** — antes del request, si `isTokenExpired()` devuelve true
 - **Reactivo** — después del request, si el servidor devuelve 401 (el token puede haber expirado justo entre el chequeo y el envío)
+
+Los `fetch()` directos fueron reemplazados por `_fetchWithTimeout()` (ver sección anterior) para evitar que el cold start de Render deje los requests colgados indefinidamente.
 
 Todos los JS de la app usan `apiFetch()` en lugar de `fetch()` directamente. Así la lógica de tokens está en un solo lugar.
 
@@ -825,6 +846,25 @@ document.addEventListener('keydown', e => {
 });
 ```
 Cierra el modal activo al presionar Escape. Complementa el cierre por click fuera del modal (click-outside) que ya existía.
+
+### `invalidateHomeCache()` — invalidación del cache de home al mutar precios
+
+```javascript
+const HOME_SUMMARY_CACHE = 'rs_home_summary_v1';
+
+function invalidateHomeCache() {
+  localStorage.removeItem(HOME_SUMMARY_CACHE);
+}
+```
+
+La página `home.html` guarda el resumen semanal en `localStorage` (clave `rs_home_summary_v1`) con un TTL de 5 minutos para evitar llamar a la API en cada visita. Cuando el usuario modifica sus precios custom, ese resumen puede quedar desactualizado — por ejemplo, si el costo total de una receta cambia porque se editó el precio de un ingrediente.
+
+`invalidateHomeCache()` elimina la clave del cache. Se llama en tres operaciones que mutan precios:
+- `saveRowEdit()` — al guardar una edición en una fila existente
+- `saveNewRow()` — al crear un nuevo precio
+- `deletePrice()` — al eliminar un precio
+
+La próxima vez que el usuario visita `home.html`, el cache ya no existe y se hace una llamada fresca a `/summary`.
 
 ---
 
@@ -1371,3 +1411,63 @@ El listado de unidades "no pesables" estaba hardcodeado en `recipe.js` como `_PI
 Moverlo al backend centraliza la lógica — si se agrega una nueva unidad, solo se modifica
 `facade.py`, no el frontend. Además, el backend tiene acceso a `bought_unit` (la unidad
 con que fue guardado el precio) mientras que el frontend solo conoce la unidad del ingrediente.
+
+---
+
+# Sprint 12 — Cache TTL en home + fetch timeout
+
+---
+
+## `frontend/js/home.js` — Cache TTL y manejo de errores de red
+
+`home.js` carga el resumen semanal (`/summary`) cuando el usuario visita `home.html`. Para evitar llamadas innecesarias a la API en cada visita, se implementó un cache en `localStorage` con TTL de 5 minutos.
+
+### Constante `SUMMARY_TTL_MS`
+
+```javascript
+const SUMMARY_TTL_MS = 5 * 60 * 1000; // 5 minutos en milisegundos
+```
+
+Define el tiempo de vida del cache. Si el dato en `localStorage` tiene menos de 5 minutos de antigüedad, se usa directamente sin llamar a la API.
+
+### `_readCache()` y `_writeCache(data)`
+
+```javascript
+function _readCache() {
+  try {
+    const raw = localStorage.getItem('rs_home_summary_v1');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function _writeCache(data) {
+  localStorage.setItem('rs_home_summary_v1', JSON.stringify({ data, ts: Date.now() }));
+}
+```
+
+El cache se almacena como `{data, ts}`:
+- `data` — el objeto de respuesta de `/summary`
+- `ts` — timestamp Unix en milisegundos del momento de escritura
+
+`_readCache()` envuelve `JSON.parse` en `try/catch` por si el valor en `localStorage` está corrupto (por ejemplo, si una versión anterior de la app escribió un formato distinto).
+
+### Flujo del IIFE (carga de página)
+
+```
+Al cargar home.html:
+  1. _readCache() → ¿hay cache?
+     ├── No  → llamar /summary
+     └── Sí  → ¿Date.now() - ts < SUMMARY_TTL_MS?
+               ├── Sí (fresco)   → renderizar desde cache, NO llamar a la API
+               └── No (expirado) → llamar /summary
+  2. Si se llama a la API:
+     ├── Éxito → _writeCache(data), renderizar
+     └── Error (AbortError / red) → mostrar párrafo con data-i18n="err_load"
+                                     (traducido automáticamente al cambiar idioma)
+```
+
+El IIFE renderiza desde cache si los datos están frescos. Cuando expiran o no existen, llama a `/summary` usando `apiFetch`, que internamente usa `_fetchWithTimeout` (25 s). Si la llamada lanza `AbortError` u otro error de red, el `try/catch` muestra un mensaje `data-i18n="err_load"` en lugar de un spinner infinito. Ese mensaje se re-traduce automáticamente si el usuario cambia de idioma mientras está visible.
+
+### Relación con `prices.js`
+
+El cache de home se invalida desde `prices.js` cuando el usuario muta sus precios custom (ver `invalidateHomeCache()` en la sección de `prices.js`). La clave `rs_home_summary_v1` es compartida: `home.js` la escribe, `prices.js` la elimina.

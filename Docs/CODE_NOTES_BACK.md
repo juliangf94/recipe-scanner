@@ -6643,3 +6643,315 @@ class BrandList(Resource):
 Esto permite que el sistema de chips de `prices.js` cree múltiples registros de la misma
 marca sin conflictos, siempre que el ingrediente sea diferente.
 
+---
+
+# Sprint 12 (Fase 13) — INGREDIENT_SYNONYMS · price_cache · AbortController · Home TTL cache
+
+---
+
+## `backend/app/services/facade.py` — INGREDIENT_SYNONYMS
+
+### Nueva constante a nivel de módulo
+
+```python
+INGREDIENT_SYNONYMS = {
+    'manteca':     {'manteca', 'mantequilla', 'butter', 'beurre'},
+    'mantequilla': {'manteca', 'mantequilla', 'butter', 'beurre'},
+    'butter':      {'manteca', 'mantequilla', 'butter', 'beurre'},
+    'beurre':      {'manteca', 'mantequilla', 'butter', 'beurre'},
+    'harina':      {'harina', 'flour', 'farine'},
+    'flour':       {'harina', 'flour', 'farine'},
+    'farine':      {'harina', 'flour', 'farine'},
+    # ... azúcar/sugar/sucre, sal/salt/sel, leche/milk/lait, etc.
+}
+```
+
+`INGREDIENT_SYNONYMS` se define a nivel de módulo en `facade.py`, antes de la clase `RecipeScannerFacade`, al igual que `FALLBACK_PRICES`. Cada clave mapea a un `set` de Python con todas sus variantes equivalentes (no una lista — los sets garantizan unicidad y pertenencia O(1)).
+
+**¿Por qué es necesario además de Option A (búsqueda multilingüe)?**
+
+Option A usa los campos `name_en`, `name_es`, `name_fr` generados por DeepL para buscar precios en distintos idiomas. Esto cubre el caso "el PDF estaba en francés y el precio está guardado en español". Pero no cubre las variantes **dialectales**:
+
+- "manteca" (Argentina/Uruguay) y "mantequilla" (España) son el mismo ingrediente. DeepL traduce "manteca" del español al inglés como "butter" — no como "mantequilla". Por tanto `name_es` de un ingrediente llamado "manteca" puede ser "manteca", no "mantequilla".
+- "manteca" (español RP) ↔ "beurre" (francés): el usuario puede tener su precio guardado en francés y la receta puede estar en castellano rioplatense.
+
+`INGREDIENT_SYNONYMS` resuelve este problema al nivel de candidatos, antes de buscar en la BD.
+
+**Cómo se integra en `_resolve_price()`:**
+
+```python
+# Construcción de candidatos — se agrega DESPUÉS de Option A:
+candidates = {name_lower}
+for attr in ('name_en', 'name_es', 'name_fr'):
+    val = (getattr(ing, attr, None) or '').lower().strip()
+    if val:
+        candidates.add(val)
+
+# Ampliar con sinónimos dialectales/regionales:
+for c in list(candidates):
+    candidates |= INGREDIENT_SYNONYMS.get(c, set())
+```
+
+`candidates |= set_de_sinonimos` hace la unión en el lugar. Si `candidates` contiene `'manteca'` y `INGREDIENT_SYNONYMS.get('manteca')` = `{'manteca', 'mantequilla', 'butter', 'beurre'}`, después de la operación `candidates` incluye los cuatro valores. La búsqueda de precios custom se ejecuta entonces sobre todos los candidatos.
+
+**Iteración sobre copia de la lista (`list(candidates)`):**
+
+Se usa `list(candidates)` para iterar sobre una copia estática porque estamos modificando `candidates` dentro del mismo loop. Iterar directamente sobre el set mientras se lo modifica lanza `RuntimeError: Set changed size during iteration`.
+
+---
+
+## `backend/app/services/facade.py` — FALLBACK_PRICES ampliado con francés y dialecto
+
+Se agregaron las siguientes entradas a `FALLBACK_PRICES` (precios en EUR por kg):
+
+```python
+# Nombres franceses
+'beurre':    9.00,   # manteca/mantequilla
+'farine':    1.20,   # harina
+'sucre':     1.00,   # azúcar
+'sel':       0.50,   # sal
+'lait':      1.20,   # leche
+'oeuf':      2.00,   # huevo (EUR/kg)
+'levure':    8.00,   # levadura
+'fromage':  12.00,   # queso
+'creme':     3.50,   # crema
+'citron':    2.50,   # limón
+'noix':     15.00,   # nuez
+'amande':   20.00,   # almendra
+'eau':       0.00,   # agua
+
+# Dialecto español
+'mantequilla': 9.00,  # variante española de manteca/butter
+```
+
+Estas entradas garantizan que recetas en francés o con vocabulario español de España puedan calcular costos de fallback razonables sin que el usuario haya registrado precios custom.
+
+---
+
+## `backend/app/services/facade.py` — parámetro `_cached` en `get_custom_prices_for_ingredient`
+
+### Firma actualizada
+
+```python
+# Antes:
+def get_custom_prices_for_ingredient(self, user_id, ingredient_name):
+    name_lower = ingredient_name.lower().strip()
+    all_user = [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+    # ...
+
+# Ahora:
+def get_custom_prices_for_ingredient(self, user_id, ingredient_name, _cached=None):
+    name_lower = ingredient_name.lower().strip()
+    all_user = _cached if _cached is not None else \
+               [cp for cp in self._custom_prices.get_all() if cp.user_id == user_id]
+    # ... resto del método sin cambios
+```
+
+**Propósito de `_cached`:** si se provee una lista pre-cargada de `CustomPrice`, el método opera sobre ella en lugar de ejecutar una consulta a la BD. Esto es la pieza central de la eliminación del N+1 (ver `price_cache` en `get_recipe_cost` más abajo).
+
+**¿Por qué `_cached is not None` y no solo `if _cached`?**
+
+Si el usuario no tiene ningún precio custom, `_cached` sería una lista vacía `[]`. Con `if _cached`, Python evalúa `[]` como `False` y el método haría una consulta a la BD de todas formas, anulando la optimización. `_cached is not None` distingue correctamente entre "no se pasó caché" (`None`) y "se pasó caché vacío" (`[]`).
+
+**Prefijo `_`:** indica que es un parámetro de implementación interna, no parte de la API pública del método. Los callers externos (endpoints, tests) no deben usarlo — solo `_resolve_price()`.
+
+---
+
+## `backend/app/services/facade.py` — parámetro `_price_cache` en `_resolve_price`
+
+### Firma actualizada
+
+```python
+# Antes:
+def _resolve_price(self, ing, user_id=None):
+
+# Ahora:
+def _resolve_price(self, ing, user_id=None, _price_cache=None):
+```
+
+`_resolve_price` recibe `_price_cache` y lo pasa en cada llamada a `get_custom_prices_for_ingredient`:
+
+```python
+# Dentro del loop de candidatos (multilingüe + sinónimos):
+for candidate in candidates:
+    for cp in self.get_custom_prices_for_ingredient(
+            user_id, candidate, _cached=_price_cache):
+        if cp.id not in seen_ids:
+            seen_ids.add(cp.id)
+            customs.append(cp)
+```
+
+Todos los `return` existentes de `_resolve_price` conservan su firma de 4 valores `(price_per_kg, source, store_id, bought_unit)`. El parámetro `_price_cache` solo afecta de dónde se cargan los datos de precios custom.
+
+---
+
+## `backend/app/services/facade.py` — eliminación del N+1 con price_cache en `get_recipe_cost`
+
+### El problema N+1 anterior
+
+Antes de este cambio, el flujo de `get_recipe_cost()` producía múltiples consultas a la BD:
+
+```
+Para cada ingrediente de la receta:
+    _resolve_price(ing, user_id)
+        → para cada candidato (nombre original + traducciones + sinónimos):
+            get_custom_prices_for_ingredient(user_id, candidato)
+                → self._custom_prices.filter_by(user_id=user_id)  ← CONSULTA A LA BD
+```
+
+Con N ingredientes y K candidatos por ingrediente: **N × K consultas** a la BD por cada llamada a `get_recipe_cost()`.
+
+Ejemplo con 12 ingredientes y 4 candidatos (nombre + 3 idiomas): **48 consultas** por cálculo de costo de receta. Con `INGREDIENT_SYNONYMS` este número podía crecer más.
+
+### La solución: pre-carga única
+
+```python
+def get_recipe_cost(self, recipe_id, user_id):
+    recipe = self.get_recipe(recipe_id)
+    if not recipe or recipe.user_id != user_id:
+        return None
+
+    # Pre-carga TODOS los CustomPrice del usuario una sola vez
+    price_cache = list(self._custom_prices.filter_by(user_id=user_id))
+
+    _G  = {'g', 'gr', 'gram', 'grams', 'ml', 'millilitro', 'millilitros', 'milliliter', 'cc'}
+    _KG = {'kg', 'kilogram', 'kilograms', 'l', 'liter', 'litre', 'litro', 'litros'}
+
+    ingredients = self.get_ingredients_by_recipe(recipe_id)
+    items = []
+    total = 0.0
+
+    for ing in ingredients:
+        # price_cache se pasa en cada llamada — ninguna consulta adicional a la BD
+        price_per_kg, source, store_id, bought_unit = self._resolve_price(
+            ing, user_id, _price_cache=price_cache
+        )
+        # ... resto del cálculo sin cambios
+```
+
+**`list(self._custom_prices.filter_by(user_id=user_id))`:**
+`filter_by()` de SQLAlchemy devuelve un objeto `Query` — una consulta perezosa que aún no se ejecutó. `list()` materializa ese query en una lista Python. A partir de ese punto, todas las búsquedas en `get_custom_prices_for_ingredient` operan sobre esa lista en RAM con list comprehensions, sin ninguna interacción con la BD.
+
+**Complejidad resultante:** O(1) consultas a la BD por llamada a `get_recipe_cost()`, independientemente del número de ingredientes, candidatos o sinónimos.
+
+---
+
+## `frontend/js/api.js` — `_fetchWithTimeout` con AbortController
+
+### Helper nuevo
+
+```javascript
+function _fetchWithTimeout(url, opts = {}, ms = 25_000) {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { ...opts, signal: ctrl.signal })
+        .finally(() => clearTimeout(id));
+}
+```
+
+**`AbortController`:** API nativa del navegador que permite cancelar requests `fetch()` en curso. `ctrl.signal` se pasa como opción a `fetch()` — cuando se llama `ctrl.abort()`, el request se cancela y la promesa rechaza con un `AbortError` (subclase de `DOMException`).
+
+**`setTimeout(() => ctrl.abort(), ms)`:** programa la cancelación a los 25 segundos. Si el servidor responde antes, el `.finally()` limpia el timeout con `clearTimeout(id)` para no dejar timers huérfanos en memoria.
+
+**25 segundos:** valor elegido para cubrir el peor caso de cold start de Render free tier (~15s) más margen. No es tan largo como para que el usuario espere sin información, ni tan corto como para cortar requests legítimos lentos (cálculo de costo de receta grande).
+
+**Integración en `apiFetch`:** todos los `fetch()` dentro de `apiFetch` fueron reemplazados por `_fetchWithTimeout(url, opts)`. La interface de `apiFetch` no cambia — los callers no saben ni necesitan saber que hay un timeout activo.
+
+---
+
+## `frontend/js/home.js` — caché TTL de 5 minutos para el resumen
+
+### Constante y helpers nuevos
+
+```javascript
+const SUMMARY_TTL_MS = 5 * 60 * 1000; // 5 minutos en milisegundos
+
+function _readCache() {
+    const raw = localStorage.getItem(HOME_SUMMARY_CACHE);
+    if (!raw) return null;
+    return JSON.parse(raw); // { data, ts }
+}
+
+function _writeCache(data) {
+    localStorage.setItem(
+        HOME_SUMMARY_CACHE,
+        JSON.stringify({ data, ts: Date.now() })
+    );
+}
+```
+
+`_readCache()` retorna el objeto `{data, ts}` o `null`. El caller verifica si `Date.now() - ts < SUMMARY_TTL_MS` para decidir si el caché está fresco.
+
+`_writeCache(data)` envuelve los datos en `{data, ts}` antes de serializar. El campo `ts` (timestamp en milisegundos) es el momento en que se guardó el caché — se usa para calcular la edad.
+
+### Flujo de la IIFE refactorizada
+
+```javascript
+(async () => {
+    const cached = _readCache();
+
+    // Render inmediato desde caché si existe
+    if (cached) renderSummary(cached.data);
+
+    // Skip del fetch si el caché es fresco (< 5 minutos)
+    const fresh = cached && (Date.now() - cached.ts < SUMMARY_TTL_MS);
+    if (fresh) return;
+
+    // Fetch y manejo de errores
+    try {
+        const data = await apiFetch('/summary');
+        _writeCache(data);
+        renderSummary(data);
+    } catch (err) {
+        const p = document.createElement('p');
+        p.dataset.i18n = 'err_load';
+        p.textContent = t('err_load');
+        summaryContainer.appendChild(p);
+    }
+})();
+```
+
+**Render inmediato:** si hay caché (fresco o vencido), se renderiza inmediatamente — el usuario ve datos sin esperar al fetch. Si el caché está vencido, el fetch actualiza los datos en segundo plano y re-renderiza al completar.
+
+**`try/catch`:** captura tanto `AbortError` (timeout de 25s del `_fetchWithTimeout`) como errores de red. En lugar de dejar el spinner congelado, muestra un párrafo con `data-i18n="err_load"` — si el usuario cambia de idioma, el texto del error también se actualiza.
+
+---
+
+## `frontend/js/prices.js` — `invalidateHomeCache` y llamadas en mutaciones
+
+### Nueva constante y función
+
+```javascript
+const HOME_SUMMARY_CACHE = 'rs_home_summary_v1';
+
+function invalidateHomeCache() {
+    localStorage.removeItem(HOME_SUMMARY_CACHE);
+}
+```
+
+`invalidateHomeCache()` borra directamente la clave del caché de `localStorage`. La próxima vez que el usuario cargue `home.html`, no habrá caché y se pedirán datos frescos.
+
+**Por qué la misma clave que en `home.js`:**
+`prices.js` y `home.js` son archivos JS independientes sin imports entre ellos (vanilla JS, sin módulos ES). Usan la misma string literal `'rs_home_summary_v1'` como contrato implícito. El prefijo `rs_` es el namespace del proyecto (RecipeScanner) y `_v1` permite invalidar todos los cachés en producción si se cambia la estructura del objeto (sería `rs_home_summary_v2`).
+
+### Llamadas en mutaciones de precio
+
+```javascript
+async function saveRowEdit(priceId, tr) {
+    // ... lógica de guardado ...
+    invalidateHomeCache();  // ← precio editado → caché de home invalido
+}
+
+async function saveNewRow(tr) {
+    // ... lógica de creación ...
+    invalidateHomeCache();  // ← precio creado → caché de home invalido
+}
+
+async function deletePrice(priceId) {
+    // ... lógica de eliminación ...
+    invalidateHomeCache();  // ← precio eliminado → caché de home invalido
+}
+```
+
+El caché del resumen de home incluye el costo estimado de las recetas, que depende de los precios custom. Cualquier mutación (crear, editar, eliminar precio) puede cambiar el costo de cualquier receta del usuario — por eso se invalida el caché en los tres casos.
+

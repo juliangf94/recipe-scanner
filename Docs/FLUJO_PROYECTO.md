@@ -341,12 +341,14 @@ const BASE_URL = IS_LOCAL
   ? 'http://localhost:5000/api/v1'
   : 'https://recipe-scanner-kfnm.onrender.com/api/v1';
 
-// Wrapper de fetch con JWT automático y auto-refresh
+// Wrapper de fetch con JWT automático, auto-refresh y timeout
 async function apiFetch(path, options) {
   // 1. Agrega el header Authorization: Bearer <token>
   // 2. Si el servidor devuelve 401, intenta renovar el token con /auth/refresh
   // 3. Si el refresh funciona, reintenta el request original
   // 4. Si el refresh falla → redirige al login
+  // 5. Internamente usa _fetchWithTimeout (AbortController, 25 s) para
+  //    evitar que un cold start de Render deje el request colgado indefinidamente
 }
 ```
 
@@ -358,6 +360,31 @@ const LANGS = { es: {...}, en: {...}, fr: {...} };
 
 // t('nav_home') devuelve "Inicio" / "Home" / "Accueil"
 // según el idioma seleccionado guardado en localStorage
+```
+
+### home.js — cache TTL y resiliencia frente a cold starts
+
+`home.html` muestra el resumen semanal de cocina. Para evitar llamadas innecesarias a la API en cada visita, `home.js` implementa un cache en `localStorage` con TTL de 5 minutos:
+
+```
+Al cargar home.html:
+  1. ¿Existe cache en localStorage con clave 'rs_home_summary_v1'?
+     ├── No  → llamar GET /summary
+     └── Sí  → ¿antigüedad < 5 min (SUMMARY_TTL_MS)?
+               ├── Sí (fresco)   → renderizar desde cache, SIN llamar a la API
+               └── No (expirado) → llamar GET /summary
+  2. Si se llama a la API:
+     ├── Éxito → guardar {data, ts} en localStorage, renderizar
+     └── Error (AbortError / red) → mostrar mensaje data-i18n="err_load"
+```
+
+El cache se invalida automáticamente desde `prices.js` cada vez que el usuario muta sus precios custom (crear, editar o eliminar un precio). Así, si el costo de una receta cambia por un precio nuevo, el próximo acceso a `home.html` obtiene datos frescos del backend.
+
+```
+prices.js
+  saveRowEdit()  ─┐
+  saveNewRow()   ─┼─► invalidateHomeCache() → localStorage.removeItem('rs_home_summary_v1')
+  deletePrice()  ─┘
 ```
 
 ---
@@ -588,3 +615,12 @@ los muestra agrupados por nombre de marca con ingredientes como sublista.
 - Crear "Lidl" para "azúcar" → OK (distinto ingrediente)
 - Crear "Lidl" para "harina" de nuevo → 409 Conflict (ya existe esa combinación exacta)
 La normalización usa `_norm()` para ser insensible a acentos.
+
+**¿Por qué `home.html` no llama a la API en cada visita?**
+`home.js` guarda el resultado de `/summary` en `localStorage` con un timestamp. Al cargar la página, si el cache tiene menos de 5 minutos de antigüedad (`SUMMARY_TTL_MS`), se renderiza directamente desde el cache sin hacer ningún request. Solo cuando el cache expiró o fue invalidado se llama a la API. Esto reduce la carga en el backend de Render y mejora la velocidad de carga percibida.
+
+**¿Qué pasa si el backend tarda demasiado en responder (cold start)?**
+Todos los `fetch()` dentro de `apiFetch` usan `_fetchWithTimeout` con un límite de 25 segundos (implementado con `AbortController`). Si el servidor no responde en ese tiempo, se lanza un `AbortError`. Los llamadores que necesitan manejar este caso (como `home.js`) envuelven `apiFetch` en `try/catch` y muestran un mensaje de error traducido (`data-i18n="err_load"`) en lugar de un spinner infinito.
+
+**¿Cuándo se invalida el cache de home?**
+Cada vez que el usuario muta sus precios custom desde `prices.html` — crear, editar o eliminar un precio — `prices.js` llama a `invalidateHomeCache()`, que elimina la clave `rs_home_summary_v1` de `localStorage`. El próximo acceso a `home.html` obtendrá datos frescos del backend, reflejando los nuevos precios en el resumen semanal.

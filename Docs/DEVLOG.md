@@ -1207,3 +1207,115 @@ mejorar el balance visual entre la columna de ingredientes y la columna lateral 
 - [x] `get_brand_by_name_and_ingredient(user_id, name, ingredient_name)` en `facade.py`
 - [x] `POST /brands` usa nueva función de deduplicación por (nombre, ingrediente)
 - [x] Ajustes CSS: `detail-grid` `5fr 2fr` → `3fr 2fr`, gap `1.5rem` → `0.75rem`, padding de `app-layout`, `step-item` y `section-card-header`
+
+---
+
+## Decisiones técnicas — Fase 13 (Sinónimos multilingüe + Optimizaciones de rendimiento)
+
+### Decisión 30 — INGREDIENT_SYNONYMS para resolución de precios entre idiomas y dialectos
+
+**Problema:** La búsqueda multilingüe Option A (Decisión 12) ya iterapaba sobre `name_en`, `name_es` y `name_fr` del ingrediente para resolver precios cross-idioma. Sin embargo, no cubría las variantes **dialectales**: "manteca" (Argentina/Uruguay) y "mantequilla" (España) son el mismo ingrediente pero ninguno es traducción del otro — son variantes regionales que coexisten en español. Lo mismo aplica entre "manteca" y "butter" (inglés) o "beurre" (francés): el modelo IA y DeepL los tratan como palabras distintas.
+
+**Solución:** Diccionario `INGREDIENT_SYNONYMS` a nivel de módulo en `facade.py`:
+
+```python
+INGREDIENT_SYNONYMS = {
+    'manteca':     {'manteca', 'mantequilla', 'butter', 'beurre'},
+    'mantequilla': {'manteca', 'mantequilla', 'butter', 'beurre'},
+    'butter':      {'manteca', 'mantequilla', 'butter', 'beurre'},
+    'beurre':      {'manteca', 'mantequilla', 'butter', 'beurre'},
+    'harina':      {'harina', 'flour', 'farine'},
+    # ... (azúcar/sugar/sucre, sal/salt/sel, etc.)
+}
+```
+
+`_resolve_price()` amplía el conjunto `candidates` con estos sinónimos antes de buscar precios custom. Permite que el usuario guarde el precio de "butter" y que se aplique automáticamente a una receta que llama al ingrediente "manteca" o "beurre".
+
+Como complemento, `FALLBACK_PRICES` se amplió con nombres franceses (`beurre`, `farine`, `sucre`, `sel`, `lait`, `oeuf`, `levure`, `fromage`, `creme`, `citron`, `noix`, `amande`, `eau`) y `mantequilla`, para que recetas en francés puedan calcular costos de fallback sin precios custom.
+
+---
+
+### Decisión 31 — Eliminación del problema N+1 en get_recipe_cost con price_cache
+
+**Problema:** `get_recipe_cost()` iteraba sobre todos los ingredientes de la receta. Para cada ingrediente, `_resolve_price()` llamaba a `get_custom_prices_for_ingredient()`, que ejecutaba `self._custom_prices.filter_by(user_id=user_id)` — una consulta a la BD. Con la búsqueda multilingüe + sinónimos, cada ingrediente podía generar varios candidatos, cada uno con su propia consulta. En una receta con 12 ingredientes y 4 candidatos por ingrediente, esto producía hasta 48 consultas a la base de datos.
+
+**Solución:** Pre-cargar todos los `CustomPrice` del usuario una sola vez al inicio de `get_recipe_cost()`:
+
+```python
+def get_recipe_cost(self, recipe_id, user_id):
+    price_cache = list(self._custom_prices.filter_by(user_id=user_id))
+    # ...
+    price_per_kg, source, store_id, bought_unit = self._resolve_price(
+        ing, user_id, _price_cache=price_cache
+    )
+```
+
+`_resolve_price()` recibe `_price_cache` opcional y lo pasa a `get_custom_prices_for_ingredient()`, que también recibe `_cached` opcional. Si se provee, opera sobre esa lista en RAM en lugar de consultar la BD.
+
+**Resultado:** De O(ingredientes × candidatos) consultas a O(1) consulta por llamada a `get_recipe_cost()`.
+
+---
+
+### Decisión 32 — AbortController con timeout de 25s en todos los fetch de apiFetch
+
+**Problema:** El backend está en Render free tier, que duerme el servidor tras 15 minutos de inactividad. El cold start puede tardar 10–15 segundos. Sin timeout, si el servidor no responde, `fetch()` cuelga indefinidamente y el usuario ve el spinner girando sin ningún error visible.
+
+**Solución:** Helper `_fetchWithTimeout(url, opts, ms=25000)` en `api.js`:
+
+```javascript
+function _fetchWithTimeout(url, opts = {}, ms = 25_000) {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { ...opts, signal: ctrl.signal })
+        .finally(() => clearTimeout(id));
+}
+```
+
+Todos los `fetch()` dentro de `apiFetch` fueron reemplazados por `_fetchWithTimeout`. A los 25 segundos sin respuesta, el `AbortController` cancela el request y la promesa rechaza con `AbortError`. El bloque `try/catch` en `home.js` captura ese error y muestra el mensaje `data-i18n="err_load"` al usuario.
+
+---
+
+### Decisión 33 — Caché con TTL de 5 minutos para el resumen de home e invalidación por mutación
+
+**Problema:** `home.js` llamaba a `GET /summary` en cada carga de página. El endpoint calcula el costo de todas las recetas del usuario — es operación costosa. Si el usuario navega entre páginas varias veces en pocos minutos, hacía la misma llamada repetidamente aunque nada hubiera cambiado.
+
+**Solución:** Caché en `localStorage` con TTL de 5 minutos:
+
+```javascript
+const SUMMARY_TTL_MS = 5 * 60 * 1000;
+
+function _writeCache(data) {
+    localStorage.setItem(HOME_SUMMARY_CACHE, JSON.stringify({ data, ts: Date.now() }));
+}
+```
+
+**Flujo:**
+1. Si el caché existe y tiene menos de 5 minutos → renderiza inmediatamente sin fetch.
+2. Si el caché existe pero está vencido → renderiza el caché al instante y refresca en segundo plano.
+3. Si no hay caché → muestra spinner y espera al fetch.
+
+**Invalidación por mutación:** `prices.js` implementa `invalidateHomeCache()` que borra la clave de `localStorage`. Se invoca automáticamente en `saveRowEdit`, `saveNewRow` y `deletePrice` — cualquier cambio en precios custom invalida el caché para que el próximo acceso a home muestre costos actualizados.
+
+---
+
+### Fase 13 — Sinónimos multilingüe + Optimizaciones de rendimiento ✅
+
+#### Objetivos
+- Resolver precios entre idiomas y dialectos sin depender de la traducción IA (manteca ↔ butter ↔ beurre)
+- Eliminar el problema N+1 de consultas a la BD en el cálculo de costos de receta
+- Prevenir que los fetch cuelguen indefinidamente ante cold starts de Render
+- Reducir llamadas innecesarias al endpoint `/summary` con caché TTL e invalidación dirigida
+
+#### Tareas completadas
+- [x] `INGREDIENT_SYNONYMS` dict en `facade.py` — mapea variantes dialectales y multilingüe (manteca/mantequilla/butter/beurre, harina/flour/farine, azúcar/sugar/sucre, etc.)
+- [x] `FALLBACK_PRICES` ampliado con nombres franceses: `beurre`, `farine`, `sucre`, `sel`, `lait`, `oeuf`, `levure`, `fromage`, `creme`, `citron`, `noix`, `amande`, `eau`; y `mantequilla: 9.00`
+- [x] `get_custom_prices_for_ingredient(user_id, ingredient_name, _cached=None)` — nuevo parámetro `_cached` para recibir lista pre-cargada y evitar consultas a la BD
+- [x] `_resolve_price(ing, user_id=None, _price_cache=None)` — nuevo parámetro `_price_cache` pasado a cada llamada de `get_custom_prices_for_ingredient`
+- [x] `get_recipe_cost()` — pre-carga `price_cache = list(self._custom_prices.filter_by(user_id=user_id))` una sola vez; elimina N+1 de consultas a la BD
+- [x] `_fetchWithTimeout(url, opts, ms=25000)` en `api.js` — todos los `fetch()` de `apiFetch` reemplazados; previene cuelgue indefinido en cold start
+- [x] `SUMMARY_TTL_MS = 5 * 60 * 1000` en `home.js` — TTL de 5 minutos para el caché del resumen
+- [x] `_readCache()` y `_writeCache(data)` en `home.js` — envuelven `{data, ts}` para soporte de TTL
+- [x] IIFE de `home.js` refactorizada — render inmediato desde caché, skip de API si caché fresco, refresh en segundo plano si vencido
+- [x] `try/catch` en `apiFetch('/summary')` en `home.js` — `AbortError` y errores de red muestran mensaje con `data-i18n="err_load"` en lugar de spinner congelado
+- [x] `const HOME_SUMMARY_CACHE = 'rs_home_summary_v1'` y `function invalidateHomeCache()` en `prices.js`
+- [x] `invalidateHomeCache()` llamado en `saveRowEdit`, `saveNewRow` y `deletePrice`

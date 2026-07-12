@@ -17,7 +17,7 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 - Save, view, edit, and delete recipes with multilingual fields (EN/ES/FR)
 - Estimate ingredient prices via Open Food Facts API + custom price database
 - Custom prices linked to stores and brands with 4-case priority resolution
-- Accent-insensitive multilingual ingredient matching (`_norm` + translation fields)
+- Accent-insensitive multilingual ingredient matching (`_norm` + translation fields) con resolución de sinónimos entre idiomas — `manteca`, `mantequilla`, `butter` y `beurre` se consideran el mismo ingrediente al buscar precios personalizados (`INGREDIENT_SYNONYMS`)
 - Secure per-user data isolation — users can only access their own data
 - Static HTML + JS frontend, fully decoupled from the backend API
 - Containerized with Docker (multi-stage build: dev + production with gunicorn)
@@ -25,6 +25,8 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 - Color personalizable por sección de ingredientes
 - Gestión de marcas multi-ingrediente: cada marca puede tener varios ingredientes, con chips de selección y eliminación individual por ingrediente
 - Advertencia de incompatibilidad de unidades (`unit_warning`) cuando el ingrediente está en unidades no pesables pero el precio fue guardado en €/kg
+- Caché TTL de 5 minutos en el home summary — visitas repetidas renderizan instantáneamente sin llamar a `/summary`; se invalida automáticamente al guardar o borrar un precio
+- Resiliencia ante cold starts de Render: `_fetchWithTimeout` con AbortController (25 s) previene que el fetch quede colgado indefinidamente
 
 ---
 

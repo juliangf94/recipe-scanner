@@ -426,3 +426,32 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 | 15 | `_G` y `_KG` sets movidos fuera del loop en facade (optimización) | Baja | ✅ Done |
 
 **Resultado**: Marcas con soporte multi-ingrediente, advertencia de unidades incompatibles en costos, y layout más compacto.
+
+---
+
+## Sprint 12 — Cache TTL en home + fetch timeout + invalidación por mutación
+
+**Objetivo**: Mejorar la resiliencia frente a cold starts de Render, reducir llamadas a la API con cache TTL en la home page, e invalidar el cache automáticamente cuando el usuario muta sus precios custom.
+
+| # | Tarea | Prioridad | Estado |
+|---|---|---|---|
+| 1 | `_fetchWithTimeout(url, opts, ms=25000)` en `api.js` — usa `AbortController` para abortar fetches colgados tras 25 s | Alta | ✅ Done |
+| 2 | Todos los `fetch()` dentro de `apiFetch` reemplazados por `_fetchWithTimeout` | Alta | ✅ Done |
+| 3 | `SUMMARY_TTL_MS = 5 * 60 * 1000` + `_readCache()` / `_writeCache()` en `home.js` | Alta | ✅ Done |
+| 4 | IIFE de `home.js` usa cache fresco (<5 min) para evitar llamada a `/summary` | Alta | ✅ Done |
+| 5 | `apiFetch('/summary')` en `home.js` envuelto en `try/catch` — `AbortError`/errores de red muestran `data-i18n="err_load"` en lugar de spinner infinito | Alta | ✅ Done |
+| 6 | `const HOME_SUMMARY_CACHE = 'rs_home_summary_v1'` + `invalidateHomeCache()` en `prices.js` | Media | ✅ Done |
+| 7 | `invalidateHomeCache()` llamado en `saveRowEdit`, `saveNewRow`, `deletePrice` — mutaciones de precio invalidan el cache de home | Media | ✅ Done |
+| 8 | Resolución de sinónimos multilingüe de precios (cross-language price synonym resolution) | Media | ✅ Done |
+| 9 | Optimización de consultas N+1 en resolución de precios | Media | ✅ Done |
+
+**Notas técnicas:**
+- El timeout de 25 s permite que Render despierte del cold start (10–20 s) sin colgar el fetch indefinidamente. El warm-up ping a `/health` reduce la probabilidad de cold start pero no lo garantiza.
+- La clave `rs_home_summary_v1` es compartida entre `home.js` (escritura) y `prices.js` (invalidación). Si en el futuro se agrega una nueva página que muta datos de resumen, también debe llamar a `invalidateHomeCache()`.
+- Los mensajes de error en `home.html` usan `data-i18n="err_load"` para ser re-traducidos automáticamente si el usuario cambia de idioma mientras el error está visible.
+
+**Definition of Done:**
+- ✅ `home.html` no llama a `/summary` si el cache tiene menos de 5 minutos
+- ✅ Editar/crear/eliminar un precio custom invalida el cache inmediatamente
+- ✅ Un cold start de Render no cuelga el fetch más de 25 segundos
+- ✅ Los errores de red en `home.html` muestran mensaje traducido, no spinner infinito

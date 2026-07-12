@@ -189,6 +189,16 @@ flowchart TD
     style Z4 fill:#95A5A6,color:#fff
 ```
 
+**Resolución de sinónimos entre idiomas (INGREDIENT_SYNONYMS):**
+
+Antes de consultar los precios personalizados del usuario (nivel 2), la facade expande el nombre del ingrediente usando un mapa de sinónimos multiidioma:
+
+```
+"beurre"  →  ["beurre", "mantequilla", "manteca", "butter"]
+```
+
+Esto permite que un precio guardado como "manteca" (español regional) sea encontrado automáticamente cuando la receta tiene "beurre" (francés). Los grupos cubren variantes en español, inglés, francés y nombres regionales (ej: *manteca* vs *mantequilla*). La búsqueda es el primer candidato que devuelva un precio; si ningún sinónimo tiene precio personalizado, el flujo continúa con Open Food Facts y el fallback interno.
+
 ---
 
 ## 9. Retos Técnicos
@@ -255,6 +265,7 @@ rompía tests existentes.
 | ¿Por qué Groq y no OpenAI? | Groq es más rápido (inferencia en hardware especializado) y gratuito para el volumen de uso del MVP |
 | ¿Qué pasa si Llama devuelve JSON mal formado? | Validación del schema + retry automático con prompt más estricto |
 | ¿Por qué 4 fuentes de precio y no solo una? | Ninguna fuente cubre el 100% de los ingredientes. La cascada garantiza siempre tener un estimado |
+| ¿Cómo maneja la app recetas en diferentes idiomas con tus precios guardados? | A través de `INGREDIENT_SYNONYMS`, un mapa que agrupa variantes regionales e idiomáticas del mismo ingrediente. Por ejemplo, si la receta es en francés y usa "beurre", la facade busca precios también para "mantequilla", "manteca" y "butter". Así un precio guardado en cualquiera de esas formas se aplica correctamente, sin que el usuario tenga que duplicar entradas. Los grupos cubren español, inglés, francés y variantes regionales. |
 | ¿Cómo manejás la seguridad del token? | Access token de 15 min en memoria, refresh token de 30 días, flag anti-loop en el cliente |
 | ¿Cuántos tests tenés? | 336: 132 pytest (unitarios e integración) + 204 Newman (contrato de API) |
 | ¿Por qué el modo oscuro usa `localStorage` y no solo `prefers-color-scheme` de CSS? | Con `prefers-color-scheme` el usuario no puede elegir un tema distinto al de su sistema operativo. Con `localStorage` y un toggle, el usuario puede decidir independientemente. Además, `theme.js` se carga de forma síncrona en `<head>` para evitar el flash de tema incorrecto (FOUC) antes de que el navegador pinte la página. |

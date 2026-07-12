@@ -850,3 +850,55 @@ Los directorios de uploads existen en el repo gracias a archivos `.gitkeep` pero
 | Groq + Llama 3.3-70b-versatile | OpenAI GPT-4 | Más rápido (LPU), open-source, tier gratuito, sin costo; vision fallback: llama-4-scout |
 | Open Food Facts | APIs de supermercados | Abierta, gratuita, sin acuerdo comercial, 3M+ productos |
 | Frontend HTML/JS estático | React, Vue, Jinja2 | Desacoplado del backend, mismo consumidor que app móvil futura |
+| INGREDIENT_SYNONYMS (facade.py) | Búsqueda solo por traducciones IA (Option A) | Cubre variantes dialectales (manteca ↔ mantequilla ↔ butter ↔ beurre) que DeepL no relaciona |
+| price_cache en get_recipe_cost | Consultas individuales por ingrediente×candidato (N+1) | Una sola consulta a la BD por cálculo de costo — O(1) independiente de ingredientes y sinónimos |
+| AbortController 25s en apiFetch | fetch() sin timeout | Previene cuelgue indefinido en cold start de Render free tier; AbortError capturado y mostrado al usuario |
+| Caché TTL 5 min en home summary | Llamada a /summary en cada carga de página | localStorage con TTL + invalidación en mutaciones de precio; render inmediato desde caché |
+
+---
+
+## 7. Performance Optimizations
+
+### N+1 eliminado en `get_recipe_cost`
+
+El cálculo de costo de receta antes del Sprint 12 ejecutaba una consulta a la BD por cada
+combinación de ingrediente × candidato de nombre (nombre original + traducciones IA + sinónimos
+dialectales). Con una receta de 12 ingredientes y 4 candidatos cada uno, se ejecutaban hasta
+48 queries por request.
+
+**Fix:** `get_recipe_cost()` pre-carga `price_cache = list(self._custom_prices.filter_by(user_id=user_id))`
+una sola vez al inicio. `_resolve_price()` y `get_custom_prices_for_ingredient()` reciben
+esta lista como parámetro `_price_cache` / `_cached` y operan sobre ella en RAM sin tocar
+la BD. Resultado: **O(1) consultas** por cálculo de costo, independientemente del número de
+ingredientes.
+
+### Resolución de sinónimos multilingüe y dialectales
+
+La cadena de resolución de precios tiene ahora tres capas de nombres candidatos para cada
+ingrediente:
+
+1. **Nombre del ingrediente en todos los idiomas** — `name_en`, `name_es`, `name_fr`
+   generados por DeepL al momento del scan.
+2. **INGREDIENT_SYNONYMS** — diccionario a nivel de módulo que mapea variantes dialectales
+   y regionales (`manteca` ↔ `mantequilla` ↔ `butter` ↔ `beurre`; `harina` ↔ `flour`
+   ↔ `farine`; etc.).
+3. **Fuzzy matching (3 pasos)** — exact, word-prefix, singular/plural sobre cada candidato
+   del paso 1 y 2.
+
+Esta cascada permite que el usuario guarde un precio con cualquier variante del nombre y
+que se aplique automáticamente a cualquier receta en cualquier idioma o dialecto.
+
+### Caché TTL en home summary + invalidación dirigida
+
+`GET /summary` calcula el costo de todas las recetas del usuario — operación costosa.
+`home.js` implementa un caché en `localStorage` con TTL de 5 minutos:
+- Si el caché es fresco (< 5 min): render inmediato, cero fetches.
+- Si el caché está vencido: render inmediato con datos cacheados + refresh en segundo plano.
+- Mutaciones en `prices.js` (`saveRowEdit`, `saveNewRow`, `deletePrice`) llaman a
+  `invalidateHomeCache()` para forzar refresh en el próximo acceso a home.
+
+### Timeout de 25s con AbortController
+
+`_fetchWithTimeout()` en `api.js` cancela cualquier `fetch()` que no responda en 25 segundos
+usando la API nativa `AbortController`. Cubre el caso de cold start de Render free tier
+(~15s) y convierte el cuelgue silencioso del spinner en un error visible al usuario.
