@@ -29,25 +29,43 @@ from app.utils.security import hash_password
 OFF_SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 OFF_PRICES_URL = "https://prices.openfoodfacts.org/api/v1/prices"
 
+# Regional/cross-language synonym groups — "manteca" (AR) = "mantequilla" (ES) = "butter" = "beurre"
+INGREDIENT_SYNONYMS = {
+    n: group
+    for group in [
+        {'manteca', 'mantequilla', 'butter', 'beurre'},
+        {'harina', 'flour', 'farine'},
+        {'azucar', 'azúcar', 'sugar', 'sucre'},
+        {'leche', 'milk', 'lait'},
+        {'huevo', 'huevos', 'egg', 'eggs', 'oeuf', 'oeufs'},
+        {'crema', 'cream', 'creme', 'crème'},
+        {'sal', 'salt', 'sel'},
+        {'limon', 'limón', 'lemon', 'citron'},
+        {'levadura', 'yeast', 'levure'},
+    ]
+    for n in group
+}
+
 FALLBACK_PRICES = {
     # Prices in EUR per kg — average French supermarket prices 2025
-    'harina': 1.20,    'flour': 1.20,
-    'azucar': 1.00,    'sugar': 1.00,
-    'manteca': 9.00,   'butter': 9.00,
-    'leche': 1.20,     'milk': 1.20,
-    'huevo': 2.00,     'huevos': 2.00,    'egg': 2.00,    'eggs': 2.00,
-    'ricota': 8.50,
-    'queso': 12.00,    'cheese': 12.00,
-    'sal': 0.50,       'salt': 0.50,
-    'aceite': 4.00,    'oil': 4.00,
-    'crema': 3.50,     'cream': 3.50,
-    'limon': 2.50,     'lemon': 2.50,
+    'harina': 1.20,    'flour': 1.20,     'farine': 1.20,
+    'azucar': 1.00,    'sugar': 1.00,     'sucre': 1.00,
+    'manteca': 9.00,   'mantequilla': 9.00, 'butter': 9.00, 'beurre': 9.00,
+    'leche': 1.20,     'milk': 1.20,      'lait': 1.20,
+    'huevo': 2.00,     'huevos': 2.00,    'egg': 2.00,    'eggs': 2.00,   'oeuf': 2.00,
+    'ricota': 8.50,    'ricotta': 8.50,
+    'queso': 12.00,    'cheese': 12.00,   'fromage': 12.00,
+    'sal': 0.50,       'salt': 0.50,      'sel': 0.50,
+    'aceite': 4.00,    'oil': 4.00,       'huile': 4.00,
+    'crema': 3.50,     'cream': 3.50,     'creme': 3.50,
+    'limon': 2.50,     'lemon': 2.50,     'citron': 2.50,
     'naranja': 1.80,   'orange': 1.80,
     'vainilla': 30.00, 'vanilla': 30.00,
     'chocolate': 8.00, 'cacao': 10.00,
-    'levadura': 8.00,  'yeast': 8.00,
-    'nuez': 15.00,     'nuts': 15.00,
-    'almendra': 20.00, 'almond': 20.00,
+    'levadura': 8.00,  'yeast': 8.00,     'levure': 8.00,
+    'nuez': 15.00,     'nuts': 15.00,     'noix': 15.00,
+    'almendra': 20.00, 'almond': 20.00,   'amande': 20.00,
+    'agua': 0.00,      'water': 0.00,     'eau': 0.00,
 }
 
 GROQ_PROMPT = """You are a recipe extraction assistant.
@@ -880,6 +898,9 @@ class RecipeScannerFacade:
                 val = (getattr(ing, attr, None) or '').lower().strip()
                 if val:
                     candidates.add(val)
+            # Expand with regional synonyms so "manteca" matches "beurre" recipe ingredients
+            for c in list(candidates):
+                candidates.update(INGREDIENT_SYNONYMS.get(self._norm(c), set()))
 
             seen_ids = set()
             customs = []
@@ -920,9 +941,14 @@ class RecipeScannerFacade:
         if ing.price_source == 'off' and ing.estimated_cost and ing.estimated_cost > 0:
             return ing.estimated_cost, 'off', None, None
 
-        # 4. Local fallback dict
+        # 4. Local fallback dict — check primary name and all translations
+        fallback_candidates = {name_lower}
+        for attr in ('name_en', 'name_es', 'name_fr'):
+            val = (getattr(ing, attr, None) or '').lower().strip()
+            if val:
+                fallback_candidates.add(val)
         for key, price in FALLBACK_PRICES.items():
-            if key in name_lower:
+            if any(key in c for c in fallback_candidates):
                 return price, 'fallback', None, None
 
         return 5.00, 'fallback', None, None
