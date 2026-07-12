@@ -652,7 +652,7 @@ class RecipeScannerFacade:
         name_lower = name.lower().strip()
         ing_lower = (ingredient_name or '').lower().strip() or None
         for b in self._brands.filter_by(user_id=user_id):
-            if b.name.lower() == name_lower and (b.ingredient_name or None) == ing_lower:
+            if b.name.lower() == name_lower and (b.ingredient_name or '').lower().strip() == (ing_lower or ''):
                 return b
         return None
 
