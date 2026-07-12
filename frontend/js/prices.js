@@ -91,7 +91,7 @@ function brandOptions(selectedId, ingName) {
 
 function unitOptions(selected) {
   return UNITS.map(u =>
-    `<option value="${u}"${u === selected ? ' selected' : ''}>${u}</option>`
+    `<option value="${u}"${u === selected ? ' selected' : ''}>${tUnit(u)}</option>`
   ).join('');
 }
 

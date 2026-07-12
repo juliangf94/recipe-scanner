@@ -1215,6 +1215,8 @@ const UNIT_MAP = {
   tazas:     { en: 'cups',   fr: 'tasses' },
   unidad:    { en: 'unit',   fr: 'unité' },
   unidades:  { en: 'units',  fr: 'unités' },
+  pieza:     { en: 'piece',  fr: 'pièce' },
+  piezas:    { en: 'pieces', fr: 'pièces' },
   // English → ES / FR
   pinch:     { es: 'pizca',  fr: 'pincée' },
   tbsp:      { es: 'cdas',   fr: 'c. à s.' },
@@ -1223,6 +1225,8 @@ const UNIT_MAP = {
   cups:      { es: 'tazas',  fr: 'tasses' },
   unit:      { es: 'unidad', fr: 'unité' },
   units:     { es: 'unidades', fr: 'unités' },
+  piece:     { es: 'pieza',  fr: 'pièce' },
+  pieces:    { es: 'piezas', fr: 'pièces' },
   // French → ES / EN
   'pincée':  { es: 'pizca',  en: 'pinch' },
   'pincées': { es: 'pizcas', en: 'pinches' },
@@ -1230,6 +1234,8 @@ const UNIT_MAP = {
   'tasses':  { es: 'tazas',  en: 'cups' },
   'unité':   { es: 'unidad', en: 'unit' },
   'unités':  { es: 'unidades', en: 'units' },
+  'pièce':   { es: 'pieza',  en: 'piece' },
+  'pièces':  { es: 'piezas', en: 'pieces' },
 };
 
 function tUnit(unit) {
