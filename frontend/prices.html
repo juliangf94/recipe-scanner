@@ -136,7 +136,11 @@
       <div id="brands-list" style="margin-bottom:1rem;min-height:2rem;"></div>
       <div class="form-group" style="display:flex;flex-direction:column;gap:0.4rem;">
         <input type="text" id="new-brand-name" data-i18n-placeholder="label_new_brand" placeholder="New brand name">
-        <input type="text" id="new-brand-ing" data-i18n-placeholder="ph_brand_ing" placeholder="For ingredient (optional)" style="font-size:0.85rem;">
+        <div id="brand-ings-chips" style="display:flex;flex-wrap:wrap;gap:0.35rem;min-height:0;"></div>
+        <div style="display:flex;gap:0.4rem;align-items:center;">
+          <input type="text" id="new-brand-ing" data-i18n-placeholder="ph_brand_ing" placeholder="For ingredient (optional)" style="font-size:0.85rem;flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addBrandIngChip();}">
+          <button type="button" onclick="addBrandIngChip()" style="padding:0.4rem 0.65rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;font-size:1rem;line-height:1;" title="Add ingredient">+</button>
+        </div>
         <button class="btn btn-orange" onclick="createBrand()" data-i18n="btn_add_brand" style="align-self:flex-end;">+ Add brand</button>
       </div>
       <div id="brands-error" class="alert alert-error" style="display:none;margin-top:0.5rem;"></div>

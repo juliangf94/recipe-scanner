@@ -648,6 +648,14 @@ class RecipeScannerFacade:
                 return b
         return None
 
+    def get_brand_by_name_and_ingredient(self, user_id, name, ingredient_name):
+        name_lower = name.lower().strip()
+        ing_lower = (ingredient_name or '').lower().strip() or None
+        for b in self._brands.filter_by(user_id=user_id):
+            if b.name.lower() == name_lower and (b.ingredient_name or None) == ing_lower:
+                return b
+        return None
+
     def get_brand_by_id(self, brand_id):
         return self._brands.get_by_id(brand_id)
 

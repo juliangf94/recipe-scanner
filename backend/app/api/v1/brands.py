@@ -28,7 +28,7 @@ class BrandList(Resource):
         user_id = get_jwt_identity()
         name = api.payload['name'].strip()
         ingredient_name = (api.payload.get('ingredient_name') or '').strip().lower() or None
-        existing = facade.get_brand_by_name(user_id, name)
+        existing = facade.get_brand_by_name_and_ingredient(user_id, name, ingredient_name)
         if existing:
             return {'id': existing.id, 'name': existing.name, 'ingredient_name': existing.ingredient_name}, 200
         brand = facade.create_brand(user_id, name, ingredient_name=ingredient_name)

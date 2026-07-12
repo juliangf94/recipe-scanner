@@ -3,6 +3,7 @@ requireAuth();
 let allPrices = [];
 let allStores = [];
 let allBrands = [];
+let brandIngChips = [];
 
 // ── Sidebar user info ─────────────────────────────────────────────────────────
 const user = getUser();
@@ -224,10 +225,38 @@ async function saveBrandIng(brandId) {
   }
 }
 
+function addBrandIngChip() {
+  const inp = document.getElementById('new-brand-ing');
+  const val = inp.value.trim().toLowerCase();
+  if (!val || brandIngChips.includes(val)) { inp.value = ''; return; }
+  brandIngChips.push(val);
+  renderBrandIngChips();
+  inp.value = '';
+  inp.focus();
+}
+
+function removeBrandIngChip(val) {
+  brandIngChips = brandIngChips.filter(v => v !== val);
+  renderBrandIngChips();
+}
+
+function renderBrandIngChips() {
+  const container = document.getElementById('brand-ings-chips');
+  if (!container) return;
+  container.innerHTML = brandIngChips.map(v =>
+    `<span style="display:inline-flex;align-items:center;gap:0.25rem;background:var(--blue);color:#fff;border-radius:20px;padding:2px 10px;font-size:0.78rem;">
+      ${tIng(v)}
+      <button type="button" onclick="removeBrandIngChip('${v.replace(/'/g, "\\'")}')" style="background:none;border:none;color:#fff;cursor:pointer;padding:0 0 0 2px;font-size:1rem;line-height:1;">×</button>
+    </span>`
+  ).join('');
+}
+
 function openBrandsModal() {
   document.getElementById('brands-error').style.display = 'none';
   document.getElementById('new-brand-name').value = '';
-  if (document.getElementById('new-brand-ing')) document.getElementById('new-brand-ing').value = '';
+  document.getElementById('new-brand-ing').value = '';
+  brandIngChips = [];
+  renderBrandIngChips();
   renderBrandsList();
   document.getElementById('brands-modal').classList.add('open');
 }
@@ -238,27 +267,37 @@ function closeBrandsModal() {
 
 async function createBrand() {
   const name = document.getElementById('new-brand-name').value.trim();
-  const ingName = (document.getElementById('new-brand-ing')?.value || '').trim().toLowerCase() || null;
+  const pendingIng = (document.getElementById('new-brand-ing')?.value || '').trim().toLowerCase();
+  if (pendingIng && !brandIngChips.includes(pendingIng)) brandIngChips.push(pendingIng);
+
   const errEl = document.getElementById('brands-error');
   errEl.style.display = 'none';
   if (!name) return;
+
   const btn = document.querySelector('#brands-modal .btn-orange');
   btn.disabled = true;
+
+  const ingredients = brandIngChips.length ? [...brandIngChips] : [null];
+
   try {
-    const res = await apiFetch('/brands', {
-      method: 'POST',
-      body: JSON.stringify({ name, ingredient_name: ingName })
-    });
-    if (!res || !res.ok) {
-      errEl.textContent = t('err_brand_create');
-      errEl.style.display = '';
-      return;
+    for (const ing of ingredients) {
+      const res = await apiFetch('/brands', {
+        method: 'POST',
+        body: JSON.stringify({ name, ingredient_name: ing })
+      });
+      if (!res || !res.ok) {
+        errEl.textContent = t('err_brand_create');
+        errEl.style.display = '';
+        return;
+      }
+      if (!allBrands.find(b => b.id === res.data.id)) {
+        allBrands.push(res.data);
+      }
     }
     document.getElementById('new-brand-name').value = '';
-    if (document.getElementById('new-brand-ing')) document.getElementById('new-brand-ing').value = '';
-    if (!allBrands.find(b => b.id === res.data.id)) {
-      allBrands.push(res.data);
-    }
+    document.getElementById('new-brand-ing').value = '';
+    brandIngChips = [];
+    renderBrandIngChips();
     renderBrandsList();
     applySortAndRender();
   } finally {
