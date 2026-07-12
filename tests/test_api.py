@@ -730,6 +730,212 @@ class TestCosts:
         assert ing['source'] != 'manual'
 
 
+# ── Brands multi-ingredient ───────────────────────────────────────────────────
+
+class TestBrandsMultiIngredient:
+    """
+    Covers the brand deduplication rules introduced with multi-ingredient brands:
+    - Same name + same ingredient_name  → idempotent (returns existing, 200)
+    - Same name + different ingredient  → two distinct records (201 each)
+    - GET /brands returns ALL records, including several with the same name
+    """
+
+    def test_same_name_different_ingredient_creates_two_records(self, client):
+        """POST /brands with same name but distinct ingredient_name must create TWO records."""
+        token = register_and_login(client, 'bmi1@test.com')
+        res1 = post_json(client, '/api/v1/brands',
+                         {'name': 'Hacendado', 'ingredient_name': 'leche'}, token=token)
+        res2 = post_json(client, '/api/v1/brands',
+                         {'name': 'Hacendado', 'ingredient_name': 'mantequilla'}, token=token)
+        assert res1.status_code == 201
+        assert res2.status_code == 201
+        assert json.loads(res1.data)['id'] != json.loads(res2.data)['id']
+
+    def test_same_name_same_ingredient_returns_existing(self, client):
+        """POST /brands with identical name AND ingredient_name must return the existing brand (200)."""
+        token = register_and_login(client, 'bmi2@test.com')
+        res1 = post_json(client, '/api/v1/brands',
+                         {'name': 'Hacendado', 'ingredient_name': 'leche'}, token=token)
+        res2 = post_json(client, '/api/v1/brands',
+                         {'name': 'Hacendado', 'ingredient_name': 'leche'}, token=token)
+        assert res1.status_code == 201
+        assert res2.status_code == 200
+        assert json.loads(res1.data)['id'] == json.loads(res2.data)['id']
+
+    def test_get_brands_returns_all_including_same_name(self, client):
+        """GET /brands must list ALL records, even those sharing the same brand name."""
+        token = register_and_login(client, 'bmi3@test.com')
+        post_json(client, '/api/v1/brands',
+                  {'name': 'Hacendado', 'ingredient_name': 'leche'}, token=token)
+        post_json(client, '/api/v1/brands',
+                  {'name': 'Hacendado', 'ingredient_name': 'mantequilla'}, token=token)
+        res = get_json(client, '/api/v1/brands', token=token)
+        assert res.status_code == 200
+        brands = json.loads(res.data)
+        hacendado = [b for b in brands if b['name'] == 'Hacendado']
+        assert len(hacendado) == 2
+
+    def test_generic_brand_and_ingredient_specific_brand_are_different_records(self, client):
+        """A generic brand (no ingredient) and one with ingredient_name must be two records."""
+        token = register_and_login(client, 'bmi4@test.com')
+        res1 = post_json(client, '/api/v1/brands', {'name': 'Dia'}, token=token)
+        res2 = post_json(client, '/api/v1/brands',
+                         {'name': 'Dia', 'ingredient_name': 'leche'}, token=token)
+        assert res1.status_code == 201
+        assert res2.status_code == 201
+        assert json.loads(res1.data)['id'] != json.loads(res2.data)['id']
+
+    def test_generic_brand_repeated_with_no_ingredient_is_idempotent(self, client):
+        """POST /brands with same name and NO ingredient_name twice → same record (existing behaviour)."""
+        token = register_and_login(client, 'bmi5@test.com')
+        res1 = post_json(client, '/api/v1/brands', {'name': 'Mercadona'}, token=token)
+        res2 = post_json(client, '/api/v1/brands', {'name': 'Mercadona'}, token=token)
+        assert res1.status_code == 201
+        assert res2.status_code == 200
+        assert json.loads(res1.data)['id'] == json.loads(res2.data)['id']
+
+    def test_ingredient_name_stored_in_response(self, client):
+        """POST /brands with ingredient_name must include it in the response."""
+        token = register_and_login(client, 'bmi6@test.com')
+        res = post_json(client, '/api/v1/brands',
+                        {'name': 'Natura', 'ingredient_name': 'yogur'}, token=token)
+        assert res.status_code == 201
+        data = json.loads(res.data)
+        assert data['ingredient_name'] == 'yogur'
+
+    def test_multiple_brands_same_name_listed_with_correct_ingredients(self, client):
+        """Each brand with same name must expose its own ingredient_name in GET /brands."""
+        token = register_and_login(client, 'bmi7@test.com')
+        post_json(client, '/api/v1/brands',
+                  {'name': 'Carrefour', 'ingredient_name': 'arroz'}, token=token)
+        post_json(client, '/api/v1/brands',
+                  {'name': 'Carrefour', 'ingredient_name': 'pasta'}, token=token)
+        res = get_json(client, '/api/v1/brands', token=token)
+        brands = json.loads(res.data)
+        carrefour = [b for b in brands if b['name'] == 'Carrefour']
+        ingredient_names = {b['ingredient_name'] for b in carrefour}
+        assert ingredient_names == {'arroz', 'pasta'}
+
+
+# ── Unit warning in recipe cost ───────────────────────────────────────────────
+
+class TestUnitWarning:
+    """
+    Covers the unit_warning flag in GET /api/v1/recipes/{id}/cost.
+    unit_warning=True  → ingredient uses a piece/count unit but the stored custom
+                         price was purchased in a weight unit (g, kg, etc.)
+    unit_warning=False → price was purchased in a non-weight unit, OR source='manual'
+    """
+
+    @pytest.fixture
+    def piece_ingredient_setup(self, client):
+        """Creates a recipe with a single 'unidad'-unit ingredient."""
+        token = register_and_login(client, 'uwarn@test.com')
+        r = post_json(client, '/api/v1/recipes/', {'title': 'Tortilla'}, token=token)
+        recipe_id = json.loads(r.data)['id']
+        i = post_json(client, f'/api/v1/recipes/{recipe_id}/ingredients',
+                      {'name': 'huevo', 'quantity': '3', 'unit': 'unidad'}, token=token)
+        ing_id = json.loads(i.data)['id']
+        return token, recipe_id, ing_id
+
+    def test_unit_warning_field_present_in_cost_response(self, client):
+        """Every ingredient entry in the cost response must include the unit_warning field."""
+        token = register_and_login(client, 'uwpresent@test.com')
+        r = post_json(client, '/api/v1/recipes/', {'title': 'Pan'}, token=token)
+        recipe_id = json.loads(r.data)['id']
+        post_json(client, f'/api/v1/recipes/{recipe_id}/ingredients',
+                  {'name': 'harina', 'quantity': '500', 'unit': 'g'}, token=token)
+        res = get_json(client, f'/api/v1/recipes/{recipe_id}/cost', token=token)
+        data = json.loads(res.data)
+        assert 'unit_warning' in data['ingredients'][0]
+
+    def test_unit_warning_true_when_piece_unit_but_price_stored_per_weight(
+            self, client, piece_ingredient_setup):
+        """
+        ingredient unit = 'unidad' (piece), CustomPrice bought_unit = 'g' (weight)
+        → unit_warning must be True.
+        """
+        token, recipe_id, _ = piece_ingredient_setup
+        post_json(client, '/api/v1/prices', {
+            'ingredient_name': 'huevo',
+            'bought_qty': 500, 'bought_unit': 'g', 'bought_price': 1.0
+        }, token=token)
+        res = get_json(client, f'/api/v1/recipes/{recipe_id}/cost', token=token)
+        data = json.loads(res.data)
+        ing = data['ingredients'][0]
+        assert ing['source'] == 'custom'
+        assert ing['unit_warning'] is True
+
+    def test_unit_warning_true_with_kg_bought_unit(self, client):
+        """
+        ingredient unit = 'pieza', CustomPrice bought_unit = 'kg'
+        → unit_warning must be True.
+        """
+        token = register_and_login(client, 'uwkg@test.com')
+        r = post_json(client, '/api/v1/recipes/', {'title': 'Compota'}, token=token)
+        recipe_id = json.loads(r.data)['id']
+        post_json(client, f'/api/v1/recipes/{recipe_id}/ingredients',
+                  {'name': 'manzana', 'quantity': '4', 'unit': 'pieza'}, token=token)
+        post_json(client, '/api/v1/prices', {
+            'ingredient_name': 'manzana',
+            'bought_qty': 1, 'bought_unit': 'kg', 'bought_price': 2.0
+        }, token=token)
+        res = get_json(client, f'/api/v1/recipes/{recipe_id}/cost', token=token)
+        ing = json.loads(res.data)['ingredients'][0]
+        assert ing['unit_warning'] is True
+
+    def test_unit_warning_false_when_price_stored_per_unit(self, client):
+        """
+        ingredient unit = 'unidad', CustomPrice bought_unit = 'unidad' (non-weight)
+        → unit_warning must be False.
+        """
+        token = register_and_login(client, 'uwfalse@test.com')
+        r = post_json(client, '/api/v1/recipes/', {'title': 'Tortilla 2'}, token=token)
+        recipe_id = json.loads(r.data)['id']
+        post_json(client, f'/api/v1/recipes/{recipe_id}/ingredients',
+                  {'name': 'huevo', 'quantity': '3', 'unit': 'unidad'}, token=token)
+        post_json(client, '/api/v1/prices', {
+            'ingredient_name': 'huevo',
+            'bought_qty': 6, 'bought_unit': 'unidad', 'bought_price': 1.50
+        }, token=token)
+        res = get_json(client, f'/api/v1/recipes/{recipe_id}/cost', token=token)
+        ing = json.loads(res.data)['ingredients'][0]
+        assert ing['source'] == 'custom'
+        assert ing['unit_warning'] is False
+
+    def test_unit_warning_false_when_source_is_manual(
+            self, client, piece_ingredient_setup):
+        """
+        Even when the ingredient unit is 'unidad', if source='manual' the warning
+        must be False (the user explicitly set the price; they know what they're doing).
+        """
+        token, recipe_id, ing_id = piece_ingredient_setup
+        put_json(client, f'/api/v1/recipes/{recipe_id}/ingredients/{ing_id}/price',
+                 {'price_per_kg': 0.30}, token)
+        res = get_json(client, f'/api/v1/recipes/{recipe_id}/cost', token=token)
+        ing = json.loads(res.data)['ingredients'][0]
+        assert ing['source'] == 'manual'
+        assert ing['unit_warning'] is False
+
+    def test_unit_warning_false_for_weight_unit_ingredient_with_weight_price(self, client):
+        """
+        When the ingredient itself uses a weight unit (g), unit_warning must be False
+        regardless of the price's bought_unit.
+        """
+        token = register_and_login(client, 'uwweight@test.com')
+        r = post_json(client, '/api/v1/recipes/', {'title': 'Bizcocho'}, token=token)
+        recipe_id = json.loads(r.data)['id']
+        post_json(client, f'/api/v1/recipes/{recipe_id}/ingredients',
+                  {'name': 'harina', 'quantity': '200', 'unit': 'g'}, token=token)
+        post_json(client, '/api/v1/prices', {
+            'ingredient_name': 'harina',
+            'bought_qty': 1, 'bought_unit': 'kg', 'bought_price': 1.20
+        }, token=token)
+        res = get_json(client, f'/api/v1/recipes/{recipe_id}/cost', token=token)
+        ing = json.loads(res.data)['ingredients'][0]
+        assert ing['unit_warning'] is False
+
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 class TestHealth:

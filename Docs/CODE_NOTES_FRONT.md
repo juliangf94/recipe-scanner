@@ -889,9 +889,19 @@ Al cargar el script, lee `localStorage.getItem('rs-theme')` y aplica el tema gua
 
 ## `frontend/css/style.css` — Ajustes de layout
 
-#### Ajustes de layout (actualizados)
+#### Ajustes de layout (actualizados — Sprint 11)
 - **Sidebar**: `--sidebar-width: 220px` (reducido desde 260px para dar más espacio al contenido)
-- **Grid de detalle de receta**: `.detail-grid { grid-template-columns: 5fr 2fr }` (antes `3fr 2fr`) — el panel de ingredientes es más ancho y el panel lateral más angosto
+- **Grid de detalle de receta**: `.detail-grid { grid-template-columns: 3fr 2fr; gap: 0.75rem }` — revertido a `3fr 2fr` para dar más espacio relativo a la columna de pasos. El gap se redujo de `1.5rem` a `0.75rem` para compactar el espacio horizontal.
+- **App layout**: `.app-layout { padding: 2rem 1rem }` (antes `2rem 1.75rem`) — más espacio de contenido en pantallas medianas
+- **Step item**: `.step-item { padding: 0.75rem 0.75rem; gap: 0.6rem }` (antes `1rem 1.2rem` / `1rem`) — tarjetas de paso más compactas
+- **Section card header**: `.section-card-header { padding: 0.75rem 0.75rem }` (antes `0.9rem 1.2rem`) — consistencia con step-item
+
+#### Historial de cambios en `detail-grid`
+| Sprint | Valor | Motivo |
+|---|---|---|
+| Sprint 11 inicial | `3fr 2fr` | Valor original |
+| Sprint 11 (Fase 11) | `5fr 2fr` | Más espacio a ingredientes |
+| Sprint 11 (Fase 12) | `3fr 2fr` | Reequilibrio — pasos necesitan más espacio relativo |
 
 ---
 
@@ -1131,3 +1141,233 @@ Los ingredientes tienen columnas `name_en`, `name_es`, `name_fr` en la BD. `tIng
 ## Soporte trilingüe EN/ES/FR completo
 
 El sistema i18n soporta tres idiomas (no solo EN/ES). El objeto `TRANSLATIONS` en `i18n.js` tiene claves para los tres idiomas. Los botones de idioma en el sidebar son EN / ES / FR. Las traducciones del backend (ingredientes, pasos, título) también están en tres idiomas con columnas `_en`, `_es`, `_fr`.
+
+---
+
+# Sprint 11 (Fase 12) — Nuevas funciones en prices.js, recipe.js e i18n.js
+
+---
+
+## `frontend/js/i18n.js` — Nuevas keys (Sprint 11)
+
+Se agregaron dos nuevas claves al objeto `TRANSLATIONS` en los tres idiomas:
+
+### `brand_for_prefix`
+Prefijo que aparece al mostrar el ingrediente asociado a una marca en la lista agrupada.
+
+| Idioma | Valor |
+|---|---|
+| EN | `'for'` |
+| ES | `'para'` |
+| FR | `'pour'` |
+
+Uso: `"Carrefour — for: harina, azúcar"` (EN) / `"Carrefour — para: harina, azúcar"` (ES)
+
+### `warn_unit_mismatch`
+Mensaje del tooltip que aparece cuando `unit_warning = true` en el cálculo de costos.
+Indica al usuario que el ingrediente está en unidades no pesables pero el precio fue guardado
+en €/kg, lo que hace que el cálculo sea orientativo.
+
+---
+
+## `frontend/js/prices.js` — Sistema de marcas multi-ingrediente (Sprint 11)
+
+### Variable global `brandIngChips`
+
+```javascript
+let brandIngChips = [];
+```
+
+Acumula los ingredientes seleccionados en el modal de creación de marca antes de guardar.
+Se resetea a `[]` cada vez que se abre el modal (`openBrandsModal()`).
+
+### `addBrandIngChip()`
+
+Lee el valor del `<input>` de ingrediente en el modal, lo agrega a `brandIngChips` si no está vacío ni duplicado, limpia el campo, y llama a `renderBrandIngChips()`.
+
+```javascript
+function addBrandIngChip() {
+  const val = document.getElementById('brand-ing-input').value.trim();
+  if (!val || brandIngChips.includes(val)) return;
+  brandIngChips.push(val);
+  document.getElementById('brand-ing-input').value = '';
+  renderBrandIngChips();
+}
+```
+
+### `removeBrandIngChip(val)`
+
+Elimina un chip específico del array `brandIngChips` y re-renderiza.
+
+```javascript
+function removeBrandIngChip(val) {
+  brandIngChips = brandIngChips.filter(c => c !== val);
+  renderBrandIngChips();
+}
+```
+
+### `renderBrandIngChips()`
+
+Re-dibuja la lista visual de chips en el DOM del modal. Cada chip tiene un botón × que llama a `removeBrandIngChip(val)`.
+
+```javascript
+function renderBrandIngChips() {
+  const container = document.getElementById('brand-ing-chips');
+  container.innerHTML = brandIngChips.map(c =>
+    `<span class="chip">${c} <button onclick="removeBrandIngChip('${c}')">×</button></span>`
+  ).join('');
+}
+```
+
+### `createBrand()` — iteración sobre chips
+
+En lugar de crear un solo registro, `createBrand()` itera sobre `brandIngChips` y hace un `POST /brands` por cada ingrediente:
+
+```javascript
+async function createBrand() {
+  const name = document.getElementById('brand-name-input').value.trim();
+  if (!name || brandIngChips.length === 0) return;
+
+  for (const ing of brandIngChips) {
+    await apiFetch('/brands', {
+      method: 'POST',
+      body: JSON.stringify({ name, ingredient_name: ing })
+    });
+  }
+  brandIngChips = [];
+  closeBrandsModal();
+  await loadBrands();
+  renderBrandsList();
+}
+```
+
+### `renderBrandsList()` — agrupación por nombre
+
+Agrupa los registros de marcas por nombre y renderiza:
+- Un encabezado de marca con botón "Eliminar marca" (`deleteBrandGroup`)
+- La lista de ingredientes asociados, separados por comas, cada uno con su botón × (`deleteBrandEntry`)
+- Un botón "+" inline para agregar nuevos ingredientes sin abrir el modal principal
+
+```javascript
+function renderBrandsList() {
+  // Agrupar allBrands por nombre
+  const grouped = {};
+  for (const b of allBrands) {
+    if (!grouped[b.name]) grouped[b.name] = [];
+    grouped[b.name].push(b);
+  }
+  // Renderizar un bloque por nombre de marca
+  container.innerHTML = Object.entries(grouped).map(([name, entries]) => `
+    <div class="brand-group">
+      <span class="brand-name">${name}</span>
+      <span class="brand-ings">
+        ${entries.map(e => `
+          ${e.ingredient_name}
+          <button onclick="deleteBrandEntry('${e.id}')">×</button>
+        `).join(', ')}
+      </span>
+      <button onclick="startAddBrandIng('${entries[0].id}')">+</button>
+      <button onclick="deleteBrandGroup('${name}')">Eliminar marca</button>
+    </div>
+  `).join('');
+}
+```
+
+### `startAddBrandIng(brandId)`
+
+Inserta una fila temporal inline en la lista para agregar un ingrediente a una marca existente.
+No abre el modal principal — edición in-place.
+
+### `saveAddBrandIng(brandName)`
+
+Lee el valor de la fila temporal y hace `POST /brands` con `{name: brandName, ingredient_name: value}`.
+Tras guardar, recarga la lista y elimina la fila temporal.
+
+### `deleteBrandEntry(brandId)`
+
+Elimina un único registro de marca (un ingrediente de una marca) via `DELETE /brands/<brandId>`.
+No pide confirmación — la acción es pequeña e individual.
+
+```javascript
+async function deleteBrandEntry(brandId) {
+  await apiFetch(`/brands/${brandId}`, { method: 'DELETE' });
+  allBrands = allBrands.filter(b => b.id !== brandId);
+  renderBrandsList();
+}
+```
+
+### `deleteBrandGroup(brandName)`
+
+Elimina TODOS los registros de una marca (todos los ingredientes) con confirmación previa.
+Filtra `allBrands` por nombre y hace un `DELETE` por cada entrada.
+
+```javascript
+async function deleteBrandGroup(brandName) {
+  if (!confirm(`¿Eliminar todos los registros de "${brandName}"?`)) return;
+  const entries = allBrands.filter(b => b.name === brandName);
+  for (const b of entries) {
+    await apiFetch(`/brands/${b.id}`, { method: 'DELETE' });
+  }
+  allBrands = allBrands.filter(b => b.name !== brandName);
+  renderBrandsList();
+}
+```
+
+La función anterior `deleteBrand()` fue reemplazada por `deleteBrandGroup()`.
+
+---
+
+## `frontend/js/recipe.js` — price-clickable y unit_warning (Sprint 11)
+
+### `renderIngRow()` — celda qty con `price-clickable`
+
+La celda `col-qty` (que muestra cantidad y unidad del ingrediente) ahora tiene:
+- Clase CSS `price-clickable` — aplica cursor pointer y underline sutil
+- `onclick` que llama `openEditIngModal(ingId)` con foco directo en el campo de cantidad
+
+```javascript
+function renderIngRow(ing) {
+  // ...
+  const qtyCell = `
+    <td class="col-qty price-clickable"
+        onclick="openEditIngModal('${ing.id}', 'quantity')">
+      ${ing.quantity} ${ing.unit}
+    </td>`;
+  // ...
+}
+```
+
+El parámetro `'quantity'` le indica a `openEditIngModal()` que debe hacer `.focus()` en el
+campo de cantidad cuando abre el modal — permite editar la cantidad sin navegar los campos del formulario.
+
+**Por qué:** antes el usuario tenía que hacer click en el botón ✏️ de la fila, abrir el modal,
+y luego hacer click en el campo de cantidad. Con `price-clickable`, un solo click en la
+cantidad ya lo lleva directamente al campo correcto.
+
+### `loadCost()` — campo `unit_warning` del backend
+
+El endpoint `GET /recipes/<id>/cost` ahora incluye el campo `unit_warning: boolean` por ingrediente.
+
+**Lógica de renderizado:**
+
+```javascript
+function renderCostRow(i) {
+  const ppkgCell = i.unit_warning
+    ? `<td class="col-ppkg">
+         ⚠️ <span class="tooltip" title="${t('warn_unit_mismatch')}">?</span>
+       </td>`
+    : `<td class="col-ppkg">${i.price_per_kg ? '€' + i.price_per_kg.toFixed(2) : '—'}</td>`;
+
+  const totalCell = i.unit_warning
+    ? `<td class="col-total">?</td>`
+    : `<td class="col-total">${i.cost != null ? '€' + i.cost.toFixed(2) : '—'}</td>`;
+
+  return ppkgCell + totalCell;
+}
+```
+
+**Por qué `unit_warning` en el backend y no `_PIECE_UNITS` en el frontend:**
+El listado de unidades "no pesables" estaba hardcodeado en `recipe.js` como `_PIECE_UNITS`.
+Moverlo al backend centraliza la lógica — si se agrega una nueva unidad, solo se modifica
+`facade.py`, no el frontend. Además, el backend tiene acceso a `bought_unit` (la unidad
+con que fue guardado el precio) mientras que el frontend solo conoce la unidad del ingrediente.

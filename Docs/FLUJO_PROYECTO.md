@@ -67,8 +67,8 @@ No explica línea a línea — explica QUÉ hace cada parte y POR QUÉ existe.
 └──────────┬──────────────┬──────────────┬────────────────────┘
            │              │              │
            ▼              ▼              ▼
-      SQLAlchemy       Groq API      Open Food Facts
-      (Supabase PG)   (llama-3.3)     (precios)
+      SQLAlchemy         Groq API           Open Food Facts
+      (Supabase PG)   (llama-3.3-70b-versatile)   (precios)
 ```
 
 ---
@@ -221,7 +221,7 @@ scan_pdf()
   │
   ├── _extract_pdf_text()   → PyMuPDF extrae el texto del PDF
   │
-  ├── _call_groq()          → envía el texto a Groq (Qwen 3.6-27b)
+  ├── _call_groq()          → envía el texto a Groq (llama-3.3-70b-versatile)
   │                           recibe JSON: {title, ingredients, steps}
   │
   ├── create_recipe()       → guarda la receta
@@ -406,7 +406,7 @@ facade.scan_pdf(user_id, file_bytes, filename)
         │   (solo texto seleccionable, no imágenes)
         │
         ├── _call_groq(text)
-        │   Prompt enviado a Qwen 3.6-27b:
+        │   Prompt enviado a llama-3.3-70b-versatile (Groq):
         │   "Extraé la receta de este texto y devolvé JSON con
         │    title, ingredients (name, quantity, unit), steps (order, description)"
         │
@@ -450,17 +450,23 @@ Para cada ingrediente:
      - Si la unidad es kg, l, litro, liter → usa qty directamente
      - Otras unidades (unidades, tazas, etc.) → usa qty directamente (estimado)
   2. Llama a _resolve_price(ing, user_id)
-     → devuelve (precio_por_kg, fuente, tienda_id)
-  3. costo_ingrediente = precio_por_kg × cantidad_normalizada
+     → devuelve (precio_por_kg, fuente, tienda_id, bought_unit)
+     El 4º valor bought_unit es la unidad con que fue guardado el precio en DB.
+  3. Detecta unit_warning:
+     → True si la unidad del ingrediente NO es pesable (g/kg/ml/l)
+        Y el precio fue guardado con unidad pesable (g/kg/ml/l)
+     → Si unit_warning = True: el campo `cost` es None, el frontend muestra ?
+  4. costo_ingrediente = precio_por_kg × cantidad_normalizada (solo si !unit_warning)
         │
         ▼
 Retorna:
   {
     "ingredients": [
-      {"name": "harina", "cost": 0.15, "source": "custom", "store": "Carrefour"},
-      {"name": "azúcar", "cost": 0.08, "source": "fallback"}
+      {"name": "harina", "cost": 0.15, "source": "custom", "store": "Carrefour", "unit_warning": false},
+      {"name": "azúcar", "cost": 0.08, "source": "fallback", "unit_warning": false},
+      {"name": "huevos", "cost": null, "source": "custom", "unit_warning": true}  // ⚠️ precio en €/kg pero ingrediente en "unidades"
     ],
-    "total": 2.43
+    "total": 2.23
   }
 ```
 
@@ -525,7 +531,7 @@ Los modelos son clases pasivas de datos — no tienen lógica de persistencia pr
 Flask da control total — cada componente (JWT, ORM, Swagger) lo elegimos e integramos nosotros. Con Django el framework toma esas decisiones. Para el jury es mejor poder explicar cada línea.
 
 **¿Por qué Groq y no OpenAI?**
-Groq tiene un tier gratuito generoso y hardware LPU especializado para LLMs — es significativamente más rápido que OpenAI. El modelo usado es open-source (Meta LLaMA o Alibaba Qwen).
+Groq tiene un tier gratuito generoso y hardware LPU especializado para LLMs — es significativamente más rápido que OpenAI. El modelo usado es `llama-3.3-70b-versatile` (Meta, open-source), con `llama-4-scout` como fallback para procesamiento de imágenes.
 
 **¿Por qué JWT y no sesiones?**
 JWT es stateless — el servidor no guarda nada. Cualquier instancia del servidor puede verificar el token. Es el estándar para APIs REST y es compatible con apps móviles futuras.
@@ -559,3 +565,26 @@ Render tiene un límite de 30s por request. La traducción puede tardar 5–15s.
 
 **¿Por qué el modo oscuro usa `localStorage` y no solo `prefers-color-scheme`?**
 La media query responde al SO, no al usuario. Con `localStorage` el usuario puede elegir un tema distinto al del sistema. `theme.js` se carga en `<head>` para evitar FOUC.
+
+**¿Qué significa `unit_warning` en el cálculo de costos?**
+Cuando el usuario guardó un precio de "huevos" como €3.50/kg pero el ingrediente en la
+receta está en "unidades" (3 huevos), el precio por kg no se puede aplicar directamente.
+El backend detecta esta incompatibilidad comparando la unidad del ingrediente con la unidad
+con que fue guardado el precio (`bought_unit`). Si son incompatibles, activa `unit_warning: true`.
+El frontend muestra ⚠️ en la columna de €/kg y ? en el total — el usuario sabe que el precio
+es orientativo y debería editar el ingrediente o el precio para hacerlos compatibles.
+
+**¿Por qué una marca puede tener múltiples ingredientes?**
+En la realidad, el usuario compra varios ingredientes en la misma tienda/marca. Por ejemplo,
+"Carrefour" puede tener precios para harina, azúcar, manteca, etc. Con el modelo anterior
+(una fila por marca), el usuario tenía que crear "Carrefour" una sola vez y luego asociar
+ingredientes por separado. Con el nuevo modelo (una fila por nombre+ingrediente), el modal
+de creación de marcas permite agregar varios ingredientes a la vez usando chips, y la lista
+los muestra agrupados por nombre de marca con ingredientes como sublista.
+
+**¿Cómo funciona la deduplicación de marcas?**
+`POST /brands` verifica que no exista ya la combinación `(user_id, nombre, ingredient_name_normalizado)`.
+- Crear "Lidl" para "harina" → OK
+- Crear "Lidl" para "azúcar" → OK (distinto ingrediente)
+- Crear "Lidl" para "harina" de nuevo → 409 Conflict (ya existe esa combinación exacta)
+La normalización usa `_norm()` para ser insensible a acentos.

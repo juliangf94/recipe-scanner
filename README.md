@@ -12,7 +12,7 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 
 ## Features
 
-- Upload a PDF recipe and extract ingredients and steps automatically using Groq API (Qwen 3.6-27b)
+- Upload a PDF recipe and extract ingredients and steps automatically using Groq API (Llama 3.3-70b-versatile)
 - User authentication with JWT access + refresh tokens, bcrypt password hashing
 - Save, view, edit, and delete recipes with multilingual fields (EN/ES/FR)
 - Estimate ingredient prices via Open Food Facts API + custom price database
@@ -23,6 +23,8 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 - Containerized with Docker (multi-stage build: dev + production with gunicorn)
 - Modo oscuro completo con toggle y persistencia en localStorage
 - Color personalizable por sección de ingredientes
+- Gestión de marcas multi-ingrediente: cada marca puede tener varios ingredientes, con chips de selección y eliminación individual por ingrediente
+- Advertencia de incompatibilidad de unidades (`unit_warning`) cuando el ingrediente está en unidades no pesables pero el precio fue guardado en €/kg
 
 ---
 
@@ -33,14 +35,14 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 | Backend | Python 3.12, Flask 3.x, flask-restx (Swagger) |
 | Authentication | Flask-JWT-Extended (access + refresh tokens) + bcrypt |
 | PDF Extraction | PyMuPDF (fitz) |
-| AI / NLP | Groq API — Qwen 3.6-27b (qwen/qwen3.6-27b) |
+| AI / NLP | Groq API — Llama 3.3-70b-versatile (vision fallback: llama-4-scout) |
 | Ingredient Prices | Open Food Facts API + FALLBACK_PRICES table |
 | Database | SQLite (dev) / PostgreSQL (prod) |
 | ORM | SQLAlchemy 2.x (Repository Pattern) |
 | Frontend | HTML + CSS + JS vanilla (static, no framework) |
 | Containerization | Docker (multi-stage) + Docker Compose |
 | Deploy | Render (backend) + Netlify (frontend) |
-| Tests | pytest (100 tests) + Postman Newman (331 assertions, 109 requests) |
+| Tests | pytest (107 tests) + Newman (204 assertions) = 311 total |
 
 ---
 
@@ -136,7 +138,7 @@ Base URL: `/api/v1` — Full interactive docs at `/api/docs`
 cd recipe-scanner
 source backend/venv/bin/activate
 pytest tests/ -v
-# 100 tests — 0 failures
+# 107 tests — 0 failures
 ```
 
 ---

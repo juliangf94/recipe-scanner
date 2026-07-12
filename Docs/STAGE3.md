@@ -138,7 +138,7 @@ flowchart TD
     end
 
     subgraph External["External Services"]
-        Groq["Groq API\nLlama 3.3-70b"]
+        Groq["Groq API\nLlama 3.3-70b-versatile\n(vision fallback: llama-4-scout)"]
         OFF["Open Food Facts API"]
         DeepL["DeepL / MyMemory\n(traducciones EN/ES/FR)"]
         Storage["Supabase Storage\n(fotos recetas + avatares)"]
@@ -475,12 +475,13 @@ sequenceDiagram
 
 ### External APIs
 
-#### Groq API (Llama 3.3-70b)
+#### Groq API (Llama 3.3-70b-versatile)
 
 - **URL base:** `https://api.groq.com/openai/v1/chat/completions`
 - **Auth:** `Authorization: Bearer <GROQ_API_KEY>`
 - **Por qué:** inferencia ultrarrápida con hardware LPU especializado. Groq ofrece
-  acceso gratuito (free tier). El modelo actual es Llama 3.3-70b (Alibaba, open-source).
+  acceso gratuito (free tier). El modelo principal es `llama-3.3-70b-versatile` (Meta, open-source).
+  Se usa `llama-4-scout` como fallback para procesamiento de imágenes.
 - **Uso en el proyecto:** se le envía el texto extraído del PDF y se le pide que
   devuelva un JSON estructurado con título, ingredientes (nombre, cantidad, unidad)
   y pasos ordenados. Las traducciones EN/ES/FR se hacen por separado (DeepL / MyMemory).
@@ -488,7 +489,7 @@ sequenceDiagram
 **Ejemplo de request:**
 ```json
 {
-  "model": "llama-3.3-70b-versatile",
+  "model": "llama-3.3-70b-versatile",   // fallback para visión: llama-4-scout
   "messages": [
     {
       "role": "user",
@@ -732,8 +733,13 @@ Output 422:
 | POST | `/stores` | Crear tienda | Yes |
 | DELETE | `/stores/<store_id>` | Eliminar tienda | Yes |
 | GET | `/brands` | Listar marcas del usuario | Yes |
-| POST | `/brands` | Crear marca | Yes |
-| DELETE | `/brands/<brand_id>` | Eliminar marca | Yes |
+| POST | `/brands` | Crear marca con ingrediente — deduplicación por (nombre, ingrediente) | Yes |
+| DELETE | `/brands/<brand_id>` | Eliminar un solo registro de marca (un ingrediente) | Yes |
+
+**Nota sobre `POST /brands`:** permite múltiples registros de la misma marca con
+distintos ingredientes. La verificación de duplicados es por la combinación
+`(user_id, nombre, ingredient_name_normalizado)` en lugar de solo por nombre.
+Esto permite que `"Lidl"` tenga registros separados para `"harina"` y `"azúcar"`.
 
 ---
 
@@ -841,6 +847,6 @@ Los directorios de uploads existen en el repo gracias a archivos `.gitkeep` pero
 | In-memory first | SQLAlchemy desde el inicio | Validar lógica sin complejidad de BD, desarrollo más rápido |
 | JWT | Sessions, OAuth | Stateless, escalable, estándar REST |
 | bcrypt | MD5, SHA-256 | Lento por diseño, incluye salt, resistente a fuerza bruta |
-| Groq + Llama 3.3-70b | OpenAI GPT-4 | Más rápido (LPU), open-source, tier gratuito, sin costo |
+| Groq + Llama 3.3-70b-versatile | OpenAI GPT-4 | Más rápido (LPU), open-source, tier gratuito, sin costo; vision fallback: llama-4-scout |
 | Open Food Facts | APIs de supermercados | Abierta, gratuita, sin acuerdo comercial, 3M+ productos |
 | Frontend HTML/JS estático | React, Vue, Jinja2 | Desacoplado del backend, mismo consumidor que app móvil futura |

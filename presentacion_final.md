@@ -7,7 +7,7 @@
 
 - Nombre: **Julian Gonzalez**
 - Proyecto: **RecipeScanner**
-- Duración: 2 meses · 9 sprints
+- Duración: 2 meses · 10 sprints
 
 > *"Me gusta preparar tortas para los cumpleaños de mis amigos y familia.
 > Cada vez que alguien me pedía el precio, tenía que investigar ingrediente
@@ -54,13 +54,13 @@ Flujo a seguir durante la demo:
 | Frontend | HTML, CSS, Vanilla JS |
 | Backend | Python 3, Flask, Flask-RESTX |
 | Base de datos | SQLAlchemy + PostgreSQL (Supabase) |
-| IA — extracción | Groq API · Llama 3.3-70b |
+| IA — extracción | Groq API · Llama 3.3-70b-versatile (vision fallback: llama-4-scout) |
 | Traducción | DeepL API |
 | Precios externos | Open Food Facts API |
 | Storage de imágenes | Supabase Storage |
 | Deploy frontend | Netlify |
 | Deploy backend | Render |
-| Tests | 107 pytest + 109 Newman = **216 total** |
+| Tests | 107 pytest + 204 Newman = **311 total** |
 
 ---
 
@@ -70,7 +70,7 @@ Flujo a seguir durante la demo:
 graph TD
     A["🌐 Browser\nNetlify (Static)"] -->|REST/JSON| B["🐍 Flask API\nRender"]
     B --> C[("🗄 PostgreSQL\nSupabase")]
-    B --> D["🤖 Groq API\nLlama 3.3-70b"]
+    B --> D["🤖 Groq API\nLlama 3.3-70b-versatile"]
     B --> E["🌍 DeepL API\nTraducción"]
     B --> F["🛒 Open Food Facts\nPrecios externos"]
     B --> G["📦 Supabase Storage\nImágenes"]
@@ -90,7 +90,7 @@ graph TD
 Usuario sube PDF
     → Frontend envía archivo al backend (multipart/form-data)
     → Backend extrae texto del PDF
-    → Llama a Groq API con el texto (Llama 3.3-70b)
+    → Llama a Groq API con el texto (Llama 3.3-70b-versatile)
     → Groq devuelve JSON estructurado (título, ingredientes, pasos)
     → Backend guarda en PostgreSQL
     → Backend llama a DeepL para traducir a EN/ES/FR
@@ -215,7 +215,7 @@ async function apiFetch(path, options = {}) {
 }
 ```
 
-### Respuestas no deterministas de Llama 3.3-70b
+### Respuestas no deterministas de Llama 3.3-70b-versatile
 El mismo PDF podía devolver estructuras JSON diferentes entre llamadas.
 Solución: prompt estructurado con JSON schema explícito + validación y
 retry automático si la respuesta no parsea correctamente.
@@ -256,7 +256,7 @@ rompía tests existentes.
 | ¿Qué pasa si Llama devuelve JSON mal formado? | Validación del schema + retry automático con prompt más estricto |
 | ¿Por qué 4 fuentes de precio y no solo una? | Ninguna fuente cubre el 100% de los ingredientes. La cascada garantiza siempre tener un estimado |
 | ¿Cómo manejás la seguridad del token? | Access token de 15 min en memoria, refresh token de 30 días, flag anti-loop en el cliente |
-| ¿Cuántos tests tenés? | 216: 107 pytest (unitarios e integración) + 109 Newman (contrato de API) |
+| ¿Cuántos tests tenés? | 311: 107 pytest (unitarios e integración) + 204 Newman (contrato de API) |
 | ¿Por qué el modo oscuro usa `localStorage` y no solo `prefers-color-scheme` de CSS? | Con `prefers-color-scheme` el usuario no puede elegir un tema distinto al de su sistema operativo. Con `localStorage` y un toggle, el usuario puede decidir independientemente. Además, `theme.js` se carga de forma síncrona en `<head>` para evitar el flash de tema incorrecto (FOUC) antes de que el navegador pinte la página. |
 | ¿Por qué `section_meta` es una columna TEXT con JSON y no una tabla separada? | Las secciones son dinámicas y en pequeña cantidad por receta (típicamente 2–5). Una tabla separada requeriría un JOIN extra en cada carga de receta sin beneficio real. El JSON embebido en TEXT es suficiente para este volumen de datos. |
 | ¿Por qué la traducción corre en un hilo separado? | Render tiene un límite de 30 segundos por request HTTP. La traducción con DeepL puede tardar 5–15 segundos para recetas largas. Sin el hilo, el usuario veía un error de conexión aunque la receta se había creado correctamente. Con el hilo daemon, la respuesta HTTP se retorna inmediatamente y la traducción completa los campos en segundo plano. |

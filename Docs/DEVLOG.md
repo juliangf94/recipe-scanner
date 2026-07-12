@@ -13,14 +13,14 @@ Fecha de entrega: finales de junio 2026
 | ORM | SQLAlchemy 2.x | Abstracción de SQL, soporta SQLite y PostgreSQL sin cambiar código |
 | Autenticación | flask_jwt_extended + bcrypt | JWT = stateless (sin sesiones en servidor); bcrypt = hash lento por diseño |
 | PDF parsing | PyMuPDF | Binding C de MuPDF, muy rápido para extraer texto |
-| IA | Groq API (Qwen 3.6-27b) | Inferencia ultrarrápida, modelo open-source potente |
+| IA | Groq API (Llama 3.3-70b-versatile; vision fallback: llama-4-scout) | Inferencia ultrarrápida, modelo open-source potente |
 | API externa | Open Food Facts | Base de datos de alimentos abierta y gratuita |
 | BDD desarrollo | SQLite | Sin servidor, archivo local, ideal para desarrollo |
 | BDD producción | PostgreSQL | Robusto, concurrente, estándar en producción |
 | API docs | flask_restx (Swagger UI) | Documentación automática en `/api/docs`, preparado para app móvil |
 | Frontend | HTML + JS estático | Sin build step, sin framework reactivo — justificado en Decisión 18; la misma API sirve a cualquier cliente futuro |
-| Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 100 tests, 0 failures |
-| Tests end-to-end | Newman + Postman | 331 assertions contra el servidor en vivo — 109 requests, 0 failures |
+| Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 107 tests, 0 failures |
+| Tests end-to-end | Newman + Postman | 204 assertions contra el servidor en vivo — 0 failures |
 | Variables de entorno | python-dotenv | Carga `.env` en desarrollo; en producción las claves van directo al servidor |
 | Containerización | Docker (multi-stage) | Stage dev con hot reload, stage production con gunicorn + usuario no-root |
 | Deploy backend | Render (Docker) | Free tier, auto-deploy desde GitHub, soporte Docker nativo |
@@ -60,14 +60,15 @@ rápido que alternativas puras en Python como PyPDF2 o pdfplumber. Para un proye
 que procesa PDFs subidos por usuarios, la velocidad de extracción de texto es crítica.
 Además maneja correctamente PDFs complejos con múltiples formatos de encoding.
 
-**Groq API con Qwen 3.6-27b — IA**
+**Groq API con Llama 3.3-70b-versatile — IA**
 Elegimos Groq sobre OpenAI por dos razones principales. Primero, Groq ofrece
 inferencia ultrarrápida gracias a su hardware especializado LPU — los tiempos de
 respuesta son notablemente menores que OpenAI para el mismo modelo. Segundo,
-el proyecto comenzó con LLaMA 3.3-70b (Meta, open-source) y migró a Qwen 3.6-27b
-(Alibaba, open-source) en julio 2026 cuando Groq deprecó LLaMA 3.3. Ambos modelos
-son open-source — sin dependencia de un proveedor propietario. Para nuestro caso
-de uso — extraer ingredientes, cantidades y pasos de un texto de receta — Qwen 3.6-27b
+el modelo `llama-3.3-70b-versatile` (Meta, open-source) ofrece excelente calidad
+para extracción estructurada de recetas. Como fallback para procesamiento de
+imágenes se usa `llama-4-scout` (vision model). Ambos modelos son open-source —
+sin dependencia de un proveedor propietario. Para nuestro caso de uso — extraer
+ingredientes, cantidades y pasos de un texto de receta — Llama 3.3-70b-versatile
 es más que suficiente y el costo es mínimo comparado con GPT-4.
 
 **Open Food Facts — API externa**
@@ -1062,3 +1063,146 @@ def get_week_cooked_recipe_ids(user_id): → qué recetas cocinó esta semana
 - [x] Escape para cerrar modales — listener `keydown` en `prices.js` y `recipe.js`
 - [x] Fix de dialecto en traducción — texto fuente copiado directamente sin pasar por DeepL, evita que español argentino sea "traducido" a español de España
 - [x] Diccionario de secciones multilingüe — `SECTION_MAP` + `tSection()` en `i18n.js`, traduce nombres de secciones en tiempo real sin modificar la DB
+
+---
+
+## Decisiones técnicas — Fase 12 (UX marcas multi-ingrediente + unit_warning + ajustes CSS)
+
+### Decisión 25 — Marcas multi-ingrediente con chips (prices.js)
+
+**Problema:** El flujo anterior de creación de marca permitía asociar solo un ingrediente
+por acción. Para guardar una marca con varios ingredientes el usuario tenía que abrir el
+modal varias veces, una por ingrediente.
+
+**Solución:** Sistema de chips en el modal "Crear marca":
+- Variable global `brandIngChips = []` acumula los ingredientes seleccionados antes de guardar.
+- `addBrandIngChip()` — agrega el valor del `<input>` a `brandIngChips` y limpia el campo.
+- `removeBrandIngChip(val)` — elimina un chip específico del array.
+- `renderBrandIngChips()` — re-dibuja los chips visuales en el DOM.
+- `openBrandsModal()` resetea `brandIngChips = []` al abrir el modal.
+- `createBrand()` itera sobre `brandIngChips` y hace un `POST /brands` por ingrediente,
+  permitiendo crear en un solo paso una marca con N ingredientes.
+
+```javascript
+// Ejemplo: crear marca "Carrefour" con 3 ingredientes
+brandIngChips = ['harina', 'azúcar', 'manteca'];
+// createBrand() hace 3 POSTs: {name: 'Carrefour', ingredient_name: 'harina'}, etc.
+```
+
+---
+
+### Decisión 26 — renderBrandsList agrupa por nombre de marca
+
+**Problema:** Con el nuevo modelo (una fila por nombre+ingrediente), la lista de marcas
+mostraba filas duplicadas para el mismo supermercado con distintos ingredientes.
+
+**Solución:** `renderBrandsList()` agrupa los registros por nombre de marca y muestra:
+- Un único encabezado de marca
+- Los ingredientes asociados como lista separada por comas con botón × individual por ingrediente (`deleteBrandEntry(brandId)`)
+- Botón "Eliminar marca" que borra TODOS los registros de esa marca con confirmación (`deleteBrandGroup(brandName)`)
+
+Funciones nuevas:
+- `startAddBrandIng(brandId)` — inserta una fila temporal inline en la lista para agregar un ingrediente a una marca existente sin abrir el modal principal.
+- `saveAddBrandIng(brandName)` — lee el valor de la fila temporal y hace `POST /brands` con `{name: brandName, ingredient_name: value}`.
+- `deleteBrandEntry(brandId)` — elimina un solo registro (un ingrediente de una marca) via `DELETE /brands/<id>` sin pedir confirmación.
+- `deleteBrandGroup(brandName)` — elimina todos los registros de esa marca con `window.confirm()` antes de ejecutar.
+
+La función `deleteBrand()` fue deprecada y reemplazada por `deleteBrandGroup()`.
+
+---
+
+### Decisión 27 — unit_warning en get_recipe_cost (facade.py)
+
+**Problema:** Cuando el precio de un ingrediente fue guardado como €/kg pero el ingrediente
+en la receta está en "unidades" (piezas, cucharadas, etc.), el sistema calculaba un precio
+numérico incorrecto sin advertir al usuario. Por ejemplo: "3 huevos" con precio "€3.50/kg
+de huevos" mostraría un total absurdo.
+
+**Solución:** `get_recipe_cost()` detecta la incompatibilidad y activa `unit_warning`:
+- `unit_warning = True` cuando: la unidad del ingrediente en la receta NO es peso/volumen
+  (g/kg/ml/l) Y el precio en DB fue guardado en unidades de peso/volumen (g/kg/ml/l).
+- Cuando `unit_warning = True`: se muestra ⚠️ con tooltip en la columna €/kg, y `?` en
+  la columna TOTAL en lugar del precio calculado.
+- `_G` y `_KG` sets (conjuntos de unidades de masa/volumen) se movieron fuera del loop
+  para evitar re-crearlos en cada iteración de ingrediente.
+
+**Cambio en `_resolve_price()`:**
+Ahora devuelve 4 valores: `(price_per_kg, source, store_id, bought_unit)` en lugar de 3.
+El cuarto valor `bought_unit` permite que `get_recipe_cost()` compare con la unidad del
+ingrediente de receta para determinar el `unit_warning`.
+
+**Renderizado en recipe.js:**
+- `renderIngRow()`: la celda `col-qty` tiene clase `price-clickable` y `onclick` que
+  abre `openEditIngModal()` con foco directo en el campo de cantidad — facilita editar
+  la cantidad desde la tabla de ingredientes.
+- Cuando `unit_warning = true`: la celda €/kg muestra `⚠️` con tooltip explicativo,
+  y la celda TOTAL muestra `?` en lugar del precio calculado.
+
+---
+
+### Decisión 28 — Deduplicación de marcas por (nombre, ingrediente) en backend
+
+**Problema:** El endpoint `POST /brands` verificaba duplicados solo por nombre de marca.
+Con el nuevo modelo multi-ingrediente, dos registros `{name: 'Lidl', ingredient_name: 'harina'}`
+y `{name: 'Lidl', ingredient_name: 'azúcar'}` son válidos y distintos — la verificación
+por solo nombre rechazaba el segundo como duplicado.
+
+**Solución:**
+- Nueva función en facade: `get_brand_by_name_and_ingredient(user_id, name, ingredient_name)`
+  — busca duplicados por la combinación (nombre, ingrediente_normalizado) en lugar de solo por nombre.
+- `POST /brands` usa esta nueva función para la verificación de duplicados, permitiendo
+  múltiples registros de la misma marca con distintos ingredientes.
+
+```python
+# brands.py — antes
+existing = facade.get_brand_by_name(user_id, name)
+
+# brands.py — ahora
+existing = facade.get_brand_by_name_and_ingredient(user_id, name, ingredient_name)
+```
+
+---
+
+### Decisión 29 — Ajustes de layout CSS (Fase 12)
+
+Los valores de layout del `detail-grid` y elementos de tarjeta fueron afinados para
+mejorar el balance visual entre la columna de ingredientes y la columna lateral de pasos.
+
+| Propiedad | Valor anterior | Valor actual | Motivo |
+|---|---|---|---|
+| `.detail-grid` columns | `5fr 2fr` | `3fr 2fr` | La columna de pasos necesita más espacio relativo |
+| `.detail-grid` gap | `1.5rem` | `0.75rem` | Reduce el espacio vacío entre columnas |
+| `.app-layout` padding | `2rem 1.75rem` | `2rem 1rem` | Más espacio de contenido en pantallas medianas |
+| `.step-item` padding | `1rem 1.2rem` | `0.75rem 0.75rem` | Tarjetas de paso más compactas |
+| `.step-item` gap | `1rem` | `0.6rem` | Reduce espacio interno en cada paso |
+| `.section-card-header` padding | `0.9rem 1.2rem` | `0.75rem 0.75rem` | Consistencia con step-item |
+
+---
+
+### Fase 12 — Multi-ingrediente por marca + unit_warning + ajustes CSS ✅
+
+#### Objetivos
+- Rediseñar el flujo de creación de marcas para soportar múltiples ingredientes en un solo paso
+- Agregar detección automática de incompatibilidad de unidades en el cálculo de costos
+- Afinar el layout CSS del detalle de receta
+
+#### Tareas completadas
+- [x] Variable global `brandIngChips = []` + funciones `addBrandIngChip`, `removeBrandIngChip`, `renderBrandIngChips` en `prices.js`
+- [x] `openBrandsModal()` resetea chips al abrir
+- [x] `createBrand()` itera sobre chips y hace un POST por ingrediente
+- [x] `renderBrandsList()` agrupa por nombre, muestra ingredientes como lista con × individual
+- [x] `startAddBrandIng(brandId)` + `saveAddBrandIng(brandName)` — agrega ingrediente a marca existente inline
+- [x] `deleteBrandEntry(brandId)` — elimina un solo registro sin confirmación
+- [x] `deleteBrandGroup(brandName)` — elimina todos los registros de una marca con confirmación
+- [x] `deleteBrand()` deprecada, reemplazada por `deleteBrandGroup()`
+- [x] i18n: nueva key `brand_for_prefix` ('for' / 'para' / 'pour') en los 3 idiomas
+- [x] i18n: nueva key `warn_unit_mismatch` en los 3 idiomas
+- [x] `renderIngRow()` en `recipe.js`: celda `col-qty` con clase `price-clickable` y onclick a `openEditIngModal()`
+- [x] `loadCost()` en `recipe.js`: campo `i.unit_warning` controla ⚠️ — ya NO usa `_PIECE_UNITS` hardcodeado
+- [x] Cuando `unit_warning = true`: ⚠️ con tooltip en columna €/kg, `?` en columna TOTAL
+- [x] `_resolve_price()` en `facade.py` retorna 4 valores: `(price_per_kg, source, store_id, bought_unit)`
+- [x] `get_recipe_cost()` detecta `unit_warning` comparando unidad de receta vs `bought_unit` del precio
+- [x] `_G` y `_KG` sets movidos fuera del loop en `facade.py` (optimización)
+- [x] `get_brand_by_name_and_ingredient(user_id, name, ingredient_name)` en `facade.py`
+- [x] `POST /brands` usa nueva función de deduplicación por (nombre, ingrediente)
+- [x] Ajustes CSS: `detail-grid` `5fr 2fr` → `3fr 2fr`, gap `1.5rem` → `0.75rem`, padding de `app-layout`, `step-item` y `section-card-header`

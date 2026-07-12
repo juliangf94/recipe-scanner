@@ -6470,3 +6470,176 @@ if col == source_col:
 Alcance: el mismo cambio se aplica en `_translate_ingredient()` y `_translate_step()`
 para cuando se agrega/edita un ingrediente o paso individual.
 
+---
+
+# Sprint 11 (Fase 12) — Cambios en facade.py y brands.py
+
+---
+
+## `backend/app/services/facade.py` — `_resolve_price` retorna 4 valores
+
+### Cambio: 4º valor de retorno `bought_unit`
+
+`_resolve_price()` pasó de retornar 3 valores a retornar 4:
+
+```python
+# Antes:
+return price_per_kg, source, store_id
+
+# Ahora:
+return price_per_kg, source, store_id, bought_unit
+```
+
+El cuarto valor `bought_unit` es la unidad en que fue guardado el precio en la DB
+(e.g., `'g'`, `'kg'`, `'unidad'`, etc.). Todos los return statements de la función
+fueron actualizados para incluir este valor.
+
+**¿Por qué este cambio?**
+`get_recipe_cost()` necesita comparar la unidad del ingrediente en la receta vs la unidad
+con que fue guardado el precio, para detectar incompatibilidades (ver `unit_warning` abajo).
+Sin el 4º valor, habría que hacer una segunda consulta a la DB para obtener la unidad del precio.
+
+---
+
+## `backend/app/services/facade.py` — `unit_warning` en `get_recipe_cost`
+
+### Sets `_G` y `_KG` movidos fuera del loop
+
+```python
+# Antes: se re-creaban en cada iteración de ingrediente
+def get_recipe_cost(self, recipe_id, user_id):
+    for ing in ingredients:
+        _G = {'g', 'gr', 'gram', ...}    # re-creado N veces
+        _KG = {'kg', 'l', 'litro', ...}  # re-creado N veces
+
+# Ahora: definidos una sola vez antes del loop
+def get_recipe_cost(self, recipe_id, user_id):
+    _G  = {'g', 'gr', 'gram', 'grams', 'ml', 'millilitro', 'millilitros', 'milliliter', 'cc'}
+    _KG = {'kg', 'kilogram', 'kilograms', 'l', 'liter', 'litre', 'litro', 'litros'}
+    for ing in ingredients:
+        ...
+```
+
+Moverlos fuera del loop es una optimización de rendimiento. Para recetas con muchos
+ingredientes (20-30), los sets se creaban en cada iteración — costoso en memoria.
+
+### Detección de `unit_warning`
+
+```python
+# Dentro de get_recipe_cost(), después de llamar a _resolve_price():
+price_per_kg, source, store_id, bought_unit = self._resolve_price(ing, user_id)
+
+ing_unit = (ing.unit or '').lower().strip()
+bought_u  = (bought_unit or '').lower().strip()
+
+# unidades "de peso/volumen" — se pueden convertir a kg
+weight_units = _G | _KG
+
+# unit_warning = True cuando:
+# - la unidad del ingrediente NO es pesable (no está en weight_units)
+# - Y el precio fue guardado con una unidad pesable (está en weight_units)
+unit_warning = (
+    ing_unit not in weight_units
+    and bool(bought_u)
+    and bought_u in weight_units
+)
+```
+
+**Ejemplo:**
+- Ingrediente: `3 huevos` (unit = `'unidad'` — no pesable)
+- Precio guardado como: `€3.50/kg` (bought_unit = `'g'` → pesable)
+- `unit_warning = True` → la celda TOTAL muestra `?`, no un precio calculado
+
+**Ejemplo sin warning:**
+- Ingrediente: `200 g` de harina (unit = `'g'` — pesable)
+- Precio: `€2.00/kg` (bought_unit = `'g'` — pesable)
+- `unit_warning = False` → cálculo normal
+
+El campo `unit_warning` se agrega al dict de cada ingrediente en el resultado de
+`get_recipe_cost()`:
+```python
+items.append({
+    'name': ing.name,
+    'cost': round(cost, 4) if not unit_warning else None,
+    'price_per_kg': round(price_per_kg, 4) if price_per_kg else None,
+    'source': source,
+    'store_id': store_id,
+    'unit_warning': unit_warning,
+    # ...
+})
+```
+
+---
+
+## `backend/app/services/facade.py` — `get_brand_by_name_and_ingredient`
+
+### Nueva función
+
+```python
+def get_brand_by_name_and_ingredient(self, user_id: str, name: str, ingredient_name: str):
+    """
+    Busca un registro de marca que coincida con (user_id, nombre, ingrediente_normalizado).
+    Retorna el primer registro encontrado o None.
+
+    Diferencia con get_brand_by_name(): este método permite que existan múltiples
+    registros de la misma marca con distintos ingredientes — solo considera duplicado
+    la combinación exacta (nombre + ingrediente).
+    """
+    norm_ing = self._norm(ingredient_name)
+    brands = self._brands.get_all()
+    return next(
+        (b for b in brands
+         if b.user_id == user_id
+         and b.name.lower() == name.lower()
+         and self._norm(getattr(b, 'ingredient_name', '') or '') == norm_ing),
+        None
+    )
+```
+
+**Por qué existe:**
+Con el modelo multi-ingrediente, dos registros `(Lidl, harina)` y `(Lidl, azúcar)` son
+**distintos** — no son duplicados entre sí. Verificar duplicados solo por nombre de marca
+rechazaría el segundo registro.
+
+Esta función verifica la combinación `(nombre, ingrediente_normalizado)` usando `_norm()`
+para ser insensible a acentos (e.g., `"azúcar"` == `"azucar"`).
+
+---
+
+## `backend/app/api/v1/brands.py` — POST /brands con deduplicación por (nombre, ingrediente)
+
+### Cambio en endpoint `POST /brands`
+
+```python
+# Antes: verificaba duplicados solo por nombre de marca
+@brands_ns.route('/')
+class BrandList(Resource):
+    @jwt_required()
+    def post(self):
+        data = api.payload
+        user_id = get_jwt_identity()
+        name = data.get('name', '').strip()
+        ingredient_name = data.get('ingredient_name', '').strip()
+
+        # ANTES:
+        existing = facade.get_brand_by_name(user_id, name)
+        if existing:
+            return {'error': 'Brand already exists'}, 409
+
+        # AHORA:
+        existing = facade.get_brand_by_name_and_ingredient(user_id, name, ingredient_name)
+        if existing:
+            return {'error': 'Brand with this ingredient already exists'}, 409
+
+        brand = facade.create_brand(user_id, name, ingredient_name=ingredient_name)
+        return {'id': brand.id, 'name': brand.name, ...}, 201
+```
+
+**Efecto:**
+- `POST /brands {name: 'Lidl', ingredient_name: 'harina'}` → 201 Created
+- `POST /brands {name: 'Lidl', ingredient_name: 'azúcar'}` → 201 Created (antes retornaba 409)
+- `POST /brands {name: 'Lidl', ingredient_name: 'harina'}` (segunda vez) → 409 Conflict
+
+Esto permite que el sistema de chips de `prices.js` cree múltiples registros de la misma
+marca sin conflictos, siempre que el ingrediente sea diferente.
+

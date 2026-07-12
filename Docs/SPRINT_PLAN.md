@@ -357,7 +357,7 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 
 | Metric | Target | Actual |
 |---|---|---|
-| Test coverage | 70%+ on models, persistence, services | 100 tests pytest (66 API + 34 unit) + 331 Postman assertions (109 requests) ✅ |
+| Test coverage | 70%+ on models, persistence, services | 107 tests pytest + 204 Newman assertions = 311 total ✅ |
 | Bugs at sprint end | 0 critical, under 3 minor | 0 critical ✅ |
 | Commits per sprint | Minimum 5 meaningful commits | ✅ |
 | Branches | All work on `develop`, swap isolated to `feature/sqlalchemy` | ✅ |
@@ -393,3 +393,29 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 | 8 | `SECTION_MAP` + `tSection()` en `i18n.js` — traduce nombres de sección en tiempo real | Baja | ✅ Done |
 
 **Resultado**: Todos los items completados. App estable y lista para presentación.
+
+---
+
+## Sprint 11 — Marcas multi-ingrediente + unit_warning + ajustes CSS
+
+**Objetivo**: Mejorar la gestión de marcas (multi-ingrediente), agregar advertencia de unidades incompatibles, y refinar el layout visual.
+
+| # | Tarea | Prioridad | Estado |
+|---|---|---|---|
+| 1 | `brandIngChips = []` + chip system en modal de marcas (`prices.js`) | Alta | ✅ Done |
+| 2 | `createBrand()` itera chips y hace POST por ingrediente | Alta | ✅ Done |
+| 3 | `renderBrandsList()` agrupa por nombre, lista ingredientes con × individual | Alta | ✅ Done |
+| 4 | `startAddBrandIng` + `saveAddBrandIng` — agrega ingrediente inline a marca existente | Media | ✅ Done |
+| 5 | `deleteBrandEntry` (un registro) + `deleteBrandGroup` (todos los de una marca) | Media | ✅ Done |
+| 6 | `_resolve_price()` retorna 4 valores: `(price_per_kg, source, store_id, bought_unit)` | Alta | ✅ Done |
+| 7 | `get_recipe_cost()` detecta `unit_warning` y lo agrega a cada item del resultado | Alta | ✅ Done |
+| 8 | `renderIngRow()`: celda qty con `price-clickable` + onclick a `openEditIngModal()` | Media | ✅ Done |
+| 9 | `loadCost()`: usa `i.unit_warning` del backend — elimina `_PIECE_UNITS` hardcodeado | Media | ✅ Done |
+| 10 | Cuando `unit_warning = true`: ⚠️ en €/kg y `?` en TOTAL | Media | ✅ Done |
+| 11 | `get_brand_by_name_and_ingredient()` en facade — deduplicación por (nombre, ingrediente) | Alta | ✅ Done |
+| 12 | `POST /brands` usa nueva deduplicación — permite misma marca con distintos ingredientes | Alta | ✅ Done |
+| 13 | i18n: keys `brand_for_prefix` y `warn_unit_mismatch` en EN/ES/FR | Baja | ✅ Done |
+| 14 | CSS: `detail-grid` `5fr 2fr` → `3fr 2fr`, gap `1.5rem` → `0.75rem`, padding de `app-layout`, `step-item`, `section-card-header` | Baja | ✅ Done |
+| 15 | `_G` y `_KG` sets movidos fuera del loop en facade (optimización) | Baja | ✅ Done |
+
+**Resultado**: Marcas con soporte multi-ingrediente, advertencia de unidades incompatibles en costos, y layout más compacto.
