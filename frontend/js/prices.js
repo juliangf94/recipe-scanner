@@ -187,9 +187,46 @@ function renderBrandsList() {
         <span style="font-weight:500;">${b.name}</span>
         ${b.ingredient_name ? `<span style="font-size:0.78rem;color:var(--text-muted);">(${tf('brand_for', { ing: tIng(b.ingredient_name) })})</span>` : ''}
         <button onclick="startEditBrandIng('${b.id}')" style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:var(--text-muted);padding:0;" title="${t('ph_brand_ing')}">✏️</button>
+        <button onclick="startAddBrandIng('${b.id}')" style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--blue);padding:0;font-weight:700;" title="${t('btn_add')}">+</button>
       </span>
       <button class="btn btn-danger btn-sm" onclick="deleteBrand('${b.id}','${b.name.replace(/'/g, '\\\'')}')">${t('btn_del_price')}</button>
     </div>`).join('');
+}
+
+function startAddBrandIng(brandId) {
+  document.getElementById('brow-add-temp')?.remove();
+  const brand = allBrands.find(b => b.id === brandId);
+  if (!brand) return;
+  const row = document.getElementById('brow-' + brandId);
+  if (!row) return;
+  const safeName = brand.name.replace(/'/g, "\\'");
+  row.insertAdjacentHTML('afterend', `
+    <div id="brow-add-temp" style="display:flex;align-items:center;gap:0.4rem;padding:0.3rem 0 0.3rem 0.75rem;border-bottom:1px solid var(--border);background:var(--bg);">
+      <span style="font-size:0.8rem;color:var(--text-muted);flex-shrink:0;">${brand.name} →</span>
+      <input id="bing-add-input" type="text"
+        placeholder="${t('ph_brand_ing')}"
+        style="font-size:0.82rem;padding:0.15rem 0.3rem;flex:1;border:1px solid var(--border);border-radius:4px;background:var(--card-bg);color:var(--text);"
+        onkeydown="if(event.key==='Enter')saveAddBrandIng('${safeName}');if(event.key==='Escape')document.getElementById('brow-add-temp')?.remove();">
+      <button onclick="saveAddBrandIng('${safeName}')" style="background:none;border:none;cursor:pointer;color:green;font-size:1rem;padding:0 0.15rem;" title="Guardar">✓</button>
+      <button onclick="document.getElementById('brow-add-temp')?.remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:0 0.15rem;" title="Cancelar">✕</button>
+    </div>`);
+  document.getElementById('bing-add-input')?.focus();
+}
+
+async function saveAddBrandIng(brandName) {
+  const input = document.getElementById('bing-add-input');
+  const ingName = (input?.value || '').trim().toLowerCase() || null;
+  document.getElementById('brow-add-temp')?.remove();
+  if (!ingName) return;
+  const res = await apiFetch('/brands', {
+    method: 'POST',
+    body: JSON.stringify({ name: brandName, ingredient_name: ingName })
+  });
+  if (res && res.ok) {
+    if (!allBrands.find(b => b.id === res.data.id)) allBrands.push(res.data);
+    renderBrandsList();
+    applySortAndRender();
+  }
 }
 
 function startEditBrandIng(brandId) {
