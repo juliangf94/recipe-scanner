@@ -715,9 +715,9 @@ class RecipeScannerFacade:
         s = s.lower().strip()
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
-    def get_custom_prices_for_ingredient(self, user_id, ingredient_name):
+    def get_custom_prices_for_ingredient(self, user_id, ingredient_name, _cached=None):
         name_n = self._norm(ingredient_name)
-        all_user = self._custom_prices.filter_by(user_id=user_id)
+        all_user = _cached if _cached is not None else self._custom_prices.filter_by(user_id=user_id)
 
         # 1. Exact match (accent-insensitive)
         exact = [cp for cp in all_user if self._norm(cp.ingredient_name) == name_n]
@@ -835,8 +835,11 @@ class RecipeScannerFacade:
                'l', 'liter', 'liters', 'litro', 'litros'}
         _WEIGHT = _G | _KG
 
+        # Pre-load all custom prices for the user once to avoid N+1 DB queries
+        price_cache = list(self._custom_prices.filter_by(user_id=user_id)) if user_id else None
+
         for ing in ingredients:
-            price_per_kg, source, store_id, bought_unit = self._resolve_price(ing, user_id)
+            price_per_kg, source, store_id, bought_unit = self._resolve_price(ing, user_id, _price_cache=price_cache)
             try:
                 qty = float(ing.quantity)
             except (ValueError, TypeError):
@@ -881,8 +884,9 @@ class RecipeScannerFacade:
             'currency': 'EUR'
         }
 
-    def _resolve_price(self, ing, user_id=None):
-        """Returns (price_per_kg, source, store_id, bought_unit)."""
+    def _resolve_price(self, ing, user_id=None, _price_cache=None):
+        """Returns (price_per_kg, source, store_id, bought_unit).
+        Pass _price_cache (list of all CustomPrice for the user) to avoid repeated DB queries."""
         # 1. Manual override
         if ing.manual_price is not None:
             return ing.manual_price, 'manual', None, None
@@ -905,7 +909,7 @@ class RecipeScannerFacade:
             seen_ids = set()
             customs = []
             for candidate in candidates:
-                for cp in self.get_custom_prices_for_ingredient(user_id, candidate):
+                for cp in self.get_custom_prices_for_ingredient(user_id, candidate, _cached=_price_cache):
                     if cp.id not in seen_ids:
                         seen_ids.add(cp.id)
                         customs.append(cp)
