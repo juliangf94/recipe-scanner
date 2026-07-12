@@ -132,21 +132,40 @@ function countPricedIngs(data) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 let _summaryData = null;
 const SUMMARY_CACHE = 'rs_home_summary_v1';
+const SUMMARY_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 document.addEventListener('langchange', () => {
   if (_summaryData) renderHome(_summaryData);
 });
 
+function _readCache() {
+  try {
+    const raw = localStorage.getItem(SUMMARY_CACHE);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    // Support both legacy format (plain data) and new format ({data, ts})
+    if (entry && entry.ts && entry.data) return entry;
+    // Legacy: treat as missing (no TTL info)
+    return null;
+  } catch (_) { return null; }
+}
+
+function _writeCache(data) {
+  localStorage.setItem(SUMMARY_CACHE, JSON.stringify({ data, ts: Date.now() }));
+}
+
 (async () => {
-  // Render from cache immediately — eliminates cold-start wait on repeat visits
-  const cached = localStorage.getItem(SUMMARY_CACHE);
-  if (cached) {
-    try {
-      _summaryData = JSON.parse(cached);
-      renderHome(_summaryData);
-      applyTranslations();
-    } catch (_) { /* corrupt cache — fallthrough to API */ }
+  const entry = _readCache();
+  const isFresh = entry && (Date.now() - entry.ts) < SUMMARY_TTL_MS;
+
+  if (entry) {
+    _summaryData = entry.data;
+    renderHome(_summaryData);
+    applyTranslations();
   }
+
+  // Skip API call if cache is fresh (not expired and not invalidated)
+  if (isFresh) return;
 
   const res = await apiFetch('/summary');
   if (!res || !res.ok) {
@@ -157,7 +176,7 @@ document.addEventListener('langchange', () => {
     return;
   }
   _summaryData = res.data;
-  localStorage.setItem(SUMMARY_CACHE, JSON.stringify(res.data));
+  _writeCache(res.data);
   renderHome(_summaryData);
   applyTranslations();
 })();

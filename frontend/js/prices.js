@@ -5,6 +5,9 @@ let allStores = [];
 let allBrands = [];
 let brandIngChips = [];
 
+const HOME_SUMMARY_CACHE = 'rs_home_summary_v1';
+function invalidateHomeCache() { localStorage.removeItem(HOME_SUMMARY_CACHE); }
+
 // ── Sidebar user info ─────────────────────────────────────────────────────────
 const user = getUser();
 if (user) {
@@ -557,6 +560,7 @@ async function saveRowEdit(priceId, row) {
   const ppkgCell = row.querySelector('.ppkg-cell');
   if (ppkgCell) ppkgCell.textContent = ppkg != null ? '€' + ppkg.toFixed(2) : '—';
 
+  invalidateHomeCache();
   showSuccess(t('btn_save'));
 }
 
@@ -596,6 +600,7 @@ async function saveNewRow(row) {
     return;
   }
 
+  invalidateHomeCache();
   showSuccess(t('btn_save'));
   await loadPrices();
 }
@@ -620,6 +625,7 @@ function deletePrice(priceId, name) {
       showError(t('err_price_del'));
       return;
     }
+    invalidateHomeCache();
     showSuccess(t('btn_del_price'));
     await loadPrices();
   });
