@@ -167,16 +167,23 @@ function _writeCache(data) {
   // Skip API call if cache is fresh (not expired and not invalidated)
   if (isFresh) return;
 
-  const res = await apiFetch('/summary');
-  if (!res || !res.ok) {
+  try {
+    const res = await apiFetch('/summary');
+    if (!res || !res.ok) {
+      if (!_summaryData) {
+        document.getElementById('home-content').innerHTML =
+          `<p class="text-muted">${t('err_load')}</p>`;
+      }
+      return;
+    }
+    _summaryData = res.data;
+    _writeCache(res.data);
+    renderHome(_summaryData);
+    applyTranslations();
+  } catch (_) {
     if (!_summaryData) {
       document.getElementById('home-content').innerHTML =
         `<p class="text-muted">${t('err_load')}</p>`;
     }
-    return;
   }
-  _summaryData = res.data;
-  _writeCache(res.data);
-  renderHome(_summaryData);
-  applyTranslations();
 })();
