@@ -357,7 +357,7 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 
 | Metric | Target | Actual |
 |---|---|---|
-| Test coverage | 70%+ on models, persistence, services | 107 tests pytest + 204 Newman assertions = 311 total ✅ |
+| Test coverage | 70%+ on models, persistence, services | 132 tests pytest + 204 Newman assertions = 336 total ✅ |
 | Bugs at sprint end | 0 critical, under 3 minor | 0 critical ✅ |
 | Commits per sprint | Minimum 5 meaningful commits | ✅ |
 | Branches | All work on `develop`, swap isolated to `feature/sqlalchemy` | ✅ |
@@ -370,10 +370,17 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 |---|---|---|
 | Models | Unit test | pytest |
 | Repository | Unit test | pytest |
-| Facade | Integration test | pytest |
-| API endpoints | Integration test | pytest + Flask test client |
+| Facade | Integration test | pytest — `TestGetBrandByNameAndIngredient` (12 tests) |
+| API endpoints | Integration test | pytest + Flask test client — `TestBrandsMultiIngredient` (7), `TestUnitWarning` (6) |
 | External APIs | Mock | pytest + unittest.mock |
 | Full user flow | Manual | Browser |
+
+**Archivos de test:**
+- `tests/test_api.py` — 79 tests (API endpoints + autenticación + costos + brands multi-ingrediente + unit_warning)
+- `tests/test_facade.py` — 12 tests (unit tests directos de facade, especialmente `get_brand_by_name_and_ingredient`)
+- `tests/test_models.py` — modelos SQLAlchemy
+- `tests/test_repository.py` — InMemoryStorage CRUD
+- `tests/postman/` — colección Newman, 204 assertions contra servidor en vivo
 
 ---
 

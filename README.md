@@ -42,7 +42,7 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 | Frontend | HTML + CSS + JS vanilla (static, no framework) |
 | Containerization | Docker (multi-stage) + Docker Compose |
 | Deploy | Render (backend) + Netlify (frontend) |
-| Tests | pytest (107 tests) + Newman (204 assertions) = 311 total |
+| Tests | pytest (132 tests) + Newman (204 assertions) = 336 total |
 
 ---
 
@@ -138,7 +138,7 @@ Base URL: `/api/v1` — Full interactive docs at `/api/docs`
 cd recipe-scanner
 source backend/venv/bin/activate
 pytest tests/ -v
-# 107 tests — 0 failures
+# 132 tests — 0 failures
 ```
 
 ---
