@@ -184,7 +184,7 @@ function renderBrandsList() {
     <div id="brow-${b.id}" style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
       <span class="brand-name-area" style="flex:1;display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;">
         <span style="font-weight:500;">${b.name}</span>
-        ${b.ingredient_name ? `<span style="font-size:0.78rem;color:var(--text-muted);">(${tf('brand_for', { ing: b.ingredient_name })})</span>` : ''}
+        ${b.ingredient_name ? `<span style="font-size:0.78rem;color:var(--text-muted);">(${tf('brand_for', { ing: tIng(b.ingredient_name) })})</span>` : ''}
         <button onclick="startEditBrandIng('${b.id}')" style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:var(--text-muted);padding:0;" title="${t('ph_brand_ing')}">✏️</button>
       </span>
       <button class="btn btn-danger btn-sm" onclick="deleteBrand('${b.id}','${b.name.replace(/'/g, '\\\'')}')">${t('btn_del_price')}</button>
