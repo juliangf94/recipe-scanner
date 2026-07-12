@@ -172,7 +172,7 @@ function _writeCache(data) {
     if (!res || !res.ok) {
       if (!_summaryData) {
         document.getElementById('home-content').innerHTML =
-          `<p class="text-muted">${t('err_load')}</p>`;
+          `<p class="text-muted" data-i18n="err_load">${t('err_load')}</p>`;
       }
       return;
     }
@@ -183,7 +183,7 @@ function _writeCache(data) {
   } catch (_) {
     if (!_summaryData) {
       document.getElementById('home-content').innerHTML =
-        `<p class="text-muted">${t('err_load')}</p>`;
+        `<p class="text-muted" data-i18n="err_load">${t('err_load')}</p>`;
     }
   }
 })();
