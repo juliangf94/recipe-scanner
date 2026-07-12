@@ -154,6 +154,12 @@ async function refreshAccessToken() {
  * - Returns null for 204 No Content responses (e.g. DELETE).
  * - Returns { ok, status, data } for all other responses.
  */
+function _fetchWithTimeout(url, opts, ms = 25000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
 async function apiFetch(path, options = {}) {
   // Proactively refresh if access token is about to expire
   const access = getAccessToken();
@@ -166,7 +172,7 @@ async function apiFetch(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const res = await _fetchWithTimeout(`${BASE_URL}${path}`, { ...options, headers });
 
   // 401 → try one silent refresh, then retry
   if (res.status === 401) {
@@ -177,7 +183,7 @@ async function apiFetch(path, options = {}) {
     const retryHeaders = { 'Content-Type': 'application/json', ...options.headers };
     if (retryToken) retryHeaders['Authorization'] = `Bearer ${retryToken}`;
 
-    const retryRes = await fetch(`${BASE_URL}${path}`, { ...options, headers: retryHeaders });
+    const retryRes = await _fetchWithTimeout(`${BASE_URL}${path}`, { ...options, headers: retryHeaders });
     if (retryRes.status === 401) {
       clearTokens();
       window.location.href = 'index.html';
