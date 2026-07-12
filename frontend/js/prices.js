@@ -321,7 +321,7 @@ function buildPriceRow(p) {
   const priceVal = p.bought_price != null ? p.bought_price : (p.price_per_kg != null ? p.price_per_kg : '');
   return `
     <tr class="price-row" data-id="${p.id}" onfocusout="handleRowFocusOut(event,'${p.id}')">
-      <td><input class="cell-inp ing-cell" type="text" value="${p.ingredient_name}" oninput="updateCalc(this)"></td>
+      <td><input class="cell-inp ing-cell" type="text" value="${tIng(p.ingredient_name)}" data-real-name="${p.ingredient_name}" onfocus="this.value=this.dataset.realName" onblur="if(this.value===this.dataset.realName)this.value=tIng(this.dataset.realName)" oninput="updateCalc(this)"></td>
       <td><select class="cell-sel store-cell" aria-label="${t('label_store')}" onchange="updateCalc(this)">${storeOptions(p.store_id)}</select></td>
       <td><select class="cell-sel brand-cell" aria-label="${t('manage_brands')}" onchange="updateCalc(this)">${brandOptions(p.brand_id, p.ingredient_name)}</select></td>
       <td><input class="cell-inp qty-cell" type="text" inputmode="decimal" value="${p.bought_qty || ''}" placeholder="—" oninput="updateCalc(this)"></td>
