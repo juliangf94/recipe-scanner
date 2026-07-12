@@ -404,7 +404,7 @@ function renderIngRow(i, sections) {
         </div>
       </td>
       <td class="ing-name">${ingDisplayName(i)}</td>
-      <td class="col-qty">${i.quantity} ${tUnit(i.unit)}</td>
+      <td class="col-qty price-clickable" onclick="openEditIngModal('${i.id}'); setTimeout(()=>{const f=document.getElementById('ing-edit-qty');if(f){f.select();}},150)">${i.quantity} ${tUnit(i.unit)}</td>
       <td class="col-store">${storeSelect}</td>
       ${brandSelectCell}
       <td class="col-price-kg price-clickable" data-ing-id="${i.id}" data-col="pkg"
@@ -701,21 +701,25 @@ async function loadCost() {
     document.getElementById('cost-footer').style.display = '';
     document.getElementById('cost-total').textContent = `€${c.total_estimated_cost.toFixed(2)}`;
 
+    const _PIECE_UNITS = new Set(['unidad', 'unidades', 'pieza', 'piezas', 'piece', 'pieces', 'pièce', 'pièces', 'pizca', 'pizcas', 'pinch', 'cda', 'cdas', 'tbsp', 'tsp', 'cucharada', 'cucharadas']);
+
     c.ingredients.forEach(i => {
       const src = i.source || 'fallback';
       const srcLabel = t(`src_${src}`);
+      const unitMismatch = src !== 'manual' && _PIECE_UNITS.has((i.unit || '').toLowerCase().trim());
 
       // €/kg column (clickable)
       const pkgCell = document.querySelector(`[data-ing-id="${i.ing_id}"][data-col="pkg"]`);
       if (pkgCell) {
         const pkg = i.price_per_kg != null ? `€${i.price_per_kg.toFixed(2)}` : '—';
-        pkgCell.innerHTML = `<span class="price-badge price-badge-${src}">${srcLabel}</span> <span class="price-val-${src}">${pkg}</span>`;
+        const warn = unitMismatch ? ` <span title="${t('warn_unit_mismatch')}" style="cursor:help;">⚠️</span>` : '';
+        pkgCell.innerHTML = `<span class="price-badge price-badge-${src}">${srcLabel}</span> <span class="price-val-${src}">${pkg}</span>${warn}`;
       }
 
       // Total column (display only)
       const totalCell = document.querySelector(`[data-ing-id="${i.ing_id}"][data-col="total"]`);
       if (totalCell) {
-        totalCell.textContent = `€${i.estimated_price.toFixed(2)}`;
+        totalCell.textContent = unitMismatch ? '?' : `€${i.estimated_price.toFixed(2)}`;
       }
 
     });
