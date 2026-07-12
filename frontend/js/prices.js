@@ -181,16 +181,45 @@ function renderBrandsList() {
     el.innerHTML = `<p class="text-muted">${t('no_brands')}</p>`;
     return;
   }
-  el.innerHTML = allBrands.map(b => `
-    <div id="brow-${b.id}" style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
-      <span class="brand-name-area" style="flex:1;display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;">
-        <span style="font-weight:500;">${b.name}</span>
-        ${b.ingredient_name ? `<span style="font-size:0.78rem;color:var(--text-muted);">(${tf('brand_for', { ing: tIng(b.ingredient_name) })})</span>` : ''}
-        <button onclick="startEditBrandIng('${b.id}')" style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:var(--text-muted);padding:0;" title="${t('ph_brand_ing')}">✏️</button>
-        <button onclick="startAddBrandIng('${b.id}')" style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--blue);padding:0;font-weight:700;" title="${t('btn_add')}">+</button>
-      </span>
-      <button class="btn btn-danger btn-sm" onclick="deleteBrand('${b.id}','${b.name.replace(/'/g, '\\\'')}')">${t('btn_del_price')}</button>
-    </div>`).join('');
+
+  const groups = {};
+  const groupOrder = [];
+  allBrands.forEach(b => {
+    const key = b.name.toLowerCase();
+    if (!groups[key]) { groups[key] = { name: b.name, entries: [] }; groupOrder.push(key); }
+    groups[key].entries.push(b);
+  });
+
+  el.innerHTML = groupOrder.map(key => {
+    const g = groups[key];
+    const firstId = g.entries[0].id;
+    const safeName = g.name.replace(/'/g, "\\'");
+    const withIng = g.entries.filter(b => b.ingredient_name);
+
+    let ingHtml = '';
+    if (withIng.length === 1) {
+      const b = withIng[0];
+      ingHtml = `<span style="font-size:0.78rem;color:var(--text-muted);">
+        (${t('brand_for_prefix')} ${tIng(b.ingredient_name)}
+        <button onclick="deleteBrandEntry('${b.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0 0 0 1px;font-size:0.85rem;line-height:1;" title="Quitar">×</button>)
+      </span>`;
+    } else if (withIng.length > 1) {
+      const chips = withIng.map(b =>
+        `${tIng(b.ingredient_name)}<button onclick="deleteBrandEntry('${b.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0 0 0 1px;font-size:0.85rem;line-height:1;" title="Quitar">×</button>`
+      ).join(', ');
+      ingHtml = `<span style="font-size:0.78rem;color:var(--text-muted);">(${t('brand_for_prefix')} ${chips})</span>`;
+    }
+
+    return `
+      <div id="brow-${firstId}" style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+        <span class="brand-name-area" style="flex:1;display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;">
+          <span style="font-weight:500;">${g.name}</span>
+          ${ingHtml}
+          <button onclick="startAddBrandIng('${firstId}')" style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--blue);padding:0;font-weight:700;" title="${t('btn_add')}">+</button>
+        </span>
+        <button class="btn btn-danger btn-sm" onclick="deleteBrandGroup('${safeName}')">${t('btn_del_price')}</button>
+      </div>`;
+  }).join('');
 }
 
 function startAddBrandIng(brandId) {
@@ -342,14 +371,22 @@ async function createBrand() {
   }
 }
 
-function deleteBrand(brandId, brandName) {
+async function deleteBrandEntry(brandId) {
+  const res = await apiFetch(`/brands/${brandId}`, { method: 'DELETE' });
+  if (res !== null && res !== undefined && !res.ok) { showError(t('err_brand_del')); return; }
+  allBrands = allBrands.filter(b => b.id !== brandId);
+  renderBrandsList();
+  applySortAndRender();
+}
+
+function deleteBrandGroup(brandName) {
   showConfirmModal(tf('confirm_del_brand', { name: brandName }), '', async () => {
-    const res = await apiFetch(`/brands/${brandId}`, { method: 'DELETE' });
-    if (res !== null && res !== undefined && !res.ok) {
-      showError(t('err_brand_del'));
-      return;
+    const toDelete = allBrands.filter(b => b.name.toLowerCase() === brandName.toLowerCase());
+    for (const b of toDelete) {
+      const res = await apiFetch(`/brands/${b.id}`, { method: 'DELETE' });
+      if (res !== null && res !== undefined && !res.ok) { showError(t('err_brand_del')); return; }
     }
-    allBrands = allBrands.filter(b => b.id !== brandId);
+    allBrands = allBrands.filter(b => b.name.toLowerCase() !== brandName.toLowerCase());
     renderBrandsList();
     applySortAndRender();
   });
