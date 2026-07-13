@@ -42,9 +42,62 @@ INGREDIENT_SYNONYMS = {
         {'sal', 'salt', 'sel'},
         {'limon', 'limón', 'lemon', 'citron'},
         {'levadura', 'yeast', 'levure'},
+        {'miel', 'honey', 'miel'},
     ]
     for n in group
 }
+
+# Culinarily-correct translations for ingredients that translation APIs get wrong.
+# "honey" → DeepL returns "cariño" (term of endearment) instead of "miel".
+# Checked before every DeepL call; extended by adding rows to _ING_VOCAB.
+_ING_VOCAB = [
+    # (canonical_en, canonical_es, canonical_fr, *extra_aliases)
+    ('honey',              'miel',                 'miel'),
+    ('baking powder',      'polvo de hornear',     'levure chimique'),
+    ('baking soda',        'bicarbonato de sodio', 'bicarbonate de soude',
+     'bicarbonato'),
+    ('cornstarch',         'maicena',              'maïzena',
+     'cornflour', 'maizena', 'maïzena', 'fécule de maïs'),
+    ('vanilla extract',    'extracto de vainilla', 'extrait de vanille'),
+    ('vanilla bean',       'vaina de vainilla',    'gousse de vanille',
+     'vanilla pod'),
+    ('icing sugar',        'azúcar glass',         'sucre glace',
+     'powdered sugar', "confectioner's sugar", 'azucar glass'),
+    ('brown sugar',        'azúcar morena',        'sucre roux',
+     'azucar morena'),
+    ('heavy cream',        'crema de leche',       'crème entière'),
+    ('whipping cream',     'crema para batir',     'crème à fouetter'),
+    ('sour cream',         'crema agria',          'crème fraîche'),
+    ('cream cheese',       'queso crema',          'fromage à la crème',
+     'fromage a la creme'),
+    ('shortening',         'manteca vegetal',      'shortening'),
+    ('all-purpose flour',  'harina de trigo',      'farine tout usage'),
+    ('bread flour',        'harina de fuerza',     'farine de force'),
+    ('whole wheat flour',  'harina integral',      'farine complète'),
+    ('self-raising flour', 'harina leudante',      'farine avec levure'),
+    ('instant yeast',      'levadura instantánea', 'levure instantanée'),
+    ('cocoa powder',       'cacao en polvo',       'cacao en poudre'),
+    ('dark chocolate',     'chocolate negro',      'chocolat noir'),
+    ('milk chocolate',     'chocolate con leche',  'chocolat au lait'),
+    ('white chocolate',    'chocolate blanco',     'chocolat blanc'),
+    ('olive oil',          'aceite de oliva',      "huile d'olive"),
+    ('vegetable oil',      'aceite vegetal',       'huile végétale'),
+    ('sunflower oil',      'aceite de girasol',    'huile de tournesol'),
+    ('coconut oil',        'aceite de coco',       'huile de coco'),
+    ('shredded coconut',   'coco rallado',         'noix de coco râpée',
+     'desiccated coconut', 'noix de coco rapee'),
+    ('almond flour',       'harina de almendra',   "farine d'amande",
+     'ground almonds', 'almendra molida'),
+    ('dulce de leche',     'dulce de leche',       'dulce de leche'),
+    ('apple cider vinegar','vinagre de manzana',   'vinaigre de cidre'),
+    ('white vinegar',      'vinagre blanco',       'vinaigre blanc'),
+]
+INGREDIENT_TRANSLATIONS = {}
+for _row in _ING_VOCAB:
+    _en, _es, _fr = _row[0], _row[1], _row[2]
+    _entry = {'en': _en, 'es': _es, 'fr': _fr}
+    for _alias in (_en, _es, _fr) + _row[3:]:
+        INGREDIENT_TRANSLATIONS[_alias.lower()] = _entry
 
 FALLBACK_PRICES = {
     # Prices in EUR per kg — average French supermarket prices 2025
@@ -61,6 +114,7 @@ FALLBACK_PRICES = {
     'limon': 2.50,     'lemon': 2.50,     'citron': 2.50,
     'naranja': 1.80,   'orange': 1.80,
     'vainilla': 30.00, 'vanilla': 30.00,
+    'miel': 8.00,      'honey': 8.00,
     'chocolate': 8.00, 'cacao': 10.00,
     'levadura': 8.00,  'yeast': 8.00,     'levure': 8.00,
     'nuez': 15.00,     'nuts': 15.00,     'noix': 15.00,
@@ -202,13 +256,18 @@ class RecipeScannerFacade:
 
     def _translate_ingredient(self, ingredient):
         """Translate a single ingredient name to EN/ES/FR and persist.
+        Checks INGREDIENT_TRANSLATIONS first to avoid API mistranslations
+        (e.g. "honey" → "cariño" instead of "miel").
         Source language column is copied directly to avoid dialect substitution."""
         name = ingredient.name
         source_lang = self._detect_source_lang(name)
         source_col = (source_lang or '')[:2].lower()
+        known = INGREDIENT_TRANSLATIONS.get(name.strip().lower())
         for lang, col in [('EN-US', 'en'), ('ES', 'es'), ('FR', 'fr')]:
             if col == source_col:
                 setattr(ingredient, f'name_{col}', name)
+            elif known:
+                setattr(ingredient, f'name_{col}', known[col])
             else:
                 translated, _ = self._translate_batch([name], lang, source_lang=source_lang)
                 setattr(ingredient, f'name_{col}', translated[0] or name)
