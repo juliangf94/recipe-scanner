@@ -357,7 +357,7 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 
 | Metric | Target | Actual |
 |---|---|---|
-| Test coverage | 70%+ on models, persistence, services | 132 tests pytest + 204 Newman assertions = 336 total ✅ |
+| Test coverage | 70%+ on models, persistence, services | 132 pytest + 109 Newman requests = 241 total ✅ |
 | Bugs at sprint end | 0 critical, under 3 minor | 0 critical ✅ |
 | Commits per sprint | Minimum 5 meaningful commits | ✅ |
 | Branches | All work on `develop`, swap isolated to `feature/sqlalchemy` | ✅ |
@@ -380,7 +380,7 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 - `tests/test_facade.py` — 12 tests (unit tests directos de facade, especialmente `get_brand_by_name_and_ingredient`)
 - `tests/test_models.py` — modelos SQLAlchemy
 - `tests/test_repository.py` — InMemoryStorage CRUD
-- `tests/postman/` — colección Newman, 204 assertions contra servidor en vivo
+- `tests/postman/` — colección Newman, 109 requests contra servidor en vivo
 
 ---
 

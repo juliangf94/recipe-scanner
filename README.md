@@ -44,7 +44,7 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 | Frontend | HTML + CSS + JS vanilla (static, no framework) |
 | Containerization | Docker (multi-stage) + Docker Compose |
 | Deploy | Render (backend) + Netlify (frontend) |
-| Tests | pytest (132 tests) + Newman (204 assertions) = 336 total |
+| Tests | pytest (132 tests) + Newman (109 requests) = 241 total |
 
 ---
 

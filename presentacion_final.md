@@ -60,7 +60,7 @@ Flujo a seguir durante la demo:
 | Storage de imágenes | Supabase Storage |
 | Deploy frontend | Netlify |
 | Deploy backend | Render |
-| Tests | 132 pytest + 204 Newman = **336 total** |
+| Tests | 132 pytest + 109 Newman = **241 total** |
 
 ---
 
@@ -267,7 +267,7 @@ rompía tests existentes.
 | ¿Por qué 4 fuentes de precio y no solo una? | Ninguna fuente cubre el 100% de los ingredientes. La cascada garantiza siempre tener un estimado |
 | ¿Cómo maneja la app recetas en diferentes idiomas con tus precios guardados? | A través de `INGREDIENT_SYNONYMS`, un mapa que agrupa variantes regionales e idiomáticas del mismo ingrediente. Por ejemplo, si la receta es en francés y usa "beurre", la facade busca precios también para "mantequilla", "manteca" y "butter". Así un precio guardado en cualquiera de esas formas se aplica correctamente, sin que el usuario tenga que duplicar entradas. Los grupos cubren español, inglés, francés y variantes regionales. |
 | ¿Cómo manejás la seguridad del token? | Access token de 15 min en memoria, refresh token de 30 días, flag anti-loop en el cliente |
-| ¿Cuántos tests tenés? | 336: 132 pytest (unitarios e integración) + 204 Newman (contrato de API) |
+| ¿Cuántos tests tenés? | 241: 132 pytest (unitarios e integración) + 109 Newman requests (contrato de API) |
 | ¿Por qué el modo oscuro usa `localStorage` y no solo `prefers-color-scheme` de CSS? | Con `prefers-color-scheme` el usuario no puede elegir un tema distinto al de su sistema operativo. Con `localStorage` y un toggle, el usuario puede decidir independientemente. Además, `theme.js` se carga de forma síncrona en `<head>` para evitar el flash de tema incorrecto (FOUC) antes de que el navegador pinte la página. |
 | ¿Por qué `section_meta` es una columna TEXT con JSON y no una tabla separada? | Las secciones son dinámicas y en pequeña cantidad por receta (típicamente 2–5). Una tabla separada requeriría un JOIN extra en cada carga de receta sin beneficio real. El JSON embebido en TEXT es suficiente para este volumen de datos. |
 | ¿Por qué la traducción corre en un hilo separado? | Render tiene un límite de 30 segundos por request HTTP. La traducción con DeepL puede tardar 5–15 segundos para recetas largas. Sin el hilo, el usuario veía un error de conexión aunque la receta se había creado correctamente. Con el hilo daemon, la respuesta HTTP se retorna inmediatamente y la traducción completa los campos en segundo plano. |

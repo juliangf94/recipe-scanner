@@ -20,7 +20,7 @@ Fecha de entrega: finales de junio 2026
 | API docs | flask_restx (Swagger UI) | Documentación automática en `/api/docs`, preparado para app móvil |
 | Frontend | HTML + JS estático | Sin build step, sin framework reactivo — justificado en Decisión 18; la misma API sirve a cualquier cliente futuro |
 | Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 132 tests, 0 failures |
-| Tests end-to-end | Newman + Postman | 204 assertions contra el servidor en vivo — 0 failures |
+| Tests end-to-end | Newman + Postman | 109 requests contra el servidor en vivo — 0 failures |
 | Variables de entorno | python-dotenv | Carga `.env` en desarrollo; en producción las claves van directo al servidor |
 | Containerización | Docker (multi-stage) | Stage dev con hot reload, stage production con gunicorn + usuario no-root |
 | Deploy backend | Render (Docker) | Free tier, auto-deploy desde GitHub, soporte Docker nativo |
