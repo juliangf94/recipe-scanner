@@ -24,51 +24,58 @@
 
   <!-- ── Hero ─────────────────────────────────────────────────────────── -->
   <section class="hero" id="home">
-    <div class="hero-content">
-      <div class="hero-eyebrow">⚡ Powered by Groq &amp; DeepL</div>
-      <h1>
-        Scan any recipe.<br>
-        Cook <em>smarter.</em>
-      </h1>
-      <p class="hero-sub">
-        Upload a PDF and get a fully structured recipe — ingredients, steps, prep time, and cost estimates — available in English, Spanish, and French.
-      </p>
-      <div class="hero-actions">
-        <a href="https://recipes-scanner.netlify.app" target="_blank" rel="noopener" class="btn-primary">
-          Open RecipeScanner →
-        </a>
-        <a href="https://www.youtube.com/YOUR_DEMO_VIDEO" target="_blank" rel="noopener" class="btn-secondary">
-          ▶ Watch demo
-        </a>
+    <div class="hero-inner">
+      <div class="hero-content">
+        <div class="hero-eyebrow">⚡ Powered by Groq &amp; DeepL</div>
+        <h1>
+          Scan any recipe.<br>
+          Cook <em>smarter.</em>
+        </h1>
+        <p class="hero-sub">
+          Upload a PDF and get a fully structured recipe — ingredients, steps, prep time, and cost estimates — available in English, Spanish, and French.
+        </p>
+        <div class="hero-actions">
+          <a href="https://recipes-scanner.netlify.app" target="_blank" rel="noopener" class="btn-primary">
+            Open RecipeScanner →
+          </a>
+          <!-- TODO: replace href with real YouTube demo URL once recorded -->
+          <!-- <a href="https://www.youtube.com/YOUR_DEMO_VIDEO" target="_blank" rel="noopener" class="btn-secondary">
+            ▶ Watch demo
+          </a> -->
+        </div>
       </div>
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <div class="hero-stat-num">~30<span>s</span></div>
-          <div class="hero-stat-label">Avg. scan time</div>
+      <div class="hero-visual">
+        <img src="images/hero-cover.png" alt="RecipeScanner — My Recipes dashboard" class="hero-app-img">
+      </div>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-num">~30<span>s</span></div>
+        <div class="hero-stat-label">Avg. scan time</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num"><span>3</span></div>
+        <div class="hero-stat-label">Languages supported</div>
+        <div class="stat-badges">
+          <span class="stat-badge">EN</span>
+          <span class="stat-badge">ES</span>
+          <span class="stat-badge">FR</span>
         </div>
-        <div class="hero-stat">
-          <div class="hero-stat-num"><span>3</span></div>
-          <div class="hero-stat-label">Languages supported</div>
-          <div class="stat-badges">
-            <span class="stat-badge">EN</span>
-            <span class="stat-badge">ES</span>
-            <span class="stat-badge">FR</span>
-          </div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-num">241</div>
-          <div class="hero-stat-label">Automated tests</div>
-          <div class="stat-sub">132 pytest · 109 Newman</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-num"><span>4</span></div>
-          <div class="hero-stat-label">Price sources</div>
-          <div class="source-list">
-            <div class="source-item"><span class="source-num">1</span> Manual prices</div>
-            <div class="source-item"><span class="source-num">2</span> Store &amp; brand</div>
-            <div class="source-item"><span class="source-num">3</span> Open Food Facts</div>
-            <div class="source-item"><span class="source-num">4</span> Built-in price estimates</div>
-          </div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">241</div>
+        <div class="hero-stat-label">Automated tests</div>
+        <div class="stat-sub">132 pytest · 109 Newman</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num"><span>4</span></div>
+        <div class="hero-stat-label">Price sources</div>
+        <div class="source-list">
+          <div class="source-item"><span class="source-num">1</span> Manual prices</div>
+          <div class="source-item"><span class="source-num">2</span> Store &amp; brand</div>
+          <div class="source-item"><span class="source-num">3</span> Open Food Facts</div>
+          <div class="source-item"><span class="source-num">4</span> Built-in price estimates</div>
         </div>
       </div>
     </div>
@@ -84,20 +91,10 @@
       </div>
       <div class="features-grid">
 
-        <!-- Feature 1 -->
+        <!-- Feature 1 — AI Extraction (real screenshot) -->
         <div class="feature-card">
-          <div class="feature-mockup mock-scan">
-            <div class="mock-scan-inner">
-              <div class="mock-pdf-icon">📄</div>
-              <div class="mock-pdf-label">recipe.pdf</div>
-            </div>
-            <div class="mock-scan-bar"></div>
-            <div class="mock-chips">
-              <div class="mock-chip">title ✓</div>
-              <div class="mock-chip">ingredients ✓</div>
-              <div class="mock-chip">steps ✓</div>
-              <div class="mock-chip">servings ✓</div>
-            </div>
+          <div class="feature-mockup feature-img-wrap">
+            <img src="images/feature-scan.png" alt="Scan a Recipe — drag and drop PDF interface" class="feature-screenshot">
           </div>
           <div class="feature-body">
             <h3>Instant AI Extraction</h3>
@@ -105,7 +102,7 @@
           </div>
         </div>
 
-        <!-- Feature 2 -->
+        <!-- Feature 2 — Languages (HTML mockup with app colors) -->
         <div class="feature-card">
           <div class="feature-mockup mock-lang">
             <div class="mock-lang-tabs">
@@ -128,29 +125,10 @@
           </div>
         </div>
 
-        <!-- Feature 3 -->
+        <!-- Feature 3 — Recipe Cost (real screenshot) -->
         <div class="feature-card">
-          <div class="feature-mockup mock-cost">
-            <div class="mock-cost-row">
-              <span class="mock-cost-name">all-purpose flour · 250 g</span>
-              <span class="mock-cost-price">€0.30</span>
-            </div>
-            <div class="mock-cost-row">
-              <span class="mock-cost-name">soft butter · 200 g</span>
-              <span class="mock-cost-price">€1.80</span>
-            </div>
-            <div class="mock-cost-row">
-              <span class="mock-cost-name">sugar · 150 g</span>
-              <span class="mock-cost-price">€0.15</span>
-            </div>
-            <div class="mock-cost-row">
-              <span class="mock-cost-name">shredded coconut · 100 g</span>
-              <span class="mock-cost-price">€0.55</span>
-            </div>
-            <div class="mock-cost-total">
-              <span class="mock-total-label">Total estimated cost</span>
-              <span class="mock-total-val">€3.42</span>
-            </div>
+          <div class="feature-mockup feature-img-wrap">
+            <img src="images/feature-cost.png" alt="Recipe cost breakdown by ingredient" class="feature-screenshot">
           </div>
           <div class="feature-body">
             <h3>Know Your Recipe Cost</h3>
