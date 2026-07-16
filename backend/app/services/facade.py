@@ -929,6 +929,11 @@ class RecipeScannerFacade:
         _KG = {'kg', 'kilogram', 'kilograms', 'kilo', 'kilos',
                'l', 'liter', 'liters', 'litro', 'litros'}
         _WEIGHT = _G | _KG
+        # Packet/sachet units — treated as 7 g each (standard gelatin / yeast sachet weight)
+        _PACKET = {'sobre', 'sobres', 'sobrecito', 'sobrecitos',
+                   'sachet', 'sachets', 'packet', 'packets',
+                   'envelope', 'envelopes'}
+        _GRAMS_PER_PACKET = 7.0
 
         # Pre-load all custom prices for the user once to avoid N+1 DB queries
         price_cache = list(self._custom_prices.filter_by(user_id=user_id)) if user_id else None
@@ -942,14 +947,18 @@ class RecipeScannerFacade:
             _unit = (ing.unit or '').lower().strip()
             if _unit in _G:
                 estimated = round((qty / 1000) * price_per_kg, 2)
+            elif _unit in _PACKET:
+                estimated = round((qty * _GRAMS_PER_PACKET / 1000) * price_per_kg, 2)
             else:
                 estimated = round(qty * price_per_kg, 2)
             total += estimated
 
             # True when recipe uses a piece unit but price was stored per weight unit
+            # Packet units are excluded — we can convert them via _GRAMS_PER_PACKET
             price_bought_unit = (bought_unit or '').lower().strip()
             unit_warning = (
                 _unit not in _WEIGHT
+                and _unit not in _PACKET
                 and source not in ('manual',)
                 and price_bought_unit in _WEIGHT
             )
