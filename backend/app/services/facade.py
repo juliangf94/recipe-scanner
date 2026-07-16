@@ -993,9 +993,14 @@ class RecipeScannerFacade:
                 val = (getattr(ing, attr, None) or '').lower().strip()
                 if val:
                     candidates.add(val)
-            # Expand with regional synonyms so "manteca" matches "beurre" recipe ingredients
+            # Expand with regional synonyms so "manteca" matches "beurre" recipe ingredients.
+            # Also try the first word of compound names ("manteca derretida" → "manteca",
+            # "beurre fondu" → "beurre") so adjective-modified ingredients find their base price.
             for c in list(candidates):
                 candidates.update(INGREDIENT_SYNONYMS.get(self._norm(c), set()))
+                first_word = self._norm(c.split()[0]) if c.split() else ''
+                if first_word and first_word != self._norm(c):
+                    candidates.update(INGREDIENT_SYNONYMS.get(first_word, set()))
 
             seen_ids = set()
             customs = []
