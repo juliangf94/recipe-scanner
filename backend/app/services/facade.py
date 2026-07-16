@@ -634,6 +634,7 @@ class RecipeScannerFacade:
                 model='meta-llama/llama-4-scout-17b-16e-instruct',
                 messages=[{'role': 'user', 'content': content}],
                 temperature=0.1,
+                timeout=90,
             )
             raw = response.choices[0].message.content.strip()
             raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
@@ -659,6 +660,7 @@ class RecipeScannerFacade:
                 model='llama-3.3-70b-versatile',
                 messages=[{'role': 'user', 'content': GROQ_PROMPT + text[:8000]}],
                 temperature=0.1,
+                timeout=90,
             )
             content = response.choices[0].message.content.strip()
             # Strip <think>…</think> blocks produced by reasoning models
