@@ -565,34 +565,45 @@ class RecipeScannerFacade:
                 if existing:
                     return None, ('duplicate', existing.id, data.get('title', ''))
 
-        recipe = self.create_recipe(
+        # Build all objects in a single transaction — one round-trip instead of N+1.
+        recipe = Recipe(
             user_id=user_id,
             title=data.get('title', 'Untitled'),
             description=data.get('description', ''),
-            servings=data.get('servings', 0),
-            prep_time_min=data.get('prep_time_min', 0),
+            servings=int(data.get('servings') or 0),
+            prep_time_min=int(data.get('prep_time_min') or 0),
             category=self._normalize_category(data.get('category', ''))
         )
+        db.session.add(recipe)
+        db.session.flush()  # assigns recipe.id without committing
 
         ingredients = []
         for item in data.get('ingredients', []):
-            ing = self.add_ingredient(
+            ing = Ingredient(
                 recipe_id=recipe.id,
                 name=item.get('name', ''),
                 quantity=str(item.get('quantity', '')),
                 unit=item.get('unit', ''),
-                skip_translate=True
+                section=item.get('section') or None,
             )
+            db.session.add(ing)
             ingredients.append(ing)
 
         steps = []
         for item in data.get('steps', []):
-            step = self.add_step(
+            step = Step(
                 recipe_id=recipe.id,
                 order_num=item.get('order_num', 0),
                 description=item.get('description', '')
             )
+            db.session.add(step)
             steps.append(step)
+
+        db.session.commit()  # single commit for recipe + all ingredients + all steps
+
+        recipe_id  = recipe.id
+        ing_ids    = [i.id for i in ingredients]
+        step_ids   = [s.id for s in steps]
 
         from flask import current_app
         app = current_app._get_current_object()
@@ -600,7 +611,13 @@ class RecipeScannerFacade:
         def _translate_bg():
             with app.app_context():
                 try:
-                    self._translate_recipe(recipe, ingredients, steps)
+                    # Re-query objects in the new session — originals are detached.
+                    r   = db.session.get(Recipe,     recipe_id)
+                    ings  = [db.session.get(Ingredient, i) for i in ing_ids]
+                    stps  = [db.session.get(Step,       s) for s in step_ids]
+                    ings  = [i for i in ings  if i]
+                    stps  = [s for s in stps  if s]
+                    self._translate_recipe(r, ings, stps)
                 except Exception as e:
                     logging.error('Background translation failed: %s', e)
 
