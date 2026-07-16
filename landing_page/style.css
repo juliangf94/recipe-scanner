@@ -287,6 +287,27 @@ section { padding: 5rem 2rem; }
   line-height: 1.65;
 }
 
+/* ── Demo Video ──────────────────────────────────────────────────── */
+.demo-section { background: var(--bg-alt); }
+.demo-header { margin-bottom: 2.5rem; }
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.video-wrapper iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 /* ── Features ────────────────────────────────────────────────────── */
 #features { background: var(--bg); }
 .features-header { margin-bottom: 3.5rem; }
