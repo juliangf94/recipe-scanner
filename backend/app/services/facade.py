@@ -91,6 +91,15 @@ _ING_VOCAB = [
     ('dulce de leche',     'dulce de leche',       'dulce de leche'),
     ('apple cider vinegar','vinagre de manzana',   'vinaigre de cidre'),
     ('white vinegar',      'vinagre blanco',       'vinaigre blanc'),
+    ('egg white',          'clara de huevo',       "blanc d'œuf",
+     'egg whites', 'claras de huevo', 'clara', 'claras',
+     "blancs d'œufs", "blanc d'oeuf", "blancs d'oeufs"),
+    ('egg yolk',           'yema de huevo',        "jaune d'œuf",
+     'egg yolks', 'yemas de huevo', 'yema', 'yemas',
+     "jaunes d'œufs", "jaune d'oeuf", "jaunes d'oeufs"),
+    ('gelatin',            'gelatina',             'gélatine',
+     'unflavored gelatin', 'gelatina sin sabor', 'gelatine sans saveur',
+     'gélatine sans saveur', 'powdered gelatin', 'gelatina en polvo'),
 ]
 INGREDIENT_TRANSLATIONS = {}
 for _row in _ING_VOCAB:
