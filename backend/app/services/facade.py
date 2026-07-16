@@ -43,6 +43,7 @@ INGREDIENT_SYNONYMS = {
         {'limon', 'limón', 'lemon', 'citron'},
         {'levadura', 'yeast', 'levure'},
         {'miel', 'honey', 'miel'},
+        {'galletitas', 'galletas', 'cookies', 'cookie', 'biscuits', 'biscuit', 'galette', 'galettes'},
     ]
     for n in group
 }
@@ -100,6 +101,9 @@ _ING_VOCAB = [
     ('gelatin',            'gelatina',             'gélatine',
      'unflavored gelatin', 'gelatina sin sabor', 'gelatine sans saveur',
      'gélatine sans saveur', 'powdered gelatin', 'gelatina en polvo'),
+    ('cookies',            'galletitas',           'galettes',
+     'cookie', 'galletas', 'biscuits', 'biscuit', 'galette',
+     'galletita', 'petit beurre', 'petits beurres'),
 ]
 INGREDIENT_TRANSLATIONS = {}
 for _row in _ING_VOCAB:
