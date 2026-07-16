@@ -157,7 +157,12 @@ function buildBrandOptions(selectedId, ingName) {
     }
   }
 
-  const brandOpts = brands.map(b =>
+  // Deduplicate by name — keep the selected entry if present, else the first seen.
+  const seen = new Map();
+  for (const b of brands) {
+    if (!seen.has(b.name) || b.id === selectedId) seen.set(b.name, b);
+  }
+  const brandOpts = [...seen.values()].map(b =>
     `<option value="${b.id}"${b.id === selectedId ? ' selected' : ''}>${b.name}</option>`
   ).join('');
   return autoOpt + brandOpts;
