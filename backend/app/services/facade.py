@@ -753,6 +753,10 @@ class RecipeScannerFacade:
         brand = self._brands.get_by_id(brand_id)
         if not brand or brand.user_id != user_id:
             return False
+        for cp in self._custom_prices.filter_by(user_id=user_id):
+            if cp.brand_id == brand_id:
+                cp.brand_id = None
+                self._custom_prices.update(cp)
         self._brands.delete(brand_id)
         return True
 
