@@ -86,9 +86,19 @@ function brandMatchesIngredient(brand, ingName) {
 }
 
 function brandOptions(selectedId, ingName) {
-  const visible = allBrands.filter(b => brandMatchesIngredient(b, ingName));
+  const brandsWithIng = new Set(
+    allBrands.filter(b => b.ingredient_name).map(b => b.name.toLowerCase())
+  );
+  const visible = allBrands.filter(b => {
+    if (!b.ingredient_name && brandsWithIng.has(b.name.toLowerCase())) return false;
+    return brandMatchesIngredient(b, ingName);
+  });
+  const seen = new Map();
+  for (const b of visible) {
+    if (!seen.has(b.name) || b.id === selectedId) seen.set(b.name, b);
+  }
   const blank = `<option value="">${t('no_brand')}</option>`;
-  return blank + visible.map(b =>
+  return blank + [...seen.values()].map(b =>
     `<option value="${b.id}"${b.id === selectedId ? ' selected' : ''}>${b.name}</option>`
   ).join('');
 }

@@ -141,23 +141,36 @@ function buildStoreOptions(selectedId) {
   return autoOpt + storeOpts;
 }
 
-function buildBrandOptions(selectedId, ingName) {
+function _normIng(s) {
+  return (s || '').toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function buildBrandOptions(selectedId, ing) {
+  const ingName = typeof ing === 'string' ? ing : ing.name;
   const autoOpt = `<option value="">${t('no_brand')}</option>`;
-  let brands = allBrands;
 
-  if (ingName && allPrices.length > 0) {
-    const needle = ingName.toLowerCase().trim();
-    const relatedIds = new Set(
-      allPrices
-        .filter(p => p.ingredient_name.toLowerCase().trim() === needle && p.brand_id)
-        .map(p => p.brand_id)
-    );
-    if (relatedIds.size > 0) {
-      brands = allBrands.filter(b => relatedIds.has(b.id));
+  // All language variants of this ingredient name to match against brand.ingredient_name
+  const needles = new Set(
+    [ingName, ing.name_en, ing.name_es, ing.name_fr]
+      .filter(Boolean)
+      .map(_normIng)
+  );
+
+  // Brands that have at least one ingredient-specific entry (same logic as prices.js)
+  const brandsWithIng = new Set(
+    allBrands.filter(b => b.ingredient_name).map(b => b.name.toLowerCase())
+  );
+
+  const brands = allBrands.filter(b => {
+    if (!b.ingredient_name) {
+      // Generic entry: only show if this brand has NO ingredient-specific entries at all
+      return !brandsWithIng.has(b.name.toLowerCase());
     }
-  }
+    const bn = _normIng(b.ingredient_name);
+    return needles.has(bn) ||
+      [...needles].some(n => (n + ' ').startsWith(bn + ' ') || (bn + ' ').startsWith(n + ' '));
+  });
 
-  // Deduplicate by name — keep the selected entry if present, else the first seen.
   const seen = new Map();
   for (const b of brands) {
     if (!seen.has(b.name) || b.id === selectedId) seen.set(b.name, b);
@@ -386,7 +399,7 @@ function renderIngRow(i, sections) {
     ? `<td class="col-brand"><select class="store-select-inline" data-ing-id="${i.id}" data-sel="brand"
            aria-label="Marca para ${i.name}"
            onchange="changeIngredientBrand('${i.id}', this.value)">
-         ${buildBrandOptions(i.preferred_brand_id || null, i.name)}
+         ${buildBrandOptions(i.preferred_brand_id || null, i)}
        </select></td>`
     : '';
 

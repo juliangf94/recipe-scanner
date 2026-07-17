@@ -2204,3 +2204,23 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 
 /* Scan result highlight */
 [data-theme="dark"] .scan-highlight { background: #FFF7ED11; border-color: #f5c96a44; }
+
+/* Brands list scrollbar */
+#brands-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--orange) transparent;
+}
+#brands-list::-webkit-scrollbar {
+  width: 4px;
+}
+#brands-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+#brands-list::-webkit-scrollbar-thumb {
+  background: var(--orange);
+  border-radius: 99px;
+  opacity: 0.7;
+}
+#brands-list::-webkit-scrollbar-thumb:hover {
+  background: var(--orange-hover);
+}
