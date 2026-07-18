@@ -421,7 +421,7 @@ function renderIngRow(i, sections) {
           </div>
         </div>
       </td>
-      <td class="ing-name">${ingDisplayName(i)}</td>
+      <td class="ing-name price-clickable" onclick="openEditIngModal('${i.id}')">${ingDisplayName(i)}</td>
       <td class="col-qty price-clickable" onclick="openEditIngModal('${i.id}'); setTimeout(()=>{const f=document.getElementById('ing-edit-qty');if(f){f.select();}},150)">${i.quantity} ${tUnit(i.unit)}</td>
       <td class="col-store">${storeSelect}</td>
       ${brandSelectCell}

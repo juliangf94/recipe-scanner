@@ -169,7 +169,9 @@ class RecipeFull(Resource):
                  'name_en': i.name_en or '', 'name_es': i.name_es or '', 'name_fr': i.name_fr or '',
                  'quantity': i.quantity, 'unit': i.unit,
                  'order_num': i.order_num, 'section': i.section or '',
-                 'recipe_id': i.recipe_id}
+                 'recipe_id': i.recipe_id,
+                 'preferred_store_id': i.preferred_store_id,
+                 'preferred_brand_id': i.preferred_brand_id}
                 for i in ingredients
             ],
             'steps': [
@@ -177,7 +179,7 @@ class RecipeFull(Resource):
                  'description': s.description,
                  'description_en': s.description_en or '', 'description_es': s.description_es or '', 'description_fr': s.description_fr or '',
                  'recipe_id': s.recipe_id}
-                for s in steps
+                for s in sorted(steps, key=lambda s: s.order_num)
             ]
         }, 200
 
