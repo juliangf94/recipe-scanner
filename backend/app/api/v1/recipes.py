@@ -172,7 +172,7 @@ class RecipeFull(Resource):
                  'recipe_id': i.recipe_id,
                  'preferred_store_id': i.preferred_store_id,
                  'preferred_brand_id': i.preferred_brand_id}
-                for i in ingredients
+                for i in sorted(ingredients, key=lambda i: i.order_num)
             ],
             'steps': [
                 {'id': s.id, 'order_num': s.order_num,
