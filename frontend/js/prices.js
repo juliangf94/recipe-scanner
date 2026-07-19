@@ -41,14 +41,22 @@ async function uploadAvatar(event) {
 }
 
 // ── €/kg calculator ───────────────────────────────────────────────────────────
-const G_UNITS = new Set(['g', 'gr', 'gram', 'grams', 'gramo', 'gramos', 'ml', 'milliliter', 'milliliters']);
+const G_UNITS  = new Set(['g', 'gr', 'gram', 'grams', 'gramo', 'gramos', 'ml', 'milliliter', 'milliliters']);
 const KG_UNITS = new Set(['kg', 'kilogram', 'kilograms', 'kilo', 'kilos', 'l', 'liter', 'liters', 'litro', 'litros']);
+const SPOON_ML = {
+  'cdta': 5, 'cdtas': 5, 'tsp': 5, 'teaspoon': 5, 'teaspoons': 5,
+  'cucharadita': 5, 'cucharaditas': 5,
+  'cda': 15, 'cdas': 15, 'tbsp': 15, 'tablespoon': 15, 'tablespoons': 15,
+  'cucharada': 15, 'cucharadas': 15,
+};
 
 function calcPricePerKg(qty, unit, pricePaid) {
   if (!qty || !pricePaid) return null;
   const u = (unit || '').toLowerCase().trim();
   if (KG_UNITS.has(u)) return pricePaid / qty;
-  if (G_UNITS.has(u)) return (pricePaid / qty) * 1000;
+  if (G_UNITS.has(u))  return (pricePaid / qty) * 1000;
+  const spoonMl = SPOON_ML[u];
+  if (spoonMl) return (pricePaid / (qty * spoonMl)) * 1000;
   return pricePaid / qty;
 }
 

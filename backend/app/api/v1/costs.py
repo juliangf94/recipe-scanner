@@ -8,6 +8,13 @@ api = Namespace('costs', description='Recipe cost estimation and custom ingredie
 _G_UNITS = {'g', 'gr', 'gram', 'grams', 'gramo', 'gramos', 'ml', 'milliliter', 'milliliters'}
 # Units stored as-is (qty in kg/l)
 _KG_UNITS = {'kg', 'kilogram', 'kilograms', 'kilo', 'kilos', 'l', 'liter', 'liters', 'litro', 'litros'}
+# Spoon units → ml equivalent
+_SPOON_ML = {
+    'cdta': 5, 'cdtas': 5, 'tsp': 5, 'teaspoon': 5, 'teaspoons': 5,
+    'cucharadita': 5, 'cucharaditas': 5,
+    'cda': 15, 'cdas': 15, 'tbsp': 15, 'tablespoon': 15, 'tablespoons': 15,
+    'cucharada': 15, 'cucharadas': 15,
+}
 
 
 def _calc_price_per_kg(qty, unit, price_paid):
@@ -17,8 +24,11 @@ def _calc_price_per_kg(qty, unit, price_paid):
         return round(price_paid / qty, 4) if qty else 0
     elif u in _G_UNITS:
         return round((price_paid / qty) * 1000, 4) if qty else 0
+    elif u in _SPOON_ML:
+        ml = _SPOON_ML[u] * qty
+        return round((price_paid / ml) * 1000, 4) if ml else 0
     else:
-        # Non-weight unit (unidad, pieza, cdas…): store as price per unit
+        # Non-weight unit (unidad, pieza…): store as price per unit
         return round(price_paid / qty, 4) if qty else 0
 
 

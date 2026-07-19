@@ -17,14 +17,22 @@ let priceModalMode = 'qty';
 let currentMultiplier = 1;
 
 // Unit sets for €/kg calculation (mirrors backend)
-const _G_UNITS = new Set(['g', 'gr', 'gram', 'grams', 'gramo', 'gramos', 'ml', 'milliliter', 'milliliters']);
+const _G_UNITS  = new Set(['g', 'gr', 'gram', 'grams', 'gramo', 'gramos', 'ml', 'milliliter', 'milliliters']);
 const _KG_UNITS = new Set(['kg', 'kilogram', 'kilograms', 'kilo', 'kilos', 'l', 'liter', 'liters', 'litro', 'litros']);
+const _SPOON_ML = {
+  'cdta': 5, 'cdtas': 5, 'tsp': 5, 'teaspoon': 5, 'teaspoons': 5,
+  'cucharadita': 5, 'cucharaditas': 5,
+  'cda': 15, 'cdas': 15, 'tbsp': 15, 'tablespoon': 15, 'tablespoons': 15,
+  'cucharada': 15, 'cucharadas': 15,
+};
 
 function calcPricePerKg(qty, unit, pricePaid) {
   if (!qty || !pricePaid) return null;
   const u = unit.toLowerCase().trim();
   if (_KG_UNITS.has(u)) return pricePaid / qty;
-  if (_G_UNITS.has(u)) return (pricePaid / qty) * 1000;
+  if (_G_UNITS.has(u))  return (pricePaid / qty) * 1000;
+  const spoonMl = _SPOON_ML[u];
+  if (spoonMl) return (pricePaid / (qty * spoonMl)) * 1000;
   return pricePaid / qty;
 }
 
