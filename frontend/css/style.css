@@ -592,6 +592,20 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   gap: 5px;
 }
 
+/* ── Recipe count + load more ───────────────────────────── */
+.recipe-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.9rem;
+}
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.75rem;
+  padding-bottom: 0.5rem;
+}
+.load-more-btn { min-width: 160px; }
+
 /* ── Recipe cards ───────────────────────────────────────── */
 .recipe-grid {
   display: grid;

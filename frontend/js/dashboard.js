@@ -4,6 +4,9 @@ const user = getUser();
 let allRecipes = [];
 let activeCategory = 'all';
 let activeSort = 'az';
+const PAGE_SIZE = 12;
+let visibleCount = PAGE_SIZE;
+let _searchTimer = null;
 // ── Sidebar user info ─────────────────────────────────────────────────────────
 if (user) {
   const initials = `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase();
@@ -136,15 +139,21 @@ function setCategory(cat, btn) {
   activeCategory = cat;
   document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  visibleCount = PAGE_SIZE;
   renderRecipes();
 }
 
 function filterRecipes() {
-  renderRecipes();
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => {
+    visibleCount = PAGE_SIZE;
+    renderRecipes();
+  }, 250);
 }
 
 function setSort(value) {
   activeSort = value;
+  visibleCount = PAGE_SIZE;
   renderRecipes();
 }
 
@@ -177,8 +186,8 @@ function renderRecipes() {
   });
 
   const sorted = sortedRecipes(filtered);
-
   const container = document.getElementById('recipes-container');
+
   if (sorted.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
@@ -188,7 +197,21 @@ function renderRecipes() {
     return;
   }
 
-  container.innerHTML = `<div class="recipe-grid">${sorted.map(recipeCard).join('')}</div>`;
+  const visible = sorted.slice(0, visibleCount);
+  const hasMore = sorted.length > visibleCount;
+
+  const countHtml = `<p class="recipe-count">${t('showing_count')} ${visible.length} ${t('of_total')} ${sorted.length}</p>`;
+  const gridHtml = `<div class="recipe-grid">${visible.map(recipeCard).join('')}</div>`;
+  const moreHtml = hasMore
+    ? `<div class="load-more-wrap"><button class="btn btn-outline load-more-btn" onclick="loadMore()">${t('load_more')} (${sorted.length - visibleCount})</button></div>`
+    : '';
+
+  container.innerHTML = countHtml + gridHtml + moreHtml;
+}
+
+function loadMore() {
+  visibleCount += PAGE_SIZE;
+  renderRecipes();
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
