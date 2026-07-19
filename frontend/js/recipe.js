@@ -1055,6 +1055,7 @@ function initSortable() {
       draggable: '.ing-row',
       ghostClass: 'ing-row-ghost',
       chosenClass: 'ing-row-chosen',
+      emptyInsertThreshold: 48,
       onStart: startPageAutoScroll,
       onEnd(e) { stopPageAutoScroll(); saveIngredientOrder(e); },
     });

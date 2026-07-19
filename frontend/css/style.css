@@ -1024,6 +1024,11 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 }
 .section-header-row:first-child .section-header-cell { border-top: none; }
 
+.section-empty-row td {
+  min-height: 48px;
+  height: 48px;
+}
+
 .section-title {
   font-size: 0.78rem;
   font-weight: 700;
