@@ -1,5 +1,6 @@
 (function () {
-  const STORAGE_KEY = 'rs-theme';
+  const THEME_KEY   = 'rs-theme';
+  const SIDEBAR_KEY = 'rs-sidebar-collapsed';
 
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
@@ -9,13 +10,27 @@
     });
   }
 
+  function applySidebar(collapsed) {
+    document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
+    document.querySelectorAll('.sidebar-toggle').forEach(btn => {
+      btn.textContent = collapsed ? '›' : '‹';
+      btn.title = collapsed ? 'Abrir menú' : 'Colapsar menú';
+    });
+  }
+
   window.toggleTheme = function () {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
     const next = current === 'dark' ? 'light' : 'dark';
-    localStorage.setItem(STORAGE_KEY, next);
+    localStorage.setItem(THEME_KEY, next);
     applyTheme(next);
   };
 
-  const saved = localStorage.getItem(STORAGE_KEY) || 'light';
-  applyTheme(saved);
+  window.toggleSidebar = function () {
+    const collapsed = !document.documentElement.classList.contains('sidebar-collapsed');
+    localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+    applySidebar(collapsed);
+  };
+
+  applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+  applySidebar(localStorage.getItem(SIDEBAR_KEY) === '1');
 })();

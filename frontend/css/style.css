@@ -65,9 +65,67 @@ a:hover { text-decoration: underline; }
   flex-direction: column;
   padding: 1.2rem 0;
   z-index: 100;
+  transition: width 0.22s ease, padding 0.22s ease, border-color 0.22s ease;
+  overflow: hidden;
+}
+.app-layout { transition: margin-left 0.22s ease; }
+
+/* Collapsible sidebar (desktop only) */
+@media (min-width: 961px) {
+  html.sidebar-collapsed .sidebar {
+    width: 0;
+    padding: 0;
+    border-right-color: transparent;
+  }
+  html.sidebar-collapsed .app-layout { margin-left: 0; }
+  html.sidebar-collapsed .sidebar-reopen-btn { display: flex; }
 }
 
+/* Collapse toggle button (inside sidebar logo) */
+.sidebar-toggle {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.sidebar-toggle:hover { background: var(--bg); color: var(--text); }
+
+/* Floating reopen button (shown when sidebar is collapsed) */
+.sidebar-reopen-btn {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 44px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  align-items: center;
+  justify-content: center;
+  z-index: 101;
+  transition: background 0.15s, color 0.15s;
+}
+.sidebar-reopen-btn:hover { background: var(--bg); color: var(--text); }
+
 .sidebar-logo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0 1.2rem 1.5rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0.75rem;
