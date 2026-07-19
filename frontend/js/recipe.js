@@ -14,6 +14,7 @@ let allStores = [];
 let allBrands = [];
 let allPrices = [];
 let priceModalMode = 'qty';
+let currentMultiplier = 1;
 
 // Unit sets for €/kg calculation (mirrors backend)
 const _G_UNITS = new Set(['g', 'gr', 'gram', 'grams', 'gramo', 'gramos', 'ml', 'milliliter', 'milliliters']);
@@ -257,6 +258,11 @@ function renderPage(recipe, ingredients, steps) {
             <h3>${t('section_ingredients')}</h3>
             <p class="section-hint" id="ing-count">${ingCount}</p>
           </div>
+          <div class="multiplier-ctrl">
+            <button class="mult-btn active" data-mult="1" onclick="setMultiplier(1)">×1</button>
+            <button class="mult-btn" data-mult="2" onclick="setMultiplier(2)">×2</button>
+            <button class="mult-btn" data-mult="3" onclick="setMultiplier(3)">×3</button>
+          </div>
           <button class="btn btn-outline btn-sm" onclick="openIngModal()">${t('btn_add')}</button>
         </div>
         <div id="ingredients-section">
@@ -422,7 +428,7 @@ function renderIngRow(i, sections) {
         </div>
       </td>
       <td class="ing-name price-clickable" onclick="openEditIngModal('${i.id}')">${ingDisplayName(i)}</td>
-      <td class="col-qty price-clickable" onclick="openEditIngModal('${i.id}'); setTimeout(()=>{const f=document.getElementById('ing-edit-qty');if(f){f.select();}},150)">${i.quantity} ${tUnit(i.unit)}</td>
+      <td class="col-qty price-clickable" onclick="openEditIngModal('${i.id}'); setTimeout(()=>{const f=document.getElementById('ing-edit-qty');if(f){f.select();}},150)">${_fmtMult(i.quantity)} ${tUnit(i.unit)}</td>
       <td class="col-store">${storeSelect}</td>
       ${brandSelectCell}
       <td class="col-price-kg price-clickable" data-ing-id="${i.id}" data-col="pkg"
@@ -1086,6 +1092,23 @@ function setIngredients(ings) {
   document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(ings);
   initSortable();
   loadCost();
+}
+
+function _fmtMult(qty) {
+  if (currentMultiplier === 1) return qty;
+  const n = parseFloat(qty);
+  if (isNaN(n)) return qty;
+  const r = n * currentMultiplier;
+  return Number.isInteger(r) ? r : parseFloat(r.toFixed(2));
+}
+
+function setMultiplier(n) {
+  currentMultiplier = n;
+  document.querySelectorAll('.mult-btn').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.mult) === n)
+  );
+  document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
+  initSortable();
 }
 
 // ── Translate ────────────────────────────────────────────────────────────────
