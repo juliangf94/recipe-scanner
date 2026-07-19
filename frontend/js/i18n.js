@@ -1016,8 +1016,8 @@ const CANONICAL_CAT = {
   'pastry': 'Desserts', 'pastries': 'Desserts',
   'sweet': 'Desserts', 'sweets': 'Desserts',
   'candy': 'Desserts', 'confectionery': 'Desserts',
-  'cookie': 'Desserts', 'cookies': 'Desserts',
-  'biscuit': 'Desserts', 'biscuits': 'Desserts',
+  'cookie': 'Cookies', 'cookies': 'Cookies',
+  'biscuit': 'Cookies', 'biscuits': 'Cookies',
   'brownie': 'Desserts', 'brownies': 'Desserts',
   'cupcake': 'Desserts', 'cupcakes': 'Desserts',
   'muffin': 'Desserts', 'muffins': 'Desserts',
@@ -1051,7 +1051,8 @@ const CANONICAL_CAT = {
   'dulces': 'Desserts', 'dulce': 'Desserts',
   'confitería': 'Desserts', 'confiteria': 'Desserts',
   'golosinas': 'Desserts', 'golosina': 'Desserts',
-  'galletas': 'Desserts', 'galleta': 'Desserts',
+  'galletas': 'Cookies', 'galleta': 'Cookies',
+  'galletitas': 'Cookies', 'galletita': 'Cookies',
   'torta': 'Desserts', 'tortas': 'Desserts',
   'tarta': 'Desserts', 'tartas': 'Desserts',
   'bizcocho': 'Desserts', 'bizcochos': 'Desserts',
@@ -1082,7 +1083,8 @@ const CANONICAL_CAT = {
   'gâteau': 'Desserts', 'gâteaux': 'Desserts',
   'tarte': 'Desserts', 'tartes': 'Desserts',
   'sucrerie': 'Desserts', 'sucreries': 'Desserts',
-  'confiserie': 'Desserts', 'biscuit': 'Desserts', 'biscuits': 'Desserts',
+  'confiserie': 'Desserts',
+  'biscuit': 'Cookies', 'biscuits': 'Cookies', 'galette': 'Cookies', 'galettes': 'Cookies',
   'macaron': 'Desserts', 'macarons': 'Desserts',
   'madeleine': 'Desserts', 'madeleines': 'Desserts',
   'éclair': 'Desserts', 'éclairs': 'Desserts',
@@ -1109,7 +1111,7 @@ const CANONICAL_CAT = {
 const CAT_DISPLAY = {
   en: {
     'Appetizer': 'Appetizer', 'Bakery': 'Bakery', 'Breakfast': 'Breakfast',
-    'Chicken': 'Chicken', 'Desserts': 'Desserts', 'Drink': 'Drink',
+    'Chicken': 'Chicken', 'Cookies': 'Cookies', 'Desserts': 'Desserts', 'Drink': 'Drink',
     'Fish': 'Fish', 'Main Course': 'Main Course', 'Meat': 'Meat',
     'Pasta': 'Pasta', 'Rice': 'Rice', 'Salad': 'Salad',
     'Sandwich': 'Sandwich', 'Seafood': 'Seafood', 'Snack': 'Snack',
@@ -1117,7 +1119,7 @@ const CAT_DISPLAY = {
   },
   es: {
     'Appetizer': 'Aperitivo', 'Bakery': 'Panadería', 'Breakfast': 'Desayuno',
-    'Chicken': 'Pollo', 'Desserts': 'Postres', 'Drink': 'Bebida',
+    'Chicken': 'Pollo', 'Cookies': 'Galletitas', 'Desserts': 'Postres', 'Drink': 'Bebida',
     'Fish': 'Pescado', 'Main Course': 'Plato Principal', 'Meat': 'Carne',
     'Pasta': 'Pasta', 'Rice': 'Arroz', 'Salad': 'Ensalada',
     'Sandwich': 'Sandwich', 'Seafood': 'Mariscos', 'Snack': 'Snack',
@@ -1125,7 +1127,7 @@ const CAT_DISPLAY = {
   },
   fr: {
     'Appetizer': 'Apéritif', 'Bakery': 'Boulangerie', 'Breakfast': 'Petit-déjeuner',
-    'Chicken': 'Poulet', 'Desserts': 'Desserts', 'Drink': 'Boisson',
+    'Chicken': 'Poulet', 'Cookies': 'Biscuits', 'Desserts': 'Desserts', 'Drink': 'Boisson',
     'Fish': 'Poisson', 'Main Course': 'Plat Principal', 'Meat': 'Viande',
     'Pasta': 'Pâtes', 'Rice': 'Riz', 'Salad': 'Salade',
     'Sandwich': 'Sandwich', 'Seafood': 'Fruits de mer', 'Snack': 'Snack',
@@ -1182,7 +1184,7 @@ function applyTranslations() {
 document.addEventListener('DOMContentLoaded', applyTranslations);
 
 const CATEGORY_LIST = [
-  'Appetizer', 'Bakery', 'Breakfast', 'Chicken', 'Desserts',
+  'Appetizer', 'Bakery', 'Breakfast', 'Chicken', 'Cookies', 'Desserts',
   'Drink', 'Fish', 'Main Course', 'Meat', 'Pasta', 'Rice', 'Salad',
   'Sandwich', 'Seafood', 'Snack', 'Soup', 'Vegan', 'Vegetarian',
 ];
