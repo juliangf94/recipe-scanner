@@ -12,10 +12,6 @@
 
   function applySidebar(collapsed) {
     document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
-    document.querySelectorAll('.sidebar-toggle').forEach(btn => {
-      btn.textContent = collapsed ? '›' : '‹';
-      btn.title = collapsed ? 'Abrir menú' : 'Colapsar menú';
-    });
   }
 
   window.toggleTheme = function () {

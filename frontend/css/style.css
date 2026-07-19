@@ -78,54 +78,37 @@ a:hover { text-decoration: underline; }
     border-right-color: transparent;
   }
   html.sidebar-collapsed .app-layout { margin-left: 0; }
-  html.sidebar-collapsed .sidebar-reopen-btn { display: flex; }
+  html.sidebar-collapsed .sidebar-toggle-btn { left: 0.5rem; }
 }
 
-/* Collapse toggle button (inside sidebar logo) */
-.sidebar-toggle {
-  flex-shrink: 0;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  width: 26px;
-  height: 26px;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+/* Single always-visible sidebar toggle (panel icon, like Claude) */
+.sidebar-toggle-btn {
+  position: fixed;
+  top: 0.85rem;
+  left: calc(var(--sidebar-width) - 2.4rem);
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
-}
-.sidebar-toggle:hover { background: var(--bg); color: var(--text); }
-
-/* Floating reopen button (shown when sidebar is collapsed) */
-.sidebar-reopen-btn {
-  display: none;
-  position: fixed;
-  top: 50%;
-  left: 0;
-  transform: translateY(-50%);
-  width: 18px;
-  height: 44px;
-  background: var(--sidebar-bg);
-  border: 1px solid var(--border);
-  border-left: none;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 0.8rem;
-  align-items: center;
-  justify-content: center;
-  z-index: 101;
-  transition: background 0.15s, color 0.15s;
+  z-index: 200;
+  transition: left 0.22s ease, background 0.15s, color 0.15s;
+  padding: 0;
 }
-.sidebar-reopen-btn:hover { background: var(--bg); color: var(--text); }
+.sidebar-toggle-btn:hover {
+  background: var(--bg-alt, var(--bg));
+  color: var(--text);
+}
+@media (max-width: 960px) {
+  .sidebar-toggle-btn { display: none; }
+}
 
 .sidebar-logo {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 0 1.2rem 1.5rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0.75rem;
