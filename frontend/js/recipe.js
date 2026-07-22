@@ -725,35 +725,35 @@ function deleteStep(stepId) {
 async function loadCost() {
   const res = await apiFetch(`/recipes/${recipeId}/cost`);
   if (!res || !res.ok) return;
-
   currentCostData = res.data;
+  applyCostWithMultiplier();
+}
+
+function applyCostWithMultiplier() {
+  if (!currentCostData) return;
   const c = currentCostData;
+  if (c.total_estimated_cost == null) return;
 
-  if (c.total_estimated_cost != null) {
-    document.getElementById('cost-footer').style.display = '';
-    document.getElementById('cost-total').textContent = `€${c.total_estimated_cost.toFixed(2)}`;
+  document.getElementById('cost-footer').style.display = '';
+  document.getElementById('cost-total').textContent = `€${(c.total_estimated_cost * currentMultiplier).toFixed(2)}`;
 
-    c.ingredients.forEach(i => {
-      const src = i.source || 'fallback';
-      const srcLabel = t(`src_${src}`);
-      const unitMismatch = !!i.unit_warning;
+  c.ingredients.forEach(i => {
+    const src = i.source || 'fallback';
+    const srcLabel = t(`src_${src}`);
+    const unitMismatch = !!i.unit_warning;
 
-      // €/kg column (clickable)
-      const pkgCell = document.querySelector(`[data-ing-id="${i.ing_id}"][data-col="pkg"]`);
-      if (pkgCell) {
-        const pkg = i.price_per_kg != null ? `€${i.price_per_kg.toFixed(2)}` : '—';
-        const warn = unitMismatch ? ` <span title="${t('warn_unit_mismatch')}" style="cursor:help;">⚠️</span>` : '';
-        pkgCell.innerHTML = `<span class="price-badge price-badge-${src}">${srcLabel}</span> <span class="price-val-${src}">${pkg}</span>${warn}`;
-      }
+    const pkgCell = document.querySelector(`[data-ing-id="${i.ing_id}"][data-col="pkg"]`);
+    if (pkgCell) {
+      const pkg = i.price_per_kg != null ? `€${i.price_per_kg.toFixed(2)}` : '—';
+      const warn = unitMismatch ? ` <span title="${t('warn_unit_mismatch')}" style="cursor:help;">⚠️</span>` : '';
+      pkgCell.innerHTML = `<span class="price-badge price-badge-${src}">${srcLabel}</span> <span class="price-val-${src}">${pkg}</span>${warn}`;
+    }
 
-      // Total column (display only)
-      const totalCell = document.querySelector(`[data-ing-id="${i.ing_id}"][data-col="total"]`);
-      if (totalCell) {
-        totalCell.textContent = unitMismatch ? '?' : `€${i.estimated_price.toFixed(2)}`;
-      }
-
-    });
-  }
+    const totalCell = document.querySelector(`[data-ing-id="${i.ing_id}"][data-col="total"]`);
+    if (totalCell) {
+      totalCell.textContent = unitMismatch ? '?' : `€${(i.estimated_price * currentMultiplier).toFixed(2)}`;
+    }
+  });
 }
 
 // ── Store picker per ingredient ───────────────────────────────────────────────
@@ -1118,6 +1118,7 @@ function setMultiplier(n) {
   );
   document.getElementById('ingredients-section').innerHTML = renderIngredientsTable(currentIngredients);
   initSortable();
+  applyCostWithMultiplier();
 }
 
 // ── Translate ────────────────────────────────────────────────────────────────
