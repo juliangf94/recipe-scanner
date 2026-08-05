@@ -7,6 +7,7 @@
     document.querySelectorAll('.theme-toggle').forEach(btn => {
       btn.textContent = theme === 'dark' ? '☀' : '🌙';
       btn.title = theme === 'dark' ? 'Modo claro' : 'Modo oscuro';
+      btn.setAttribute('aria-label', theme === 'dark' ? 'Modo claro' : 'Modo oscuro');
     });
   }
 

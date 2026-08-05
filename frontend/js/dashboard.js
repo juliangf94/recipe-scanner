@@ -88,7 +88,7 @@ function recipeCard(r) {
         <div class="card-meta">${meta.map(m => `<span>${m}</span>`).join('')}</div>
         <div class="card-footer">
           <span class="view-btn">${t('card_view')}</span>
-          <button class="card-delete-btn" onclick="event.preventDefault();event.stopPropagation();confirmDeleteRecipe('${r.id}','${localTitle.replace(/'/g,"\\'")}')">🗑</button>
+          <button class="card-delete-btn" aria-label="${t('delete')} ${localTitle}" onclick="event.preventDefault();event.stopPropagation();confirmDeleteRecipe('${r.id}','${localTitle.replace(/'/g,"\\'")}')">🗑</button>
         </div>
       </div>
     </a>`;

@@ -444,8 +444,8 @@ function renderIngRow(i, sections) {
       <td class="col-total" data-ing-id="${i.id}" data-col="total">—</td>
       <td class="col-del">
         <div class="col-del-inner">
-          <button class="edit-btn" onclick="openEditIngModal('${i.id}')">✎</button>
-          <button class="del-btn" onclick="deleteIngredient('${i.id}')">✕</button>
+          <button class="edit-btn" aria-label="Editar ${ingDisplayName(i)}" onclick="openEditIngModal('${i.id}')">✎</button>
+          <button class="del-btn" aria-label="Eliminar ${ingDisplayName(i)}" onclick="deleteIngredient('${i.id}')">✕</button>
         </div>
       </td>
     </tr>`;
@@ -579,8 +579,8 @@ function renderSteps(steps) {
         ${s.duration_min ? `<span class="step-duration">⏱ ${s.duration_min} min</span>` : ''}
       </div>
       <div class="step-actions">
-        <button class="edit-btn" onclick="openEditStepModal('${s.id}')">✎</button>
-        <button class="del-btn" onclick="deleteStep('${s.id}')">✕</button>
+        <button class="edit-btn" aria-label="Editar paso ${s.order_num}" onclick="openEditStepModal('${s.id}')">✎</button>
+        <button class="del-btn" aria-label="Eliminar paso ${s.order_num}" onclick="deleteStep('${s.id}')">✕</button>
       </div>
     </li>`).join('');
 

@@ -55,7 +55,7 @@
         <div class="input-wrap">
           <span class="input-icon">🔒</span>
           <input type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password">
-          <button type="button" class="input-toggle" onclick="togglePwd('reg-password', this)">👁</button>
+          <button type="button" class="input-toggle" aria-label="Mostrar u ocultar contraseña" onclick="togglePwd('reg-password', this)">👁</button>
         </div>
       </div>
       <div class="form-group">
@@ -63,13 +63,13 @@
         <div class="input-wrap">
           <span class="input-icon">🔒</span>
           <input type="password" id="reg-confirm" placeholder="••••••••" autocomplete="new-password">
-          <button type="button" class="input-toggle" onclick="togglePwd('reg-confirm', this)">👁</button>
+          <button type="button" class="input-toggle" aria-label="Mostrar u ocultar confirmación de contraseña" onclick="togglePwd('reg-confirm', this)">👁</button>
         </div>
       </div>
       <div class="checkbox-row">
         <input type="checkbox" id="reg-terms">
         <label for="reg-terms" data-i18n-html="agree_terms_html">
-          I agree to the <a href="#" onclick="return false;">Terms of Service</a> and <a href="#" onclick="return false;">Privacy Policy</a>
+          I agree to the <a href="terms.html">Terms of Service</a> and <a href="privacy.html">Privacy Policy</a>
         </label>
       </div>
       <button type="submit" class="btn btn-orange btn-full btn-lg" id="register-btn" data-i18n="btn_create_account">

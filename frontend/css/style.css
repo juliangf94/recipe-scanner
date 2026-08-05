@@ -359,6 +359,7 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(255, 130, 50, 0.18);
 }
 
 input::placeholder, textarea::placeholder { color: var(--text-light); }
@@ -547,7 +548,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   font-weight: 500;
   cursor: pointer;
   color: var(--text-muted);
-  transition: all 0.15s;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
 }
 
 .filter-pill:hover { border-color: var(--orange); color: var(--orange); }
@@ -1271,6 +1272,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   color: #fff;
 }
 .mode-btn:focus { outline: none; }
+.mode-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 
 /* Calculated price preview text */
 .price-preview-text {
@@ -1417,7 +1419,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   font-size: 1rem;
   font-weight: 500;
   color: var(--text-muted);
-  transition: all 0.15s;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
 }
 
 .method-btn.active {
@@ -1473,7 +1475,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   font-weight: 500;
   cursor: pointer;
   color: var(--text-muted);
-  transition: all 0.15s;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
 }
 
 .opt-pill.active {
@@ -1702,7 +1704,7 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
   letter-spacing: 0.5px;
   cursor: pointer;
   color: var(--text-muted);
-  transition: all 0.15s;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
 .lang-btn.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 
@@ -2306,4 +2308,13 @@ input::placeholder, textarea::placeholder { color: var(--text-light); }
 }
 #brands-list::-webkit-scrollbar-thumb:hover {
   background: var(--orange-hover);
+}
+
+h1, h2, h3, h4 { text-wrap: balance; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
