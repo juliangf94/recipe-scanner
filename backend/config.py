@@ -35,8 +35,10 @@ class ProductionConfig(Config):
         'sqlite:////app/instance/production.db'
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_pre_ping': True,
-        'pool_recycle': 280,
+        'pool_pre_ping': True,   # descarta conexiones muertas antes de usarlas
+        'pool_recycle': 1800,    # recicla conexiones cada 30 min (Supabase timeout > 10 min)
+        'pool_size': 5,          # conexiones activas en el pool
+        'max_overflow': 5,       # extra si el pool está lleno (tope = 10 total)
     }
 
 
