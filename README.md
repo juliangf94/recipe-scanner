@@ -27,6 +27,8 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 - Advertencia de incompatibilidad de unidades (`unit_warning`) cuando el ingrediente está en unidades no pesables pero el precio fue guardado en €/kg
 - Caché TTL de 5 minutos en el home summary — visitas repetidas renderizan instantáneamente sin llamar a `/summary`; se invalida automáticamente al guardar o borrar un precio
 - Resiliencia ante cold starts de Render: `_fetchWithTimeout` con AbortController (25 s) previene que el fetch quede colgado indefinidamente
+- Connection pool SQLAlchemy optimizado para Supabase: `pool_pre_ping`, `pool_recycle=1800`, `pool_size=5+max_overflow=5` — recuperación automática de conexiones muertas sin superar el límite de 25 de Supabase free
+- Accesibilidad WCAG: `aria-label` en todos los botones icon-only, focus rings visibles, `prefers-reduced-motion`, links reales en register
 
 ---
 
@@ -44,7 +46,7 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 | Frontend | HTML + CSS + JS vanilla (static, no framework) |
 | Containerization | Docker (multi-stage) + Docker Compose |
 | Deploy | Render (backend) + Netlify (frontend) |
-| Tests | pytest (132 tests) + Newman (109 requests) = 241 total |
+| Tests | pytest (145 tests) + Newman (109 requests) = 254 total |
 
 ---
 
@@ -139,8 +141,15 @@ Base URL: `/api/v1` — Full interactive docs at `/api/docs`
 ```bash
 cd recipe-scanner
 source backend/venv/bin/activate
+
+# Tests de lógica de negocio e integración API (root tests/)
 pytest tests/ -v
 # 132 tests — 0 failures
+
+# Tests del connection pool y configuración de BD (backend/tests/)
+cd backend
+pytest tests/ -v
+# 13 tests — 0 failures
 ```
 
 ---

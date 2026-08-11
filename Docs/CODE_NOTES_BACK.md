@@ -429,15 +429,28 @@ class TestingConfig(Config):
 ```python
 class ProductionConfig(Config):
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'sqlite:////app/instance/production.db'
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 1800,
+        'pool_size': 5,
+        'max_overflow': 5,
+    }
 ```
 
 - `DEBUG = False` — en producción nunca se muestran errores detallados al usuario  (expondrían información interna de la app).
 - `DATABASE_URL` debe estar definida en el servidor de producción (Render, Railway, etc.). 
   + Su valor será algo como: `postgresql://usuario:password@host:5432/nombre_db`
+  + El fallback `sqlite:////app/instance/production.db` cubre el caso en que `DATABASE_URL` no está definida.
 - `JWT_SECRET_KEY` se sobreescribe aquí **sin fallback** — si la variable no está  definida en el servidor, vale `None` y la app falla al arrancar. 
-    + Es deliberado: mejor fallar visiblemente al iniciar que correr en producción con una clave débil.
+  + Es deliberado: mejor fallar visiblemente al iniciar que correr en producción con una clave débil.
+- `SQLALCHEMY_ENGINE_OPTIONS` — configura el connection pool de SQLAlchemy para Supabase PostgreSQL:
+  + `pool_pre_ping: True` — antes de entregar una conexión del pool, SQLAlchemy ejecuta `SELECT 1`. Si la conexión fue cerrada por Supabase (timeout de inactividad), la detecta, la descarta y abre una nueva. Sin esto, el request fallaría con `OperationalError`.
+  + `pool_recycle: 1800` — fuerza el cierre y reapertura de conexiones cada 30 minutos. Supabase cierra conexiones inactivas antes de ese tiempo, por lo que `pool_pre_ping` ya maneja el caso frecuente. El recycle es un respaldo secundario para conexiones muy antiguas.
+  + `pool_size: 5` — cuántas conexiones permanecen abiertas siempre en el pool.
+  + `max_overflow: 5` — conexiones extra temporales si las 5 del pool están ocupadas. Tope total = 10, dentro del límite de 25 conexiones del plan gratuito de Supabase.
 
 ```python
 config = {
@@ -4331,7 +4344,7 @@ db = SQLAlchemy()
 
 ---
 
-## `backend/config.py` — sin cambios necesarios
+## `backend/config.py` — actualizado con connection pool
 
 ```python
 class Config:
@@ -4344,7 +4357,14 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
 
 class ProductionConfig(Config):
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'sqlite:////app/instance/production.db'
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 1800,
+        'pool_size': 5,
+        'max_overflow': 5,
+    }
 ```
 
 ### Lógica
@@ -4360,12 +4380,48 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 ```py
 SQLALCHEMY_DATABASE_URI = 'sqlite:///instance/development.db'  # development
 SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'                  # testing
-SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')        # production
+SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \  # production
+    'sqlite:////app/instance/production.db'
 ```
 -   `sqlite:///` — protocolo SQLite. Las tres barras son parte del formato URI
 -   `instance/development.db` — ruta relativa al directorio de la app; Flask crea `instance/` automáticamente
 -   `sqlite:///:memory:` — base de datos en RAM, se borra al terminar el proceso; ideal para tests (aislados y rápidos)
 -   `DATABASE_URL` en producción viene de la variable de entorno — permite usar PostgreSQL sin cambiar código
+-   El `or 'sqlite:///...'` es un fallback: si `DATABASE_URL` no está definida, usa SQLite local. Evita que la app falle al arrancar sin configuración.
+
+#### `SQLALCHEMY_ENGINE_OPTIONS` — connection pool para Supabase
+
+**¿Qué es un connection pool?**
+Un conjunto de conexiones a la base de datos que se mantienen abiertas y listas para usar. En lugar de abrir y cerrar una conexión TCP en cada request, el pool presta una conexión existente:
+
+```
+Sin pool:  request → [abrir TCP] → query → [cerrar TCP] → respuesta     (lento, costoso)
+Con pool:  request → [tomar del pool] → query → [devolver al pool] → respuesta  (rápido)
+```
+
+SQLAlchemy incluye pooling por defecto. `SQLALCHEMY_ENGINE_OPTIONS` permite configurarlo:
+
+```python
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_pre_ping': True,   # ← más importante
+    'pool_recycle': 1800,
+    'pool_size': 5,
+    'max_overflow': 5,
+}
+```
+
+-   **`pool_pre_ping: True`** — antes de entregar una conexión del pool al código, SQLAlchemy ejecuta `SELECT 1`. Si Supabase cerró la conexión por inactividad, el ping falla, SQLAlchemy descarta esa conexión y abre una nueva automáticamente. Sin esto, el request fallaría con `OperationalError: connection closed`.
+
+-   **`pool_recycle: 1800`** — fuerza el cierre y reapertura de cada conexión después de 30 minutos, independientemente de si está viva. Supabase free tier cierra conexiones inactivas antes de eso. Con `pool_pre_ping` activo, este es un respaldo secundario — el ping ya maneja el caso frecuente.
+
+-   **`pool_size: 5`** — cuántas conexiones permanecen abiertas en el pool en todo momento.
+
+-   **`max_overflow: 5`** — si las 5 conexiones del pool están ocupadas (tráfico alto), se pueden abrir hasta 5 adicionales temporalmente. Cuando terminan, se cierran (no se devuelven al pool). Tope total = 10 conexiones, dentro del límite de 25 de Supabase free.
+
+**Por qué `DevelopmentConfig` y `TestingConfig` no tienen estas opciones:**
+SQLite usa `SingletonThreadPool` en testing y `NullPool` o `StaticPool` en algunos contextos — no soporta `pool_size` / `max_overflow` de la misma manera. Los defaults de SQLAlchemy son correctos para SQLite.
+
+**Tests:** `backend/tests/test_pool.py` verifica los 4 valores del dict, que el total de conexiones no supera 25, que la app arranca y la BD responde, y que `pool_pre_ping` recupera una conexión cerrada manualmente (simulando un timeout de Supabase).
 
 ---
 

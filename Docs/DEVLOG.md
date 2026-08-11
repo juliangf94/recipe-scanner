@@ -19,7 +19,7 @@ Fecha de entrega: finales de junio 2026
 | BDD producción | PostgreSQL | Robusto, concurrente, estándar en producción |
 | API docs | flask_restx (Swagger UI) | Documentación automática en `/api/docs`, preparado para app móvil |
 | Frontend | HTML + JS estático | Sin build step, sin framework reactivo — justificado en Decisión 18; la misma API sirve a cualquier cliente futuro |
-| Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 132 tests, 0 failures |
+| Tests unitarios / integración | pytest + pytest-flask | Test client Flask con SQLite en memoria — 145 tests, 0 failures (132 en `tests/` + 13 pool tests en `backend/tests/`) |
 | Tests end-to-end | Newman + Postman | 109 requests contra el servidor en vivo — 0 failures |
 | Variables de entorno | python-dotenv | Carga `.env` en desarrollo; en producción las claves van directo al servidor |
 | Containerización | Docker (multi-stage) | Stage dev con hot reload, stage production con gunicorn + usuario no-root |
@@ -106,6 +106,9 @@ recipe_Scanner/
 │   ├── requirements.txt
 │   ├── .env                        # Variables de entorno (nunca va a GitHub)
 │   ├── scripts/                    # Scripts auxiliares (migraciones, seeds)
+│   ├── tests/                      # Tests del backend (pool, configuración)
+│   │   ├── conftest.py
+│   │   └── test_pool.py            # 13 tests: config unit, app smoke, pre_ping behavior
 │   └── app/
 │       ├── __init__.py             # Application factory (create_app)
 │       ├── extensions.py           # db = SQLAlchemy() — evita imports circulares
@@ -1319,3 +1322,130 @@ function _writeCache(data) {
 - [x] `try/catch` en `apiFetch('/summary')` en `home.js` — `AbortError` y errores de red muestran mensaje con `data-i18n="err_load"` en lugar de spinner congelado
 - [x] `const HOME_SUMMARY_CACHE = 'rs_home_summary_v1'` y `function invalidateHomeCache()` en `prices.js`
 - [x] `invalidateHomeCache()` llamado en `saveRowEdit`, `saveNewRow` y `deletePrice`
+
+---
+
+## Decisiones técnicas — Fase 14 (Accesibilidad WCAG + Connection pool)
+
+### Decisión 34 — Auditoría de accesibilidad WCAG en el frontend
+
+**Problema:** Auditoría con web-design-guidelines detectó 5 categorías de incumplimientos:
+
+1. **Botones icon-only sin `aria-label`** — invisibles para lectores de pantalla (VoiceOver, NVDA).
+2. **`outline: none` sin reemplazo** — `.mode-btn:focus { outline: none }` viola WCAG 2.4.7 (Focus Visible).
+3. **Links muertos en `register.html`** — `href="#" onclick="return false;"` impide acceder a Términos y Privacidad.
+4. **`transition: all 0.15s`** — 4 instancias generan transiciones en propiedades innecesarias (rendimiento y animaciones no deseadas).
+5. **Sin `prefers-reduced-motion`** — la app ignora la preferencia del usuario de reducir animaciones.
+
+**Correcciones aplicadas:**
+
+**`aria-label` en botones icon-only:**
+```javascript
+// dashboard.js — botón eliminar receta
+<button class="card-delete-btn" aria-label="${t('delete')} ${localTitle}" ...>🗑</button>
+
+// recipe.js — botones editar/eliminar ingrediente
+<button class="edit-btn" aria-label="Editar ${ingDisplayName(i)}" ...>✎</button>
+<button class="del-btn" aria-label="Eliminar ${ingDisplayName(i)}" ...>✕</button>
+
+// recipe.js — botones editar/eliminar paso
+<button class="edit-btn" aria-label="Editar paso ${s.order_num}" ...>✎</button>
+<button class="del-btn" aria-label="Eliminar paso ${s.order_num}" ...>✕</button>
+```
+
+```javascript
+// theme.js — theme toggle (dinámico según tema activo)
+btn.setAttribute('aria-label', theme === 'dark' ? 'Modo claro' : 'Modo oscuro');
+```
+
+**Focus visible para teclado:**
+```css
+/* Inputs — box-shadow suplementario al border-color */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(255, 130, 50, 0.18);
+}
+
+/* mode-btn — visible solo para navegación por teclado */
+.mode-btn:focus { outline: none; }
+.mode-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+```
+
+**Otras correcciones CSS:**
+```css
+/* transition: all → propiedades específicas (4 selectores) */
+.filter-pill  { transition: border-color 0.15s, color 0.15s, background-color 0.15s; }
+.method-btn   { transition: border-color 0.15s, background-color 0.15s, color 0.15s; }
+.opt-pill     { transition: border-color 0.15s, background-color 0.15s, color 0.15s; }
+.lang-btn     { transition: background-color 0.15s, color 0.15s, box-shadow 0.15s; }
+
+/* Respeta preferencia del sistema de no animaciones */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Mejor lectura en títulos */
+h1, h2, h3, h4 { text-wrap: balance; }
+```
+
+**HTML:** `.sidebar-user-menu` — `title="Menu"` → `aria-label="Menú de usuario"` en los 6 HTMLs. `.modal-close-x` en `recipe.html` — `aria-label="Cerrar"`. `.input-toggle` en `index.html` y `register.html` — aria-label descriptivo. Links de `register.html:72` — `href="#"` → `terms.html` / `privacy.html`.
+
+---
+
+### Decisión 35 — Connection pool SQLAlchemy para Supabase
+
+**Contexto:** `ProductionConfig` ya tenía `pool_pre_ping: True` y `pool_recycle: 280`. Se detectaron dos problemas: el recycle de 280 s era demasiado agresivo (causaba reconexiones frecuentes), y `pool_size`/`max_overflow` no estaban definidos explícitamente (riesgo de exceder el límite de Supabase).
+
+**¿Qué es un connection pool?**
+Conjunto de conexiones a la BD pre-establecidas y reutilizables. Elimina la latencia de abrir/cerrar conexiones TCP en cada request.
+
+```
+Sin pool:  request → [abrir TCP + auth] → query → [cerrar TCP] → respuesta   (lento)
+Con pool:  request → [tomar conn del pool] → query → [devolver conn] → respuesta  (rápido)
+```
+
+**Configuración actualizada en `ProductionConfig`:**
+```python
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_pre_ping': True,   # ejecuta SELECT 1 antes de cada checkout → conn muerta → nueva automáticamente
+    'pool_recycle': 1800,    # recicla conexiones cada 30 min (Supabase timeout ≈ 10 min)
+    'pool_size': 5,          # conexiones siempre abiertas en el pool
+    'max_overflow': 5,       # extra temporales si el pool está lleno → tope = 10 < 25 límite Supabase
+}
+```
+
+**Por qué `pool_recycle: 280 → 1800`:** `pool_pre_ping` ya detecta y reemplaza conexiones muertas antes de usarlas. El recycle de 4.7 min era redundante y causaba reconexiones frecuentes innecesarias. 30 min es el valor estándar recomendado con `pre_ping` activo.
+
+**Por qué `pool_size=5` y `max_overflow=5` explícitos:** Supabase free tier limita a 25 conexiones simultáneas. Dejar los defaults (5+10=15) era menos controlado. Acotando a 5+5=10 tenemos margen claro y visible en el código.
+
+**Tests de verificación** (`backend/tests/test_pool.py`, 13 tests):
+
+| Grupo | Tests | Qué verifica |
+|---|---|---|
+| Config unit (6) | Valores exactos del dict | `pool_pre_ping=True`, `pool_recycle=1800`, `pool_size=5`, `max_overflow=5`, `total ≤ 25`, dev sin options |
+| App smoke (4) | App + BD funcionan | App arranca, `/health` responde, SELECT 1 funciona, 20 queries sin deadlock |
+| pre_ping behavior (3) | Pool recupera conn muerta | Atributos del pool correctos, recovery tras DBAPI conn cerrada, `_pre_ping=False` sin la opción |
+
+---
+
+### Fase 14 — Accesibilidad WCAG + Connection pool + Tests ✅
+
+#### Objetivos
+- Corregir todos los incumplimientos de accesibilidad detectados por auditoría web-design-guidelines
+- Optimizar la configuración del connection pool para Supabase en producción
+- Agregar suite de tests para verificar configuración y comportamiento del pool
+
+#### Tareas completadas
+- [x] `aria-label` en todos los botones icon-only (`.card-delete-btn`, `.edit-btn`, `.del-btn`, `.modal-close-x`, `.input-toggle`, `.sidebar-user-menu`, `.theme-toggle` vía `theme.js`)
+- [x] Focus visible mejorado: `box-shadow` en `input:focus`, `:focus-visible` con `outline` en `.mode-btn`
+- [x] `transition: all 0.15s` → propiedades específicas en `.filter-pill`, `.method-btn`, `.opt-pill`, `.lang-btn`
+- [x] `@media (prefers-reduced-motion: reduce)` en `style.css`
+- [x] `text-wrap: balance` para `h1, h2, h3, h4`
+- [x] `register.html` — links `href="#"` → `terms.html` / `privacy.html`
+- [x] `pool_recycle: 280 → 1800` en `ProductionConfig.SQLALCHEMY_ENGINE_OPTIONS`
+- [x] `pool_size: 5` y `max_overflow: 5` añadidos explícitamente
+- [x] `backend/tests/conftest.py` + `backend/tests/test_pool.py` — 13 tests en 3 grupos

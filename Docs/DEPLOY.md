@@ -199,6 +199,28 @@ En desarrollo local apunta a `localhost:5000`. En Netlify (producción) apunta a
 
 ## Base de datos
 
+### Connection pool — configuración para Supabase
+
+SQLAlchemy mantiene un **pool de conexiones** a la base de datos para evitar abrir y cerrar una conexión nueva en cada request HTTP. La configuración vive en `ProductionConfig.SQLALCHEMY_ENGINE_OPTIONS`:
+
+```python
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_pre_ping': True,   # ejecuta SELECT 1 antes de cada checkout → descarta conns muertas
+    'pool_recycle': 1800,    # recicla conexiones cada 30 min (Supabase timeout ≈ 10 min)
+    'pool_size': 5,          # conexiones siempre abiertas en el pool
+    'max_overflow': 5,       # conexiones extra temporales si el pool está lleno
+}
+```
+
+**Por qué importa en este stack:**
+- Supabase cierra conexiones inactivas del lado del servidor — sin `pool_pre_ping`, SQLAlchemy entrega una conexión muerta y el request falla con `OperationalError`.
+- Supabase free tier tiene límite de 25 conexiones simultáneas — `pool_size + max_overflow = 10` deja margen seguro.
+- `pool_recycle: 1800` es el respaldo de `pool_pre_ping` para conexiones muy antiguas.
+
+`DevelopmentConfig` y `TestingConfig` no definen estas opciones — SQLite usa `SingletonThreadPool` que no las necesita.
+
+---
+
 ### Estado actual — PostgreSQL con Supabase ✅
 
 En producción la app usa **PostgreSQL en Supabase** — datos persistentes aunque Render reinicie el contenedor.
