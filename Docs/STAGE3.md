@@ -138,7 +138,7 @@ flowchart TD
     end
 
     subgraph External["External Services"]
-        Groq["Groq API\nLlama 3.3-70b-versatile\n(vision fallback: llama-4-scout)"]
+        Groq["Groq API\nopenai/gpt-oss-120b\n(texto + visión fallback)"]
         OFF["Open Food Facts API"]
         DeepL["DeepL / MyMemory\n(traducciones EN/ES/FR)"]
         Storage["Supabase Storage\n(fotos recetas + avatares)"]
@@ -475,13 +475,14 @@ sequenceDiagram
 
 ### External APIs
 
-#### Groq API (Llama 3.3-70b-versatile)
+#### Groq API (openai/gpt-oss-120b)
 
 - **URL base:** `https://api.groq.com/openai/v1/chat/completions`
 - **Auth:** `Authorization: Bearer <GROQ_API_KEY>`
 - **Por qué:** inferencia ultrarrápida con hardware LPU especializado. Groq ofrece
-  acceso gratuito (free tier). El modelo principal es `llama-3.3-70b-versatile` (Meta, open-source).
-  Se usa `llama-4-scout` como fallback para procesamiento de imágenes.
+  acceso gratuito (free tier). El modelo utilizado es `openai/gpt-oss-120b` (disponible vía Groq),
+  usado tanto para extracción de texto como fallback para procesamiento de imágenes (PDFs escaneados).
+  El proyecto originalmente usaba `llama-3.3-70b-versatile` y `llama-4-scout`, retirados por Groq en agosto 2026.
 - **Uso en el proyecto:** se le envía el texto extraído del PDF y se le pide que
   devuelva un JSON estructurado con título, ingredientes (nombre, cantidad, unidad)
   y pasos ordenados. Las traducciones EN/ES/FR se hacen por separado (DeepL / MyMemory).
@@ -489,7 +490,7 @@ sequenceDiagram
 **Ejemplo de request:**
 ```json
 {
-  "model": "llama-3.3-70b-versatile",   // fallback para visión: llama-4-scout
+  "model": "openai/gpt-oss-120b",        // texto y fallback de visión
   "messages": [
     {
       "role": "user",
@@ -847,7 +848,7 @@ Los directorios de uploads existen en el repo gracias a archivos `.gitkeep` pero
 | In-memory first | SQLAlchemy desde el inicio | Validar lógica sin complejidad de BD, desarrollo más rápido |
 | JWT | Sessions, OAuth | Stateless, escalable, estándar REST |
 | bcrypt | MD5, SHA-256 | Lento por diseño, incluye salt, resistente a fuerza bruta |
-| Groq + Llama 3.3-70b-versatile | OpenAI GPT-4 | Más rápido (LPU), open-source, tier gratuito, sin costo; vision fallback: llama-4-scout |
+| Groq + openai/gpt-oss-120b | OpenAI GPT-4 directo | Más rápido (LPU Groq), tier gratuito, mismo modelo para texto y visión fallback |
 | Open Food Facts | APIs de supermercados | Abierta, gratuita, sin acuerdo comercial, 3M+ productos |
 | Frontend HTML/JS estático | React, Vue, Jinja2 | Desacoplado del backend, mismo consumidor que app móvil futura |
 | INGREDIENT_SYNONYMS (facade.py) | Búsqueda solo por traducciones IA (Option A) | Cubre variantes dialectales (manteca ↔ mantequilla ↔ butter ↔ beurre) que DeepL no relaciona |

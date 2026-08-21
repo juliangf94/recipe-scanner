@@ -68,7 +68,7 @@ No explica línea a línea — explica QUÉ hace cada parte y POR QUÉ existe.
            │              │              │
            ▼              ▼              ▼
       SQLAlchemy         Groq API           Open Food Facts
-      (Supabase PG)   (llama-3.3-70b-versatile)   (precios)
+      (Supabase PG)   (openai/gpt-oss-120b)        (precios)
 ```
 
 ---
@@ -221,7 +221,7 @@ scan_pdf()
   │
   ├── _extract_pdf_text()   → PyMuPDF extrae el texto del PDF
   │
-  ├── _call_groq()          → envía el texto a Groq (llama-3.3-70b-versatile)
+  ├── _call_groq()          → envía el texto a Groq (openai/gpt-oss-120b)
   │                           recibe JSON: {title, ingredients, steps}
   │
   ├── create_recipe()       → guarda la receta
@@ -433,7 +433,7 @@ facade.scan_pdf(user_id, file_bytes, filename)
         │   (solo texto seleccionable, no imágenes)
         │
         ├── _call_groq(text)
-        │   Prompt enviado a llama-3.3-70b-versatile (Groq):
+        │   Prompt enviado a openai/gpt-oss-120b (Groq):
         │   "Extraé la receta de este texto y devolvé JSON con
         │    title, ingredients (name, quantity, unit), steps (order, description)"
         │
@@ -558,7 +558,7 @@ Los modelos son clases pasivas de datos — no tienen lógica de persistencia pr
 Flask da control total — cada componente (JWT, ORM, Swagger) lo elegimos e integramos nosotros. Con Django el framework toma esas decisiones. Para el jury es mejor poder explicar cada línea.
 
 **¿Por qué Groq y no OpenAI?**
-Groq tiene un tier gratuito generoso y hardware LPU especializado para LLMs — es significativamente más rápido que OpenAI. El modelo usado es `llama-3.3-70b-versatile` (Meta, open-source), con `llama-4-scout` como fallback para procesamiento de imágenes.
+Groq tiene un tier gratuito generoso y hardware LPU especializado para LLMs — es significativamente más rápido en inferencia. El modelo usado es `openai/gpt-oss-120b` (disponible vía Groq), que se usa tanto para extracción de texto como fallback de visión para PDFs basados en imágenes. El proyecto originalmente usaba `llama-3.3-70b-versatile` y `llama-4-scout`, retirados por Groq en agosto 2026.
 
 **¿Por qué JWT y no sesiones?**
 JWT es stateless — el servidor no guarda nada. Cualquier instancia del servidor puede verificar el token. Es el estándar para APIs REST y es compatible con apps móviles futuras.

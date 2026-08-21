@@ -13,7 +13,7 @@ Fecha de entrega: finales de junio 2026
 | ORM | SQLAlchemy 2.x | Abstracción de SQL, soporta SQLite y PostgreSQL sin cambiar código |
 | Autenticación | flask_jwt_extended + bcrypt | JWT = stateless (sin sesiones en servidor); bcrypt = hash lento por diseño |
 | PDF parsing | PyMuPDF | Binding C de MuPDF, muy rápido para extraer texto |
-| IA | Groq API (Llama 3.3-70b-versatile; vision fallback: llama-4-scout) | Inferencia ultrarrápida, modelo open-source potente |
+| IA | Groq API (openai/gpt-oss-120b — texto y visión) | Inferencia ultrarrápida vía LPU, tier gratuito generoso |
 | API externa | Open Food Facts | Base de datos de alimentos abierta y gratuita |
 | BDD desarrollo | SQLite | Sin servidor, archivo local, ideal para desarrollo |
 | BDD producción | PostgreSQL | Robusto, concurrente, estándar en producción |
@@ -60,16 +60,19 @@ rápido que alternativas puras en Python como PyPDF2 o pdfplumber. Para un proye
 que procesa PDFs subidos por usuarios, la velocidad de extracción de texto es crítica.
 Además maneja correctamente PDFs complejos con múltiples formatos de encoding.
 
-**Groq API con Llama 3.3-70b-versatile — IA**
-Elegimos Groq sobre OpenAI por dos razones principales. Primero, Groq ofrece
-inferencia ultrarrápida gracias a su hardware especializado LPU — los tiempos de
-respuesta son notablemente menores que OpenAI para el mismo modelo. Segundo,
-el modelo `llama-3.3-70b-versatile` (Meta, open-source) ofrece excelente calidad
-para extracción estructurada de recetas. Como fallback para procesamiento de
-imágenes se usa `llama-4-scout` (vision model). Ambos modelos son open-source —
-sin dependencia de un proveedor propietario. Para nuestro caso de uso — extraer
-ingredientes, cantidades y pasos de un texto de receta — Llama 3.3-70b-versatile
-es más que suficiente y el costo es mínimo comparado con GPT-4.
+**Groq API con openai/gpt-oss-120b — IA**
+Elegimos Groq por su hardware especializado LPU, que ofrece inferencia ultrarrápida
+con tiempos de respuesta muy bajos y un tier gratuito generoso. El modelo utilizado
+es `openai/gpt-oss-120b`, disponible vía Groq, que ofrece excelente calidad para
+extracción estructurada de recetas (JSON con secciones de ingredientes, cantidades
+y pasos). El mismo modelo se usa como fallback para procesamiento de imágenes (PDFs
+sin texto seleccionable). Para nuestro caso de uso — extraer ingredientes, cantidades
+y pasos de un texto de receta — `openai/gpt-oss-120b` vía Groq ofrece la mejor
+relación calidad/velocidad disponible en el tier gratuito.
+
+> **Nota:** El proyecto comenzó con `llama-3.3-70b-versatile` (Meta) y `llama-4-scout`
+> (visión). En agosto 2026, Groq retiró ambos modelos de su API. Se migró a
+> `openai/gpt-oss-120b`, que ofrece mejor calidad y el mismo tier gratuito.
 
 **Open Food Facts — API externa**
 Es la única base de datos de productos alimenticios verdaderamente abierta y gratuita,

@@ -12,7 +12,7 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 
 ## Features
 
-- Upload a PDF recipe and extract ingredients and steps automatically using Groq API (Llama 3.3-70b-versatile)
+- Upload a PDF recipe and extract ingredients and steps automatically using Groq API (openai/gpt-oss-120b)
 - User authentication with JWT access + refresh tokens, bcrypt password hashing
 - Save, view, edit, and delete recipes with multilingual fields (EN/ES/FR)
 - Estimate ingredient prices via Open Food Facts API + custom price database
@@ -39,7 +39,7 @@ Built as a portfolio project for Holberton School — RNCP 5 DWWM certification.
 | Backend | Python 3.12, Flask 3.x, flask-restx (Swagger) |
 | Authentication | Flask-JWT-Extended (access + refresh tokens) + bcrypt |
 | PDF Extraction | PyMuPDF (fitz) |
-| AI / NLP | Groq API — Llama 3.3-70b-versatile (vision fallback: llama-4-scout) |
+| AI / NLP | Groq API — openai/gpt-oss-120b (text + vision fallback) |
 | Ingredient Prices | Open Food Facts API + FALLBACK_PRICES table |
 | Database | SQLite (dev) / PostgreSQL (prod) |
 | ORM | SQLAlchemy 2.x (Repository Pattern) |

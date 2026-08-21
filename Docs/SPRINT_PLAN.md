@@ -455,3 +455,31 @@ Adicionalmente: Supabase Storage para fotos persistentes de recetas y avatares.
 - ✅ Editar/crear/eliminar un precio custom invalida el cache inmediatamente
 - ✅ Un cold start de Render no cuelga el fetch más de 25 segundos
 - ✅ Los errores de red en `home.html` muestran mensaje traducido, no spinner infinito
+
+---
+
+## Sprint 13 — Migración de modelos Groq + mejoras de extracción
+
+**Objetivo**: Restaurar el escaneo de PDFs (roto por deprecación de modelos Groq) y mejorar la calidad de extracción para recetas multi-sección.
+
+| # | Tarea | Prioridad | Estado |
+|---|---|---|---|
+| 1 | Migrar `llama-3.3-70b-versatile` → `openai/gpt-oss-120b` en `_call_groq()` | Alta | ✅ Done |
+| 2 | Migrar `llama-4-scout` → `openai/gpt-oss-120b` en `_call_groq_vision()` | Alta | ✅ Done |
+| 3 | PDFs sin texto extractable devuelven `no_text` (422) en vez de `scan_ai_failed` (500) | Media | ✅ Done |
+| 4 | Agregar campo `section` al GROQ_PROMPT para recetas con secciones ("Para la masa", "Para el relleno") | Alta | ✅ Done |
+| 5 | Aclarar en GROQ_PROMPT que `quantity` puede ser texto ("al gusto"), no solo número | Alta | ✅ Done |
+| 6 | Agregar `Galletitas` a `VALID_CATEGORIES` (estaba en traducciones pero `_normalize_category` la descartaba) | Baja | ✅ Done |
+| 7 | Actualizar referencias al modelo en frontend (i18n.js, scan.html), landing page y todos los Docs | Baja | ✅ Done |
+
+**Notas técnicas:**
+- Groq retiró `llama-3.3-70b-versatile` y `llama-4-scout` de su API en agosto 2026 sin previo aviso. Todos los escaneos de PDF fallaban con 404 desde el backend.
+- El test de modelos disponibles mostró: `openai/gpt-oss-120b` (120B parámetros) como mejor opción — confirmado que devuelve JSON estructurado con secciones de ingredientes correctamente.
+- `qwen/qwen3.6-27b` fue descartado: devuelve únicamente bloques `<think>` sin JSON en el output final.
+- Los modelos `openai/gpt-oss-*` en Groq no soportan entrada de imágenes (multimodal) — la función `_call_groq_vision` intentará igualmente pero fallará con 400, cayendo al error `no_text` en lugar de `scan_ai_failed`.
+
+**Definition of Done:**
+- ✅ Escanear el PDF de Empanadas de Pollo al Verdeo devuelve receta completa con secciones "Para la masa" / "Para el relleno"
+- ✅ PDFs basados en imágenes muestran error específico, no el genérico de IA
+- ✅ Categoría Galletitas visible en el selector de categorías
+- ✅ Toda la documentación refleja `openai/gpt-oss-120b` como modelo activo
