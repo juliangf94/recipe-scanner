@@ -147,14 +147,22 @@ JSON fields:
 - "prep_time_min": preparation time in minutes (integer, 0 if not mentioned)
 - "category": pick ONE from this list that best fits, or empty string if none fit:
   Desserts, Cake, Main Course, Meat, Pasta, Chicken, Fish, Seafood, Soup,
-  Salad, Breakfast, Rice, Bread, Bakery, Vegan, Vegetarian, Appetizer,
+  Salad, Breakfast, Rice, Bread, Bakery, Galletitas, Vegan, Vegetarian, Appetizer,
   Drink, Sandwich, Snack
 - "ingredients": array of objects, each with:
-    "name" (string), "quantity" (string number), "unit" (string e.g. g, kg, ml, cup)
+    "name" (string),
+    "quantity" (string — the numeric amount, e.g. "500", "2", "1/2"; use "al gusto" if no quantity is given),
+    "unit" (string — e.g. g, kg, ml, cup, cdas, cdta, unidad; empty string if none),
+    "section" (string — the ingredient group label if the recipe has sections like
+               "Para la masa", "Para el relleno", "Salsa", etc.; empty string if no sections)
 - "steps": array of objects, each with:
     "order_num" (integer starting at 1), "description" (string)
 
-IMPORTANT: Extract real values from the recipe text. Do NOT use placeholder text.
+IMPORTANT:
+- Extract real values from the recipe text. Do NOT use placeholder text.
+- If the recipe lists ingredients under titled sections, set "section" to that section name for each ingredient.
+- If there are no sections, set "section" to "" for all ingredients.
+- "quantity" must always be a string, never null or a number type.
 
 Recipe text:
 """
@@ -205,7 +213,7 @@ class RecipeScannerFacade:
     VALID_CATEGORIES = {
         'Desserts', 'Cake', 'Main Course', 'Meat', 'Pasta', 'Chicken', 'Fish',
         'Seafood', 'Soup', 'Salad', 'Breakfast', 'Rice', 'Bread', 'Bakery',
-        'Vegan', 'Vegetarian', 'Appetizer', 'Drink', 'Sandwich', 'Snack'
+        'Galletitas', 'Vegan', 'Vegetarian', 'Appetizer', 'Drink', 'Sandwich', 'Snack'
     }
 
     @staticmethod
@@ -550,8 +558,10 @@ class RecipeScannerFacade:
         """
         text = self._extract_pdf_text(file_bytes)
         if not text.strip():
-            logging.info('No text found in PDF, falling back to vision model')
+            logging.info('No text found in PDF, trying vision model')
             data = self._call_groq_vision(file_bytes)
+            if data is None:
+                return None, 'no_text'
         else:
             data = self._call_groq(text)
 
@@ -649,7 +659,7 @@ class RecipeScannerFacade:
         return images
 
     def _call_groq_vision(self, file_bytes):
-        """Fallback for image-based PDFs: send page images to llama-4-scout."""
+        """Fallback for image-based PDFs: send page images to vision model."""
         import base64
         images = self._pdf_to_images_b64(file_bytes)
         if not images:
@@ -661,7 +671,7 @@ class RecipeScannerFacade:
         content.append({'type': 'text', 'text': GROQ_PROMPT + '\n(Extract from the images above.)'})
         try:
             response = client.chat.completions.create(
-                model='meta-llama/llama-4-scout-17b-16e-instruct',
+                model='openai/gpt-oss-120b',
                 messages=[{'role': 'user', 'content': content}],
                 temperature=0.1,
                 timeout=90,
@@ -687,7 +697,7 @@ class RecipeScannerFacade:
         try:
             logging.info('PDF text sent to Groq (first 300 chars): %s', text[:300])
             response = client.chat.completions.create(
-                model='llama-3.3-70b-versatile',
+                model='openai/gpt-oss-120b',
                 messages=[{'role': 'user', 'content': GROQ_PROMPT + text[:8000]}],
                 temperature=0.1,
                 timeout=90,
