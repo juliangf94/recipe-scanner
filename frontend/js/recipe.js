@@ -192,7 +192,7 @@ function buildBrandOptions(selectedId, ing) {
 
 function buildRecipeHeaderHtml(recipe) {
   const badges = [
-    recipe.category ? `<span class="badge badge-cat">${recipe.category}</span>` : '',
+    recipe.category ? `<span class="badge badge-cat">${tCat(recipe.category)}</span>` : '',
     currentSteps.length > 0 ? `<span class="badge badge-ai">${t('badge_ai')}</span>` : '',
   ].filter(Boolean).join('');
 
